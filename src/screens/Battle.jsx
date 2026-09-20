@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import Avatar from "../components/Avatar.jsx";
 import HeroImg from "../components/HeroImg.jsx";
+import AttackOrbFx from "../components/AttackOrbFx.jsx";
 import { heroImageFor } from "../data/heroes.js";
 import { pickHitCheer, pickHurtCheer } from "../data/cheers.js";
 import { BigWord, StarField } from "../components/Decorations.jsx";
@@ -100,10 +101,15 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   const [enemyFx, setEnemyFx] = useState(null);      // 敵の行動演出 { icon, label, color }
   const [enemyIntent, setEnemyIntent] = useState(null); // 敵の「ため」状態の予告 { text, color }
   const [charging, setCharging] = useState(false);   // ためている間のオーラ
+  const [attackFx, setAttackFx] = useState(null);
   const aiStateRef = useRef({ charged: false, superCount: 0 }); // 敵のためチャージ状態
 
   // 安定参照（タイマーから最新処理を呼ぶ）
   const lockedRef = useRef(false);
+  const heroAnchorRef = useRef(null);
+  const monsterAnchorRef = useRef(null);
+  const attackFxIdRef = useRef(0);
+  const attackImpactRef = useRef(null);
   const phaseRef = useRef("intro");
   const endedRef = useRef(false); // 勝敗確定の二重発火を防ぐ
   const tallyRef = useRef({ correct: 0, wrong: 0 }); // 学習記録用：このバトルの正解/不正解（時間切れ含む）数
@@ -186,6 +192,17 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   }
 
   const setTimerBoth = (v) => { timerRef.current = v; setTimer(v); };
+  function playAttackOrb(options, impact) {
+    const id = ++attackFxIdRef.current;
+    attackImpactRef.current = impact;
+    setAttackFx({ id, ...options });
+  }
+  function handleAttackImpact(id) {
+    if (id !== attackFxIdRef.current || endedRef.current) return;
+    const impact = attackImpactRef.current;
+    attackImpactRef.current = null;
+    impact?.();
+  }
   // バフは ref（即時参照）と state（表示）を両方更新する
   const setAtkBuffBoth = (v) => { atkBuffRef.current = v; setAtkBuff(v); };
   const setGuardBuffBoth = (v) => { guardBuffRef.current = v; setGuardBuff(v); };
@@ -375,6 +392,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       // カットイン演出を見せてから着弾させる（倒した瞬間の余韻を出す）
       setTimeout(() => {
         if (endedRef.current) return;
+        playAttackOrb({ strong: true }, () => {
         setMonState("damage"); setAnimKey((k) => k + 1);
         setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
         setShowRing(true); setTimeout(() => setShowRing(false), 700);
@@ -390,6 +408,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
           if (nv <= 0) setTimeout(triggerWin, 800);
           else setTimeout(() => setMonState("idle"), 700);
           return nv;
+        });
         });
       }, 1500);
     }
@@ -801,6 +820,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       setShowRing(true); setTimeout(() => setShowRing(false), 700);
       setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340); // 自キャラ前のめり
       setCheer({ text: pickHitCheer({ streak: newCombo }), hurt: false, key: ++cheerKey.current });
+      playAttackOrb({ strong: crit || doubled || newCombo >= 3 || dmg >= baseDmg * 2 }, () => {
       setMonState("damage"); setAnimKey((k) => k + 1);
       // バリア／みがわり：あればダメージを肩代わりする
       let toHp = dmg, absorbed = 0;
@@ -833,6 +853,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         if (nv <= 0) setTimeout(triggerWin, 350);
         else setTimeout(() => { setMonState("idle"); allyFollowUp(); }, 700); // 主人公→仲間の追撃→次の問題
         return nv;
+      });
       });
     } else {
       sfx.wrong();
@@ -950,6 +971,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
             <div key={cheer.key} className={"bt-cheer" + (cheer.hurt ? " hurt" : "")}>{cheer.text}</div>
           )}
           {/* 自分のキャラ（立ち絵）：左下。正解で前のめり／被ダメでのけぞり＋赤フラッシュ */}
+          <div ref={heroAnchorRef} className="bt-hero-anchor">
           {heroImageFor(player.avatar) && (
             <HeroImg
               src={heroImageFor(player.avatar)} alt="あなた"
@@ -960,8 +982,9 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
               }}
             />
           )}
+          </div>
           {/* 敵モンスター＋戦闘演出（右側にまとめて配置） */}
-          <div className="bt-mon">
+          <div ref={monsterAnchorRef} className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && (
@@ -985,6 +1008,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
               </div>
             )}
           </div>
+          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} />
         </div>
 
         {/* プレイヤー（自分のHP）：ステージ直下に配置 */}

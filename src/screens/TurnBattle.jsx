@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import Avatar from "../components/Avatar.jsx";
 import HeroImg from "../components/HeroImg.jsx";
+import AttackOrbFx from "../components/AttackOrbFx.jsx";
 import { heroImageFor } from "../data/heroes.js";
 import { BigWord, StarField } from "../components/Decorations.jsx";
 import MathText from "../components/MathText.jsx";
@@ -115,6 +116,7 @@ export default function TurnBattle({
   const [hurt, setHurt] = useState(false);
   const [heroAtk, setHeroAtk] = useState(false);
   const [charging, setCharging] = useState(false);
+  const [attackFx, setAttackFx] = useState(null);
   const [enemyIntent, setEnemyIntent] = useState(null); // { text, color }
   const [enemyFx, setEnemyFx] = useState(null);         // { icon, label, color }
   const [skillFx, setSkillFx] = useState(null);         // { name, icon, color, big }
@@ -138,6 +140,10 @@ export default function TurnBattle({
   const tallyRef = useRef({ correct: 0, wrong: 0 });
   const bpDeltaRef = useRef(0);          // このバトル中の正解-不正解の差分（companion戦のBP増減用）
   const inputRef = useRef(null);
+  const heroAnchorRef = useRef(null);
+  const monsterAnchorRef = useRef(null);
+  const attackFxIdRef = useRef(0);
+  const attackImpactRef = useRef(null);
   // プレイヤーの状態異常・バフ
   const sleepRef = useRef(0);            // 睡眠 残ターン
   const poisonRef = useRef(0);           // 毒 残ターン
@@ -172,6 +178,17 @@ export default function TurnBattle({
     onDex?.(monster.id, { moves: { ...dexMovesRef.current }, defeated: !!defeated });
   }
   const setTimerBoth = (v) => { timerRef.current = v; setTimer(v); };
+  function playAttackOrb(options, impact) {
+    const id = ++attackFxIdRef.current;
+    attackImpactRef.current = impact;
+    setAttackFx({ id, ...options });
+  }
+  function handleAttackImpact(id) {
+    if (id !== attackFxIdRef.current || endedRef.current) return;
+    const impact = attackImpactRef.current;
+    attackImpactRef.current = null;
+    impact?.();
+  }
   function changeSp(nv) {
     const v = Math.max(0, Math.min(TURN_SP_MAX, nv));
     spRef.current = v; setSp(v); onSpChange?.(v);
@@ -359,6 +376,8 @@ export default function TurnBattle({
       return;
     }
     if (isUlt) { sfx.skill({ ult: true }); setSkillFx({ name: ultimateDef.name, icon: ultimateDef.icon, color: ultimateDef.color || "#f472b6", big: true }); setTimeout(() => setSkillFx(null), 1400); }
+    setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340);
+    playAttackOrb({ strong: isUlt || dmg >= baseDmg * 2 }, () => {
     setMonState("damage"); setAnimKey((k) => k + 1);
     setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
     setLog(isUlt ? `${ultimateDef.icon} ${ultimateDef.name}さくれつ！ ${dmg}ダメージ！` : `⚔️ こうげき！ ${dmg}ダメージ！`);
@@ -388,6 +407,7 @@ export default function TurnBattle({
     if (nv <= 0) { setTimeout(triggerWin, 700); return; }
     checkBossPhase(nv);
     setTimeout(() => { setMonState("idle"); if (!endedRef.current) enemyPhase(); }, 800);
+    });
   }
 
   function applySkill(skill) {
@@ -782,11 +802,11 @@ export default function TurnBattle({
 
         {/* 舞台 */}
         <div className="bt-stage">
-          {heroImageFor(player.avatar) && (
-            <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (hurt ? " hit" : "")}
-              style={{ position: "absolute", left: 0, bottom: -8, height: 150, width: "auto", maxWidth: "44%", objectFit: "contain", zIndex: 3, pointerEvents: "none" }} />
-          )}
-          <div className="bt-mon">
+          <div ref={heroAnchorRef} className="bt-hero-anchor">
+            {heroImageFor(player.avatar) && <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (hurt ? " hit" : "")}
+              style={{ position: "absolute", left: 0, bottom: -8, height: 150, width: "auto", maxWidth: "44%", objectFit: "contain", zIndex: 3, pointerEvents: "none" }} />}
+          </div>
+          <div ref={monsterAnchorRef} className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && <div className="bt-enemy-fx" style={{ "--ec": enemyFx.color }}><span className="ic">{enemyFx.icon}</span><span className="nm">{enemyFx.label}</span></div>}
@@ -800,6 +820,7 @@ export default function TurnBattle({
               </div>
             )}
           </div>
+          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} />
         </div>
 
         {/* プレイヤーHP */}
