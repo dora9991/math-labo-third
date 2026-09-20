@@ -61,7 +61,7 @@ export default function Login({ onDone }) {
     <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh", padding: 20 }}>
       <form onSubmit={submit} className="glass" style={{ width: "100%", maxWidth: 360, padding: "26px 22px", textAlign: "center" }}>
         <div style={{ fontSize: 30 }}>📐</div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", margin: "2px 0 2px" }}>数学ラボ2</div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", margin: "2px 0 2px" }}>数学ラボ3</div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)", marginBottom: 18 }}>
           {isRegister ? "新規登録：IDと合言葉を決めよう" : remembered ? "おかえりなさい！" : "ログインして はじめよう"}
         </div>

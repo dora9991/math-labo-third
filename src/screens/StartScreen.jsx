@@ -15,12 +15,12 @@ export default function StartScreen({ onStart }) {
     onStart();         // オープニング映像へ
   }
   return (
-    <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
+    <div className="app launch-screen" style={{ alignItems: "center", justifyContent: "center" }}>
       <MathBackdrop />
-      <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: 24 }}>
+      <div className="launch-card" style={{ position: "relative", zIndex: 1, textAlign: "center", padding: 24 }}>
         <div style={{ fontSize: 56, marginBottom: 6 }}>📐</div>
         <div style={{ fontFamily: "'M PLUS Rounded 1c',sans-serif", fontSize: 40, fontWeight: 900, background: "linear-gradient(90deg,#818cf8,#c084fc,#38bdf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: 2 }}>
-          数学ラボ2
+          数学ラボ3
         </div>
         <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 6, marginBottom: 30 }}>MATH LAB</div>
         <button

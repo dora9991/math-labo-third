@@ -12,7 +12,7 @@ export default function Header({ player, back, onBack }) {
   const pct = total > 0 ? Math.min(100, (cleared / total) * 100) : 0;
   return (
     <div className="hdr">
-      <span className="logo">📐 数学ラボ2</span>
+      <span className="logo">✦ 数学ラボ3</span>
       <div className="hdr-r">
         {back ? (
           <button className="back-btn" onClick={onBack}>← {back}</button>

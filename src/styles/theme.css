@@ -242,6 +242,137 @@ body { font-family: 'Zen Kaku Gothic New', sans-serif; background: #0f0f1a; }
 @keyframes ctaPulse { 0%, 100% { box-shadow: 0 10px 30px rgba(99,102,241,.5); } 50% { box-shadow: 0 12px 46px rgba(168,85,247,.85); } }
 @keyframes ctaShine { 0% { left: -60%; } 55%, 100% { left: 130%; } }
 
+/* ============================================================
+   Math Lab 3 / Celestial circuit design system
+   The rules below intentionally sit last: screens retain their learning
+   logic while their many existing cards and inline controls share one skin.
+   ============================================================ */
+:root {
+  --ml-ink: #05091d;
+  --ml-night: #0a1231;
+  --ml-panel: rgba(13, 28, 76, .76);
+  --ml-panel-strong: rgba(12, 23, 63, .93);
+  --ml-line: rgba(171, 220, 255, .38);
+  --ml-text: #f5f8ff;
+  --ml-muted: #bed0f3;
+  --ml-cyan: #78e7ff;
+  --ml-violet: #a995ff;
+  --ml-gold: #ffdc84;
+  --ml-green: #72e5b2;
+  --ml-danger: #ff9bb2;
+  --ml-radius: 18px;
+  --ml-shadow: 0 16px 40px rgba(1, 5, 26, .38), inset 0 1px rgba(255, 255, 255, .14);
+}
+
+html { min-height: 100%; background: var(--ml-ink); }
+body { min-height: 100%; color: var(--ml-text); background: var(--ml-ink); font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif; }
+button, input, select, textarea { font: inherit; }
+button { min-height: 44px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--ml-cyan); outline-offset: 3px;
+}
+
+.app:not(.battle-app) {
+  isolation: isolate; position: relative;
+  background:
+    radial-gradient(ellipse 78% 46% at 50% -10%, rgba(79, 141, 255, .34), transparent 67%),
+    radial-gradient(circle at 10% 80%, rgba(109, 75, 211, .22), transparent 31%),
+    linear-gradient(155deg, #101d52 0%, #0b1437 47%, #050a20 100%);
+  color: var(--ml-text);
+}
+.app:not(.battle-app)::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .6;
+  background-image: linear-gradient(rgba(137, 205, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(137, 205, 255, .035) 1px, transparent 1px);
+  background-size: 38px 38px; mask-image: linear-gradient(to bottom, #000, transparent 88%);
+}
+.content { max-width: 760px; padding: clamp(15px, 3vw, 28px); }
+.content > * { position: relative; }
+
+.hdr {
+  min-height: 64px; padding: 9px clamp(12px, 3vw, 32px); border-bottom: 1px solid var(--ml-line);
+  background: linear-gradient(180deg, rgba(5, 12, 42, .94), rgba(9, 22, 62, .72));
+  box-shadow: 0 5px 24px rgba(0, 0, 0, .24); backdrop-filter: blur(16px);
+}
+.logo { font-family: 'M PLUS Rounded 1c', sans-serif; font-size: clamp(15px, 2.5vw, 19px); letter-spacing: .06em;
+  background: linear-gradient(90deg, #fff, #9cefff 55%, #d8c4ff); -webkit-background-clip: text; background-clip: text; }
+.chip { min-height: 30px; padding: 5px 9px; border: 1px solid rgba(197, 225, 255, .35); background: rgba(11, 24, 69, .72) !important; color: var(--ml-text); box-shadow: inset 0 1px rgba(255,255,255,.11); }
+.cc { color: var(--ml-gold); }.cs { color: #ffbc86; }.cx { color: var(--ml-cyan); }.xpt { color: var(--ml-muted); }
+.xpm { background: rgba(166, 203, 255, .2); }
+
+.glass, .nb-item {
+  border: 1px solid var(--ml-line); border-radius: var(--ml-radius);
+  background: linear-gradient(135deg, rgba(25, 49, 119, .78), rgba(31, 20, 83, .69));
+  box-shadow: var(--ml-shadow); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+}
+.glass { padding: clamp(14px, 2.5vw, 20px); }
+.slbl { color: var(--ml-gold); font-size: 11px; letter-spacing: .12em; }
+.pg-ttl { font-size: clamp(21px, 4vw, 28px); letter-spacing: .025em; text-shadow: 0 2px 14px rgba(112, 207, 255, .22); }
+.pg-sub { color: var(--ml-muted); font-size: 13px; line-height: 1.6; }
+.back-btn, .title-link {
+  min-height: 40px; border: 1px solid var(--ml-line) !important; color: var(--ml-text) !important;
+  background: rgba(15, 33, 90, .75) !important; box-shadow: inset 0 1px rgba(255,255,255,.12);
+}
+.back-btn:hover, .title-link:hover { background: rgba(46, 80, 165, .72) !important; }
+
+/* Primary choices, unit cards, and legacy inline action tiles */
+.mode-card, .chap-card, .lv-card {
+  min-height: 74px; border: 1px solid rgba(191, 223, 255, .5); box-shadow: var(--ml-shadow);
+  background: linear-gradient(135deg, rgba(37, 75, 163, .92), rgba(81, 47, 156, .9));
+}
+.mode-card { min-height: 132px; }
+.mode-card:hover, .chap-card:hover, .lv-card:hover { filter: brightness(1.15); box-shadow: 0 18px 34px rgba(3,8,35,.42), 0 0 0 1px rgba(160,231,255,.36); }
+.chap-em, .lv-em { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.13); }
+.chap-sub { color: #dae7ff; }
+.easy-bg { background: linear-gradient(135deg, #176b75, #24559e); }.std-bg { background: linear-gradient(135deg, #4c439d, #7545b4); }.adv-bg { background: linear-gradient(135deg, #8c396e, #8e4d30); }
+
+.content button[style*="linear-gradient"], .content button[style*="rgba("] {
+  box-shadow: 0 8px 22px rgba(2, 7, 34, .28), inset 0 1px rgba(255,255,255,.14);
+}
+.content button:hover:not(:disabled) { filter: brightness(1.13); transition: transform .18s ease, filter .18s ease, box-shadow .18s ease; }
+.content button:hover:not(:disabled) { transform: translateY(-2px); }
+.content button:disabled { opacity: .52; }
+
+/* Practice and result surfaces stay bright for calculation clarity. */
+.qcard, .res-card {
+  border: 1px solid rgba(184, 220, 255, .8); background: linear-gradient(145deg, #fbfdff, #eaf2ff);
+  box-shadow: 0 18px 42px rgba(1, 6, 31, .45), inset 0 1px #fff;
+}
+.q-pill, .ok-btn, .rbtn.p { background: linear-gradient(135deg, #347fdf, #744bd1); box-shadow: 0 7px 16px rgba(62, 80, 190, .28); }
+.q-text, .stat-n { color: #17265b; }.choice-btn { min-height: 58px; border-color: #638edc; background: linear-gradient(145deg, #f6f9ff, #d9e7ff); color: #17265b; box-shadow: 0 4px 0 #b7cef8, 0 8px 16px rgba(24, 46, 105, .12); }
+.choice-btn:hover:not(:disabled) { background: linear-gradient(145deg, #e9f4ff, #cedfff); }
+.ans-in { min-height: 48px; border-color: #b7cbed; }.ans-in:focus { border-color: #4ca5ed; box-shadow: 0 0 0 3px rgba(93, 198, 255, .2); }
+.rbtn { min-height: 46px; }.rbtn.s { background: #eaf1ff; color: #314879; }
+
+.bubble-ico { background: linear-gradient(135deg, #58d4f4, #7665dc); box-shadow: 0 0 18px rgba(104, 220, 255, .38); }
+.bubble-txt { border: 1px solid rgba(154, 206, 255, .6); box-shadow: 0 7px 18px rgba(1, 8, 35, .25); }
+.deco-layer { opacity: .48; mix-blend-mode: screen; }.deco-blob { filter: blur(70px); opacity: .26; }.deco-sym { opacity: .13; color: #b7eaff; }
+.mute-btn { width: 46px; height: 46px; border-color: var(--ml-line); background: rgba(9, 20, 57, .84); box-shadow: var(--ml-shadow); }
+
+/* Teacher mode, dialogs and data-heavy screens */
+.content [style*="background: \"#"] { box-shadow: inset 0 1px rgba(255,255,255,.1); }
+[style*="position: fixed"][style*="zIndex"] > .glass { border-color: rgba(170, 224, 255, .66); }
+
+/* Standalone launch/title scenes */
+.launch-screen { overflow: hidden; }
+.launch-screen::after { content: ''; position: absolute; width: min(78vw, 570px); aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(133, 225, 255, .27); box-shadow: 0 0 0 44px rgba(118, 112, 255, .045), 0 0 80px rgba(103, 187, 255, .3); animation: orbitBreathe 5s ease-in-out infinite; }
+.launch-card { min-width: min(92vw, 410px); border: 1px solid rgba(189, 226, 255, .4); border-radius: 28px; background: linear-gradient(145deg, rgba(24, 46, 111, .67), rgba(33, 19, 81, .62)); box-shadow: var(--ml-shadow); backdrop-filter: blur(15px); }
+.launch-card button { min-height: 58px; border: 1px solid rgba(212, 241, 255, .55) !important; box-shadow: 0 12px 28px rgba(44, 110, 231, .38) !important; }
+.title-art { background: #07112e !important; }
+.title-art::before { display: none; }
+.title-sky { background: radial-gradient(ellipse at 50% 36%, rgba(110, 227, 255, .36) 0 4%, rgba(87, 100, 245, .22) 20%, transparent 46%), radial-gradient(circle at 18% 25%, rgba(172, 119, 255, .28), transparent 28%), radial-gradient(circle at 80% 76%, rgba(68, 177, 255, .22), transparent 30%), linear-gradient(160deg, #17265b 0%, #0a1640 46%, #050a20 100%); }
+.title-sky::before { content: ''; position: absolute; inset: 0; opacity: .6; background-image: radial-gradient(circle, #dff8ff 0 1px, transparent 1.5px), radial-gradient(circle, #d9ceff 0 1px, transparent 1.5px); background-size: 53px 53px, 89px 89px; background-position: 0 0, 23px 42px; }
+.title-sky::after { content: ''; position: absolute; left: 50%; top: 47%; width: min(70vw, 420px); aspect-ratio: 1; transform: translate(-50%, -50%); border: 1px solid rgba(147, 239, 255, .5); border-radius: 50%; box-shadow: 0 0 0 16px rgba(149, 140, 255, .07), 0 0 0 45px rgba(116, 203, 255, .035), 0 0 65px rgba(97, 195, 255, .46); }
+@keyframes orbitBreathe { 0%,100% { transform: scale(.93); opacity:.62; } 50% { transform: scale(1.06); opacity:1; } }
+
+@media (max-width: 560px) {
+  .hdr { min-height: 58px; }.hdr-r { gap: 4px; }.chip { padding: 4px 6px; }.chip.cs { display: none; }
+  .content { padding: 14px 12px 22px; }.mode-grid { gap: 9px; }.mode-card { min-height: 118px; }
+  .pg-ttl { font-size: 21px; }.choices-grid, .stats-grid { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
 /* ===== ガチャ演出（マシン登場→回す→カプセル→ピカーン→GET!） ===== */
 .gacha-ov { position: fixed; inset: 0; z-index: 240; display: flex; align-items: center; justify-content: center;
   background: radial-gradient(circle at 50% 40%, rgba(40,20,70,.78), rgba(8,5,16,.92)); }

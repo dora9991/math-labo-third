@@ -290,6 +290,42 @@
   100% { opacity: 0; transform: translate(-50%,-50%) scale(1.08); }
 }
 
+/* ===== Math Lab 3: Astral observatory battle skin ===== */
+.battle-app {
+  background:
+    radial-gradient(ellipse at 50% 22%, rgba(84, 163, 255, .35), transparent 37%),
+    radial-gradient(circle at 82% 18%, rgba(191, 135, 255, .18), transparent 22%),
+    linear-gradient(180deg, #101a4d 0%, #091333 56%, #05091b 100%) !important;
+  color: #eef6ff !important; font-family: 'Zen Kaku Gothic New', sans-serif !important;
+}
+.battle-app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .38;
+  background-image: linear-gradient(rgba(116, 211, 255, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(116, 211, 255, .06) 1px, transparent 1px);
+  background-size: 42px 42px; mask-image: linear-gradient(to bottom, #000, transparent 86%); }
+.battle-stars { opacity: .9; }.bstar { background: #d9f8ff; box-shadow: 0 0 7px #8deaff; }
+.battle-ground { height: 86px; border-top: 1px solid rgba(126, 220, 255, .4); background: linear-gradient(180deg, rgba(22, 48, 106, .45), rgba(4, 9, 30, .94)); }
+.battle-ground::before { height: 1px; top: -1px; background: linear-gradient(90deg, transparent, #8deaff, #b7a1ff, #8deaff, transparent); }
+.bt-moon { background: radial-gradient(circle at 35% 35%, #fff, #aeeeff 52%, #8295ed); box-shadow: 0 0 48px 10px rgba(127, 222, 255, .36); }
+.bt-hills { opacity: .22; filter: hue-rotate(165deg) saturate(.65); }
+.battle-content { max-width: 700px; padding: clamp(10px, 2.4vw, 20px); gap: 10px; }
+.bt-panel, .bt-q-panel, .bt-skill-bar {
+  border: 1px solid rgba(169, 218, 255, .55) !important; border-radius: 15px !important;
+  background: linear-gradient(135deg, rgba(13, 34, 88, .91), rgba(35, 19, 86, .84)) !important;
+  box-shadow: 0 12px 28px rgba(1, 5, 28, .39), inset 0 1px rgba(255,255,255,.13) !important;
+  backdrop-filter: blur(13px);
+}
+.bt-enemy-name { color: #e6dcff; font-family: 'M PLUS Rounded 1c', sans-serif; letter-spacing: .08em; }
+.bt-enemy-theme, .bt-hp-label, .bt-q-theme { color: #bfd3ff; }.bt-hp-num, .bt-player-name, .bt-log { color: #f3f8ff; }
+.bt-hp-track, .bt-timer-track { border-color: rgba(174, 217, 255, .43); border-radius: 99px; background: #071131; }
+.bt-hp-fill { box-shadow: 0 0 11px currentColor; }.bt-stage { height: 225px; }
+.bt-stage::before { content: ''; position: absolute; width: min(65vw, 330px); height: 76px; bottom: 14px; border-radius: 50%; background: radial-gradient(ellipse, rgba(102, 229, 255, .4), rgba(111, 100, 255, .12) 48%, transparent 70%); filter: blur(4px); }
+.bt-q-text { color: #fff; font-size: clamp(19px, 3.5vw, 25px); }.bt-choice { min-height: 58px; border: 1px solid rgba(190, 221, 255, .68); border-radius: 12px; color: #f8fbff; background: linear-gradient(135deg, rgba(52, 88, 184, .96), rgba(78, 42, 154, .96)); box-shadow: inset 0 1px rgba(255,255,255,.15), 0 4px 10px rgba(0,0,0,.16); }
+.bt-choice:hover:not(:disabled) { background: linear-gradient(135deg, #4f8ce8, #8b5cdf); box-shadow: 0 0 20px rgba(111, 232, 255, .48); transform: translateY(-2px); }
+.bt-choice.correct { background: linear-gradient(135deg, #16776f, #237f66); border-color: #8affd5; }.bt-choice.wrong { background: linear-gradient(135deg, #9c3a62, #753052); border-color: #ffb1c6; }
+.bt-skill-btn { min-height: 44px; border: 1px solid rgba(172, 209, 255, .42); border-radius: 11px; background: rgba(15, 31, 86, .85); color: #d2e0ff; }.bt-sp-cell { background: #0a1741; border-color: #485a9d; border-radius: 5px; }.bt-sp-cell.on { background: linear-gradient(180deg, #a7f5ff, #6d8fff); border-color: #c1f8ff; }.bt-combo { color: #ffe495; }
+.bt-select-mini { border-color: rgba(157, 218, 255, .5); border-radius: 14px; background: rgba(6, 19, 57, .7); }.bt-select-stat { background: rgba(161, 212, 255, .13); color: #dceaff; }
+.correct-ring { border-color: #80efff; box-shadow: 0 0 30px #68e5ff, 0 0 70px #8c72ff, inset 0 0 28px #6be7ff; }.correct-flash { background: radial-gradient(circle, rgba(126,235,255,.36), transparent 63%); }
+@media (max-width:560px) { .bt-stage { height: 178px; }.battle-content { padding: 9px; }.bt-choice { min-height: 54px; } }
+
 /* アイテムスロット（1つだけ） */
 .bt-item-row { margin-top: 2px; }
 .bt-item-btn {

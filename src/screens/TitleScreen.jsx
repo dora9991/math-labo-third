@@ -8,7 +8,6 @@
 import { useEffect, useRef } from "react";
 import * as bgm from "../audio/bgm.js";
 
-const BG = import.meta.env.BASE_URL + "title-bg.jpg";
 
 // 画像のすき間（左右の暗い帯）に淡く漂わせる数式シンボル
 const GLYPHS = [
@@ -50,7 +49,7 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
       `}</style>
 
       {/* 背景アート */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0, backgroundImage: `url(${BG})`, backgroundSize: "cover", backgroundPosition: "center top", backgroundColor: "#0a0820" }} />
+      <div className="title-sky" style={{ position: "absolute", inset: 0, zIndex: 0 }} />
       {/* 読みやすさ用スクリム（上＝タイトル下＝ボタンを少し暗く、中央のリングは見せる） */}
       <div style={{ position: "absolute", inset: 0, zIndex: 1,
         background: "linear-gradient(180deg, rgba(8,6,26,.62) 0%, rgba(8,6,26,.12) 22%, rgba(8,6,26,0) 46%, rgba(8,6,26,.35) 74%, rgba(6,4,20,.88) 100%)" }} />
@@ -82,7 +81,7 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
           <div style={{ fontSize: 46, fontWeight: 900, letterSpacing: 1, color: "#f5f7ff", lineHeight: 1.1,
             WebkitTextStroke: "1.5px rgba(6,4,20,.92)", paintOrder: "stroke fill",
             textShadow: "0 2px 4px rgba(0,0,0,.95), 0 0 16px rgba(125,211,252,.7), 0 0 28px rgba(167,139,250,.55)",
-            animation: "titleGlow 4s ease-in-out infinite" }}>数学ラボ2</div>
+            animation: "titleGlow 4s ease-in-out infinite" }}>数学ラボ3</div>
           <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 3, color: "#cbd5ff", marginTop: 4, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>～ MATH LAB ～</div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: "#dbeafe", marginTop: 8, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>解いて、戦って、レベルアップ！</div>
         </div>
