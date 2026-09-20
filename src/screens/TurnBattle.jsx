@@ -723,14 +723,14 @@ export default function TurnBattle({
     return (
       <div className="battle-app">
         <StarField /><div className="bt-moon" /><div className="battle-ground" />
-        <div className="battle-content" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-          <div style={{ fontSize: 64 }}>{win ? "🎉" : "💀"}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: win ? "#7fff7f" : "#ff6b6b", textShadow: win ? "0 0 18px #00ff88" : "none" }}>{win ? "勝利！" : "敗北…"}</div>
-          <div style={{ fontSize: 13, color: "#cceebb", margin: "6px 0 14px" }}>{win ? `${monster.name} をたおした！ 💰+${monster.reward} を獲得！` : `${monster.name} に やられてしまった…`}</div>
+        <div className="battle-content battle-result" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+          {win && <><div className="victory-confetti" aria-hidden>{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</div><div className="victory-banner">VICTORY<span>MISSION CLEAR</span></div></>}
+          <div className="battle-result__icon">{win ? "✦" : "☠"}</div><div className="battle-result__title">{win ? "勝利！" : "敗北…"}</div>
+          <div className="battle-result__text">{win ? `${monster.name} をたおした！ 💰+${monster.reward} を獲得！` : `${monster.name} に やられてしまった…`}</div>
           {win ? (
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="bt-choice" style={{ padding: "12px 18px" }} onClick={onExit}>👾 相手を選ぶ</button>
-              <button className="bt-choice" style={{ padding: "12px 18px", borderColor: "#7fff7f" }} onClick={() => onResult("retry")}>🔁 もう一度</button>
+            <div className="battle-result__actions">
+              <button className="bt-choice" onClick={onExit}>相手を選ぶ</button>
+              <button className="bt-choice is-result-main" onClick={() => onResult("retry")}>もう一度</button>
             </div>
           ) : (<div style={{ fontSize: 13, color: "#cceebb", fontWeight: 700 }}>メニューにもどります…</div>)}
         </div>

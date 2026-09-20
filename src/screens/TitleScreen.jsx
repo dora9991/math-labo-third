@@ -91,10 +91,7 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
         <div style={{ height: "13vh", minHeight: 70, maxHeight: 150 }} />
 
         {/* 下部：祭壇の上にボタン */}
-        <button onClick={onEnter} style={{
-          width: "100%", maxWidth: 300, padding: "15px 18px", borderRadius: 16, cursor: "pointer", border: "2px solid rgba(255,255,255,.3)",
-          fontSize: 18, fontWeight: 900, color: "#fff", background: "linear-gradient(135deg,#6366f1,#a855f7)",
-          animation: "ctaPulse 2.6s ease-in-out infinite" }}>▶ はじめる</button>
+        <button onClick={onEnter} className="game-btn game-btn--gold title-start-v3"><span className="game-btn__bevel" /><span className="game-btn__shine" /><span className="game-btn__spark game-btn__spark--a">✦</span><span className="game-btn__label"><b>冒険をはじめる</b><small>TOUCH TO START</small></span></button>
 
         <div style={{ display: "flex", gap: 10, marginTop: 12, width: "100%", maxWidth: 300 }}>
           {onHowTo && <button className="title-link" style={{ flex: 1, backdropFilter: "blur(4px)", background: "rgba(15,18,38,.55)" }} onClick={onHowTo}>📖 遊び方</button>}
