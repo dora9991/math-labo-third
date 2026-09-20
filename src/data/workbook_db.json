@@ -1,0 +1,101 @@
+{
+  "_meta": {
+    "title": "ワークブック取り込みデータベース（中1 数学 / チャレンジ編＋確認問題）",
+    "source": "IMG_3760〜IMG_3780（21枚）",
+    "note": "このゲームは答えが数値の問題のみ自動採点できる。numeric=true のものは challenge.js / 問題バンクに組み込み可能。numeric=false（文字式・作図・グラフ・図形・文章で式を答える等）は現状スキップし、ここに記録だけ残す。",
+    "legend": {
+      "up": "緑の上向き矢印（発展）バッジが付いた問題 → チャレンジ問題候補",
+      "numeric": "数値で答えられる（ゲーム組み込み可）",
+      "status": "added=challenge.jsに追加済 / candidate=数値だが未追加 / skip=非数値でスキップ / dup=基礎計算で既存DBと重複"
+    }
+  },
+
+  "challenge_edition": {
+    "c1": {
+      "name": "正の数と負の数",
+      "green_up_numeric": [
+        { "id": "c1up1", "q": "-2.5+(-7)+1.6-(-3.1)-8.4", "ans": -13.2, "numeric": true, "up": true, "status": "added" },
+        { "id": "c1up2", "q": "7-{(1-3)^2*2+6}÷2", "ans": 0, "numeric": true, "up": true, "status": "added" },
+        { "id": "c1up3", "q": "9×259-9×220-9×(-61)（くふうして計算）", "ans": 900, "numeric": true, "up": true, "status": "added" },
+        { "id": "c1up4", "q": "(-4)×10÷(-12)×4÷(-5)", "ans": "-8/3", "numeric": true, "up": true, "status": "added" }
+      ],
+      "skipped_or_dup": [
+        { "topic": "絶対値・大小・加減・乗除の基本計算（力をつけよう 1〜7）", "numeric": true, "status": "dup", "note": "既存の問題バンク・自動生成でカバー済み" },
+        { "topic": "素因数分解・集合・正負の利用・魔方陣（力をのばそう 8〜13）", "numeric": "mixed", "status": "skip", "note": "表・魔方陣など図/表が必要" }
+      ]
+    },
+    "c2": {
+      "name": "文字の式",
+      "green_up_numeric": [],
+      "skipped_or_dup": [
+        { "topic": "文字式の表し方・加減・乗除・分配（力をつけよう 1〜5、緑UP含む）", "numeric": false, "status": "skip", "note": "答えが式（例 14x+7, (8x+5)/3-(7x-9)/6）。数値判定不可" },
+        { "topic": "式の値（代入）2", "numeric": true, "status": "candidate", "note": "a=-2,b=3 等で 5a-2b, 2a^2-3a+1, 4a+b^2 → 数値。組み込み可（未追加）" },
+        { "topic": "規則性と文字式（帯の長さ 5n+2 等）", "numeric": false, "status": "skip" }
+      ]
+    },
+    "c3": {
+      "name": "1次方程式",
+      "green_up_numeric": [
+        { "id": "c3up1", "q": "(2a-1)/4 - (a+3)/4 = -1 を解く（aの値）", "ans": 0, "numeric": true, "up": true, "status": "candidate", "note": "影で読み取り不確実。再撮影で確定したい" }
+      ],
+      "skipped_or_dup": [
+        { "topic": "方程式の解き方・移項・かっこ・小数/分数係数（力をつけよう 1〜6）", "numeric": true, "status": "candidate", "note": "解xは数値。組み込み可だが既存DB(方程式)と重複多い" },
+        { "topic": "文章題：容器・過不足(150枚)・速さ・年齢（力をのばそう 10〜14）", "numeric": true, "status": "candidate", "note": "答えは数値だが式を立てる必要。チャレンジ向き。例: 過不足→袋150枚" }
+      ]
+    },
+    "c4": {
+      "name": "比例と反比例",
+      "green_up_numeric": [],
+      "skipped_or_dup": [
+        { "topic": "比例/反比例の式・値（力をつけよう 2,4,5,8）", "numeric": true, "status": "candidate", "note": "比例定数・yの値は数値。既存チャレンジc4と重複気味" },
+        { "topic": "グラフをかく・変域を不等式で表す・座標と面積（3,6,7,9,10ほか）", "numeric": false, "status": "skip", "note": "グラフ/作図/不等式・図が必要" }
+      ]
+    },
+    "c5": {
+      "name": "平面図形",
+      "green_up_numeric": [],
+      "skipped_or_dup": [
+        { "topic": "作図（直線・線分・移動・垂直二等分線・角・円・折り目）", "numeric": false, "status": "skip" },
+        { "topic": "おうぎ形の弧/面積（aπの a 値）", "numeric": true, "status": "candidate", "note": "図がなくても解ける aπ 型は数値。既存チャレンジc5に類題あり" }
+      ]
+    },
+    "c6": {
+      "name": "空間図形",
+      "green_up_numeric": [],
+      "skipped_or_dup": [
+        { "topic": "頂点/面/辺の数・回転体・投影図・作図", "numeric": "mixed", "status": "skip", "note": "図が必要" },
+        { "topic": "立体の体積/表面積（円柱・円すい・球・角すい）", "numeric": true, "status": "candidate", "note": "図が無くても解ける数値型は組み込み可。既存チャレンジc6に類題あり" }
+      ]
+    },
+    "c7": {
+      "name": "データの活用",
+      "green_up_numeric": [],
+      "skipped_or_dup": [
+        { "topic": "度数分布・ヒストグラム・相対度数・累積", "numeric": false, "status": "skip", "note": "表/グラフが必要" },
+        { "topic": "平均値・中央値・最頻値・割合", "numeric": true, "status": "candidate", "note": "数値。既存チャレンジc7でカバー" }
+      ]
+    }
+  },
+
+  "confirmation_problems": {
+    "_note": "確認問題（青ヘッダ）は基礎計算が中心で、既存の問題バンク・自動生成と内容がほぼ重複（status=dup）。重複を避けるため現状ゲームには追加していない。必要なら固定問題として追加可能。",
+    "c1": [
+      { "section": "正の符号・負の符号 / 数直線 / 大小", "type": "符号表現・数直線", "numeric": "mixed", "status": "skip", "note": "「+で表す」「数直線上の点」は4択数値に不向き" },
+      { "section": "加法・減法・小数分数・項の計算・3つ以上の項", "examples": ["(+6)+(+7)", "(-2)+(-6)", "(+12)-(+16)", "(-8/9)÷(-2/3)", "(-1.3)+(-3.1)"], "numeric": true, "status": "dup" },
+      { "section": "乗法・除法・乗除混合", "examples": ["(-4)×6÷(-8)", "(-18)÷(+6)", "6×(-3^2)", "(-5)×(-2)^3"], "numeric": true, "status": "dup" }
+    ],
+    "problem_A": {
+      "note": "問題A（基礎の応用）。計算＋簡単な文章題。",
+      "items": [
+        { "q": "8-(-4)^2÷(-1/2)", "ans": 40, "numeric": true, "status": "candidate" },
+        { "q": "5-{(-2)+8}（温度: 午前6時-3℃→午前8℃上がり正午、午後2時9℃ 等の読み取り）", "numeric": "mixed", "status": "skip", "note": "温度計の図あり" }
+      ]
+    },
+    "problem_B": {
+      "note": "問題B（思考力）。トランプの数当て・正負の利用など、図/状況説明が必要。",
+      "items": [
+        { "topic": "トランプのカードを正負で表す思考問題", "numeric": false, "status": "skip" }
+      ]
+    }
+  }
+}

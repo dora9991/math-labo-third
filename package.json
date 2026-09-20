@@ -1,0 +1,26 @@
+{
+  "name": "suugaku-labo-3",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "数学ラボ3（数学ラボ2から派生・デザイン刷新版／math-labo10を別アプリとして複製）。黒板を見ながらAI先生と発問でやり取りする（math-dialogueから派生）。",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && gh-pages -d dist",
+    "teacher": "node --env-file=.env.local scripts/teacher-server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@supabase/supabase-js": "^2.110.0",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "gh-pages": "^6.3.0",
+    "vite": "^5.4.0"
+  }
+}
