@@ -14,6 +14,8 @@ import MonsterSprite from "../components/MonsterSprite.jsx";
 import Avatar from "../components/Avatar.jsx";
 import HeroImg from "../components/HeroImg.jsx";
 import AttackOrbFx from "../components/AttackOrbFx.jsx";
+import UltimateCutIn from "../components/UltimateCutIn.jsx";
+import FxSpeedToggle from "../components/FxSpeedToggle.jsx";
 import { heroImageFor } from "../data/heroes.js";
 import { BigWord, StarField } from "../components/Decorations.jsx";
 import MathText from "../components/MathText.jsx";
@@ -31,6 +33,7 @@ import {
 import { chapterSkillTier } from "../data/chapterSkills.js";
 import { findItem, itemSummary } from "../data/items.js";
 import { findUltimate, ultimateMult } from "../data/ultimates.js";
+import { getFxSpeed, setFxSpeed } from "../engine/fxSpeed.js";
 
 // 敵の通常攻撃・連続攻撃の各発は20%の確率でかわせる（ため攻撃・必殺技は対象外＝必ず当たる）
 const DODGE_CHANCE = 0.2;
@@ -117,6 +120,8 @@ export default function TurnBattle({
   const [heroAtk, setHeroAtk] = useState(false);
   const [charging, setCharging] = useState(false);
   const [attackFx, setAttackFx] = useState(null);
+  const [ultimateCutIn, setUltimateCutIn] = useState(null);
+  const [fxSpeed, setCurrentFxSpeed] = useState(() => getFxSpeed());
   const [enemyIntent, setEnemyIntent] = useState(null); // { text, color }
   const [enemyFx, setEnemyFx] = useState(null);         // { icon, label, color }
   const [skillFx, setSkillFx] = useState(null);         // { name, icon, color, big }
@@ -144,6 +149,7 @@ export default function TurnBattle({
   const monsterAnchorRef = useRef(null);
   const attackFxIdRef = useRef(0);
   const attackImpactRef = useRef(null);
+  const launchUltimateAttackRef = useRef(null);
   // プレイヤーの状態異常・バフ
   const sleepRef = useRef(0);            // 睡眠 残ターン
   const poisonRef = useRef(0);           // 毒 残ターン
@@ -189,6 +195,7 @@ export default function TurnBattle({
     attackImpactRef.current = null;
     impact?.();
   }
+  function changeFxSpeed(speed) { setCurrentFxSpeed(setFxSpeed(speed)); }
   function changeSp(nv) {
     const v = Math.max(0, Math.min(TURN_SP_MAX, nv));
     spRef.current = v; setSp(v); onSpChange?.(v);
@@ -375,9 +382,9 @@ export default function TurnBattle({
       setTimeout(() => { if (!endedRef.current) enemyPhase(); }, 800);
       return;
     }
-    if (isUlt) { sfx.skill({ ult: true }); setSkillFx({ name: ultimateDef.name, icon: ultimateDef.icon, color: ultimateDef.color || "#f472b6", big: true }); setTimeout(() => setSkillFx(null), 1400); }
+    if (isUlt) sfx.skill({ ult: true });
     setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340);
-    playAttackOrb({ strong: isUlt || dmg >= baseDmg * 2 }, () => {
+    const launchAttack = () => playAttackOrb({ strong: isUlt || dmg >= baseDmg * 2 }, () => {
     setMonState("damage"); setAnimKey((k) => k + 1);
     setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
     setLog(isUlt ? `${ultimateDef.icon} ${ultimateDef.name}さくれつ！ ${dmg}ダメージ！` : `⚔️ こうげき！ ${dmg}ダメージ！`);
@@ -408,6 +415,8 @@ export default function TurnBattle({
     checkBossPhase(nv);
     setTimeout(() => { setMonState("idle"); if (!endedRef.current) enemyPhase(); }, 800);
     });
+    if (isUlt) { launchUltimateAttackRef.current = launchAttack; setUltimateCutIn({ id: Date.now(), def: ultimateDef }); return; }
+    launchAttack();
   }
 
   function applySkill(skill) {
@@ -741,7 +750,8 @@ export default function TurnBattle({
   if (phase === "win" || phase === "lose") {
     const win = phase === "win";
     return (
-      <div className="battle-app">
+    <div className={`battle-app fx-${fxSpeed}`}>
+      <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
         <StarField /><div className="bt-moon" /><div className="battle-ground" />
         <div className="battle-content battle-result" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
           {win && <><div className="victory-confetti" aria-hidden>{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</div><div className="victory-banner">VICTORY<span>MISSION CLEAR</span></div></>}
@@ -759,7 +769,9 @@ export default function TurnBattle({
   }
 
   return (
-    <div className={"battle-app" + (hurt ? " bt-screen-shake" : "")}>
+    <div className={`battle-app fx-${fxSpeed}` + (hurt ? " bt-screen-shake" : "")}>
+      <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
+      {ultimateCutIn && <UltimateCutIn key={ultimateCutIn.id} ultimate={ultimateCutIn.def} heroSrc={heroImageFor(player.avatar)} speed={fxSpeed} onComplete={() => { const launch = launchUltimateAttackRef.current; launchUltimateAttackRef.current = null; setUltimateCutIn(null); launch?.(); }} />}
       <div className="encounter-flash" />
       {phase === "intro" && <BigWord text="START!" color="#7fff7f" onDone={() => { phaseRef.current = "command"; startTurn(); }} />}
       <StarField /><div className="bt-moon" />
@@ -820,7 +832,7 @@ export default function TurnBattle({
               </div>
             )}
           </div>
-          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} />
+          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} fxSpeed={fxSpeed} />
         </div>
 
         {/* プレイヤーHP */}
