@@ -916,7 +916,7 @@ export default function TurnBattle({
         {/* ===== 問題フェーズ ===== */}
         {phase === "question" && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="bt-timer-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 11, color: "#88aa88" }}>のこり</span>
               <div className="bt-timer-track" style={{ flex: 1 }}>
                 <div className="bt-timer-fill" style={{ width: timePct + "%", background: timePct > 40 ? "#4ade80" : timePct > 20 ? "#fbbf24" : "#f87171" }} />
@@ -954,7 +954,7 @@ export default function TurnBattle({
                 </>
               ) : <div style={{ color: "#cceebb" }}>問題を準備中…</div>}
             </div>
-            <button onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", margin: "8px 0 0", padding: "9px", borderRadius: 11, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#fff", background: showPad ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)" }}>
+            <button className="bt-pad-toggle" onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", margin: "8px 0 0", padding: "9px", borderRadius: 11, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#fff", background: showPad ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)" }}>
               ✏️ 計算スペース{showPad ? "を閉じる" : "を開く"}
             </button>
             {showPad && <DrawPad key={q ? q.q : "pad"} height={300} />}

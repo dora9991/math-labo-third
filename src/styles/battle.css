@@ -558,3 +558,71 @@
 }
 /* バトルの応援吹き出し（自キャラの頭上） */
 .bt-cheer { left: 82px; bottom: 150px; }
+
+/* 数学ラボ3: 天文台バトル。ゲーム状態を変えず、ステージと UI のみ再構成。 */
+.battle-app { background:radial-gradient(ellipse at 50% -10%,rgba(72,108,215,.72),transparent 48%),linear-gradient(180deg,#0b1a4a 0%,#091333 48%,#050a22 100%); color:#edf6ff; font-family:'Zen Kaku Gothic New',sans-serif; }.battle-app::before { content:''; position:fixed; inset:0; pointer-events:none; background:linear-gradient(rgba(134,211,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(134,211,255,.035) 1px,transparent 1px),radial-gradient(circle at 18% 20%,#c9f5ff 0 1px,transparent 2px),radial-gradient(circle at 76% 15%,#fff 0 1px,transparent 2px); background-size:34px 34px,34px 34px,137px 131px,177px 163px; opacity:.7; }.battle-ground { height:92px; border-top:1px solid rgba(145,224,255,.32); background:linear-gradient(180deg,rgba(52,65,138,.28),rgba(3,8,31,.88)); }.battle-ground::before { background:linear-gradient(90deg,transparent,rgba(116,231,255,.42),transparent); height:2px; top:-2px; }.bt-moon { width:74px; height:74px; background:radial-gradient(circle at 37% 34%,#fff,#c9efff 48%,#7a8ee4); box-shadow:0 0 48px 13px rgba(124,221,255,.28); }.bt-hills { opacity:.25; }
+.battle-content { max-width:700px; padding:clamp(10px,2.8vw,22px); gap:11px; }.bt-panel,.bt-q-panel,.bt-skill-bar { border:1px solid rgba(170,221,255,.52)!important; border-radius:16px!important; background:linear-gradient(135deg,rgba(13,35,88,.92),rgba(46,22,103,.84))!important; box-shadow:0 13px 28px rgba(0,3,25,.35),inset 0 1px rgba(255,255,255,.13)!important; backdrop-filter:blur(12px); }.bt-enemy-name { color:#ddd2ff; font-family:'M PLUS Rounded 1c',sans-serif; letter-spacing:.08em; }.bt-enemy-theme,.bt-hp-label,.bt-q-theme { color:#bdd3ff; }.bt-hp-track,.bt-timer-track { border:1px solid rgba(176,220,255,.42); border-radius:999px; background:#071333; }.bt-hp-fill { box-shadow:0 0 11px currentColor; }.bt-hp-num,.bt-player-name,.bt-log { color:#eff7ff; }
+.bt-stage { height:230px; }.bt-stage::before { content:''; position:absolute; bottom:15px; width:min(64vw,340px); height:74px; border-radius:50%; background:radial-gradient(ellipse,rgba(104,235,255,.4),rgba(126,92,255,.13) 48%,transparent 71%); filter:blur(3px); }.bt-q-text { color:#fff; font-size:clamp(20px,3.8vw,26px); }.bt-choice { min-height:57px; border:1px solid rgba(190,226,255,.64); border-radius:13px; background:linear-gradient(135deg,rgba(49,82,171,.96),rgba(72,35,140,.96)); color:#f8fbff; box-shadow:inset 0 1px rgba(255,255,255,.14); }.bt-choice:hover:not(:disabled) { background:linear-gradient(135deg,#5789e9,#9864df); box-shadow:0 0 21px rgba(106,227,255,.5); }.bt-choice.correct { border-color:#76f3c5; background:linear-gradient(135deg,#137c70,#167b91); }.bt-choice.wrong { border-color:#ff9ab0; background:linear-gradient(135deg,#893c66,#683662); }
+.bt-select-mini { border-color:rgba(160,219,255,.52); border-radius:13px; background:rgba(7,24,67,.82); }.bt-skill-btn,.bt-item-btn { min-height:46px; border-color:rgba(172,215,255,.4); border-radius:12px; background:rgba(15,32,84,.86); color:#d9e7ff; }.bt-sp-cell { background:#081439; border-color:#4d6bb4; border-radius:5px; }.bt-sp-cell.on { background:linear-gradient(180deg,#a3f5ff,#688cff); border-color:#bcf8ff; }.bt-combo { color:#ffe18e; text-shadow:0 0 10px rgba(255,205,102,.7); }.correct-ring { border-color:#78efff; box-shadow:0 0 30px #68e5ff,0 0 70px #8c72ff,inset 0 0 28px #6be7ff; }.correct-flash { background:radial-gradient(circle,rgba(126,235,255,.36),transparent 63%); }
+@media (max-width:560px) { .bt-stage { height:184px; }.battle-content { padding:9px; } }
+
+/* ============================================================
+   Design V2 — Observatory deck.  All selectors are presentation-only:
+   battle state, numbers, controls and DOM order remain untouched.
+   ============================================================ */
+.battle-app {
+  background-image:
+    linear-gradient(180deg, rgba(3, 10, 37, .28), rgba(3, 8, 29, .83)),
+    url('/astral/battle-observatory.png');
+  background-size: cover; background-position: center; background-attachment: fixed;
+}
+.battle-app::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: .34;
+  background: radial-gradient(ellipse at 50% 56%, transparent 0 23%, rgba(5, 10, 39, .4) 71%, rgba(2, 5, 23, .76)), repeating-linear-gradient(90deg, transparent 0 68px, rgba(135, 228, 255, .045) 69px 70px); }
+.battle-stars { opacity: .72; mix-blend-mode: screen; }.bstar { box-shadow: 0 0 6px #d5f7ff; }
+.battle-ground { height: 112px; background: linear-gradient(180deg, rgba(15, 28, 73, .1), rgba(3, 8, 28, .88)); border-top-color: rgba(122, 230, 255, .42); }
+.battle-ground::before { height: 3px; background: linear-gradient(90deg, transparent, rgba(136, 237, 255, .75), transparent); box-shadow: 0 0 14px rgba(117, 228, 255, .5); }
+.bt-moon { opacity: .85; }
+.battle-content { max-width: 880px; padding: clamp(10px, 2vw, 20px); }
+.bt-panel, .bt-q-panel { position: relative; overflow: hidden; }
+.bt-panel::before, .bt-q-panel::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(120deg, rgba(255,255,255,.11), transparent 18%, transparent 76%, rgba(106, 229, 255, .1)); }
+.bt-panel > *, .bt-q-panel > * { position: relative; }
+.bt-enemy-name { text-shadow: 0 0 13px currentColor; }
+.bt-hp-track { height: 14px; box-shadow: inset 0 2px 6px rgba(0,0,0,.55); }.bt-hp-fill { position: relative; overflow: visible; }
+.bt-hp-fill::after { content: ''; position: absolute; right: 0; top: -3px; width: 5px; height: 18px; border-radius: 50%; background: #fff; filter: blur(2px); box-shadow: 0 0 12px 4px currentColor; }
+.bt-stage { border: 1px solid rgba(157, 226, 255, .26); border-radius: 22px; overflow: hidden; isolation: isolate; background: radial-gradient(ellipse at 50% 82%, rgba(91, 231, 255, .25), transparent 31%), linear-gradient(180deg, rgba(7, 17, 61, .25), rgba(3, 9, 37, .42)); }
+.bt-stage::after { content: ''; position: absolute; inset: auto -5% 0; height: 42%; z-index: -1; opacity: .6; background: linear-gradient(rgba(126, 239, 255, .22) 1px, transparent 1px), linear-gradient(90deg, rgba(126, 239, 255, .18) 1px, transparent 1px); background-size: 100% 21px, 28px 100%; transform: perspective(180px) rotateX(59deg); transform-origin: bottom; }
+.bt-mon { filter: drop-shadow(0 15px 15px rgba(1, 4, 25, .52)); }
+.bt-mon::before { content: ''; position: absolute; width: min(32vw, 210px); aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(118, 239, 255, .62); box-shadow: 0 0 0 9px rgba(126, 111, 255, .1), 0 0 32px rgba(91, 229, 255, .35), inset 0 0 22px rgba(123, 90, 255, .2); animation: astroScan 4s linear infinite; }
+.bt-mon::after { content: ''; position: absolute; width: min(36vw, 238px); height: 32px; bottom: 12%; border-radius: 50%; background: radial-gradient(ellipse, rgba(111, 236, 255, .44), transparent 68%); filter: blur(5px); z-index: -1; }
+.bt-mon img { position: relative; z-index: 1; filter: var(--monster-filter, none); }
+.bt-hero { filter: drop-shadow(0 0 11px rgba(120, 221, 255, .3)) drop-shadow(0 8px 8px rgba(0,0,0,.54)); }
+.bt-q-panel { box-shadow: 0 16px 34px rgba(0, 2, 25, .34), inset 0 1px rgba(255,255,255,.18) !important; }
+.bt-q-theme { display: inline-flex; align-items: center; gap: 5px; color: #bdeaff; font-weight: 900; letter-spacing: .06em; }.bt-q-theme::before { content: '◆'; color: #ffe18e; font-size: 9px; }
+.bt-choice { position: relative; overflow: hidden; min-height: 52px; border-width: 1px !important; }
+.bt-choice::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.2) 50%, transparent 65%); transform: translateX(-130%); transition: transform .35s ease; }
+.bt-choice:hover:not(:disabled)::after { transform: translateX(130%); }
+.bt-choice:active:not(:disabled) { transform: translateY(2px) scale(.985); filter: brightness(1.2); }
+.mon-dmg-num { font-family: 'M PLUS Rounded 1c', sans-serif; font-size: clamp(30px, 5vw, 46px); color: #fff1a6; -webkit-text-stroke: 1px #b94c7d; text-shadow: 3px 3px 0 #40153c, 0 0 18px #ff8fc9; z-index: 9; }
+.correct-ring { border-color: #fff0a4; box-shadow: 0 0 22px #fff2a0, 0 0 54px #70efff, inset 0 0 24px #a477ff; }
+@keyframes astroScan { from { transform: rotate(0deg) scale(.9); opacity: .45; } 50% { opacity: .9; } to { transform: rotate(360deg) scale(.9); opacity: .45; } }
+
+/* Wide tablets and landscape phones get a compact console: stage at left, decisions at right. */
+@media (min-width: 760px), (orientation: landscape) and (max-height: 540px) {
+  .battle-content { display: grid; grid-template-columns: minmax(300px, .92fr) minmax(350px, 1.08fr); grid-template-rows: auto minmax(154px, 1fr) auto auto; align-content: center; column-gap: 14px; row-gap: 9px; max-width: 1040px; }
+  .battle-content > .bt-panel:first-of-type { grid-column: 1; grid-row: 1; }
+  .battle-content > .bt-stage { grid-column: 1; grid-row: 2 / span 2; height: auto; min-height: 218px; }
+  .battle-content > .bt-player { grid-column: 1; grid-row: 4; }
+  .battle-content > .bt-sp { grid-column: 2; grid-row: 1; }
+  .battle-content > .bt-timer-row { grid-column: 2; }
+  .battle-content > .bt-pad-toggle { grid-column: 2; margin-top: 0 !important; }
+  .battle-content > .bt-q-panel { grid-column: 2; }
+  .battle-content > .bt-log { grid-column: 2; grid-row: 4; min-height: 0; }
+  .battle-content > .back-btn { grid-column: 1; grid-row: 5; justify-self: start; }
+  .bt-stage .bt-hero { height: min(28vh, 170px) !important; }
+  .bt-mon img, .bt-mon svg { width: min(26vw, 210px) !important; height: min(26vw, 210px) !important; }
+  .bt-choice { min-height: 48px; }
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  .battle-content { padding-top: 7px; padding-bottom: 7px; gap: 6px; }.bt-stage { min-height: 156px !important; }.bt-panel, .bt-q-panel { padding: 7px 10px !important; }.bt-q-text { margin: 3px 0 6px; font-size: 19px; }.battle-ground { height: 52px; }.bt-moon { width: 42px; height: 42px; top: 8px; right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .bt-mon::before { animation: none; } }

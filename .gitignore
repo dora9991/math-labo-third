@@ -26,3 +26,4 @@ yarn-error.log*
 
 # Supabase CLI のローカルキャッシュ（supabase link/functions deploy が作る）
 supabase/.temp/
+docs/reference-monsters/

@@ -373,6 +373,40 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
 
+/* ============================================================
+   Design V2 — Astra Observatory / a photographic academy layer
+   The image is deliberately kept behind a dark veil so text stays readable.
+   ============================================================ */
+.app:not(.battle-app) {
+  background-image:
+    linear-gradient(100deg, rgba(5, 12, 42, .93) 0%, rgba(8, 20, 62, .82) 46%, rgba(5, 9, 31, .89) 100%),
+    url('/astral/menu-academy.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+.app:not(.battle-app)::after {
+  content: ''; position: fixed; inset: 64px 0 0; pointer-events: none; z-index: -1; opacity: .75;
+  background: linear-gradient(115deg, transparent 0 20%, rgba(114, 230, 255, .08) 20.2% 20.45%, transparent 20.7% 46%, rgba(173, 137, 255, .08) 46.2% 46.45%, transparent 46.7%);
+}
+.hdr::after { content: 'ASTRA OBSERVATORY'; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(157, 226, 255, .3); color: rgba(169, 218, 255, .58); font: 800 9px/1 'M PLUS Rounded 1c', sans-serif; letter-spacing: .16em; }
+.glass { position: relative; overflow: hidden; }
+.glass::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .5; background: linear-gradient(115deg, rgba(255,255,255,.1), transparent 21%, transparent 72%, rgba(152, 227, 255, .08)); }
+.glass > * { position: relative; }
+.mode-card { position: relative; overflow: hidden; justify-content: center; text-align: left; align-items: flex-start; padding: 19px 18px; }
+.mode-card::after { content: '↗'; position: absolute; right: 13px; bottom: 10px; color: rgba(255,255,255,.58); font-size: 18px; transition: transform .2s ease; }
+.mode-card:hover::after { transform: translate(3px, -3px); }
+.mode-card .mode-icon, .mode-card > span:first-child { filter: drop-shadow(0 0 8px rgba(191, 237, 255, .6)); }
+.chap-card, .lv-card { position: relative; overflow: hidden; }
+.chap-card::after, .lv-card::after { content: ''; position: absolute; width: 74px; height: 74px; right: -24px; top: -35px; border: 1px solid rgba(178, 235, 255, .32); border-radius: 50%; box-shadow: 0 0 0 11px rgba(178, 235, 255, .06), 0 0 0 23px rgba(178, 235, 255, .04); }
+.title-sky {
+  background-image: linear-gradient(180deg, rgba(3, 9, 34, .18), rgba(3, 8, 29, .56)), url('/astral/title-sky-kingdom.png') !important;
+  background-position: center; background-size: cover;
+}
+.title-sky::before { opacity: .24; }
+.title-sky::after { border-color: rgba(230, 246, 255, .7); box-shadow: 0 0 0 16px rgba(149, 140, 255, .1), 0 0 0 45px rgba(116, 203, 255, .07), 0 0 75px rgba(97, 195, 255, .65); }
+@media (max-width: 560px) { .hdr::after { display: none; }.app:not(.battle-app) { background-attachment: scroll; } }
+
 /* ===== ガチャ演出（マシン登場→回す→カプセル→ピカーン→GET!） ===== */
 .gacha-ov { position: fixed; inset: 0; z-index: 240; display: flex; align-items: center; justify-content: center;
   background: radial-gradient(circle at 50% 40%, rgba(40,20,70,.78), rgba(8,5,16,.92)); }
@@ -434,3 +468,27 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @keyframes gachaRays { from { transform: translate(-50%,-50%) rotate(0); } to { transform: translate(-50%,-50%) rotate(360deg); } }
 @keyframes gachaGet { 0% { transform: translate(-50%,-30%) scale(0); opacity: 0; } 60% { transform: translate(-50%,-52%) scale(1.2); }
   100% { transform: translate(-50%,-50%) scale(1); opacity: 1; } }
+
+/* ========================================================================
+   数学ラボ3 / Astral Lab design system
+   学習・採点ロジックは変えず、全画面を天空の数学研究所として統一する。
+   ======================================================================== */
+:root { --lab-night:#071127; --lab-panel:rgba(12,31,76,.78); --lab-line:rgba(166,220,255,.38); --lab-line-strong:rgba(194,234,255,.66); --lab-text:#f6f9ff; --lab-muted:#c0d0ed; --lab-cyan:#7cecff; --lab-violet:#a98dff; --lab-gold:#ffdb84; --lab-radius:18px; --lab-shadow:0 16px 38px rgba(0,4,24,.36),inset 0 1px rgba(255,255,255,.13); }
+html, body { min-height:100%; background:var(--lab-night); } body { color:var(--lab-text); font-family:'Zen Kaku Gothic New','Hiragino Sans',sans-serif; } button,input,textarea,select { font:inherit; } button { min-height:44px; -webkit-tap-highlight-color:transparent; } button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid var(--lab-gold); outline-offset:3px; }
+
+/* CSSだけで星空、数式の設計図、遠くの光を描く。 */
+.app:not(.title-art) { isolation:isolate; position:relative; background:radial-gradient(circle at 14% 12%,rgba(104,212,255,.22) 0 1px,transparent 2px),radial-gradient(circle at 83% 19%,rgba(255,255,255,.7) 0 1px,transparent 2px),radial-gradient(circle at 62% 73%,rgba(162,128,255,.32) 0 1px,transparent 2px),linear-gradient(rgba(126,208,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(126,208,255,.035) 1px,transparent 1px),radial-gradient(ellipse at 50% -12%,#263f8c 0%,#13265e 28%,var(--lab-night) 74%); background-size:123px 127px,167px 149px,211px 191px,32px 32px,32px 32px,auto; color:var(--lab-text); }
+.app:not(.title-art)::after { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse at 50% 10%,transparent 20%,rgba(3,8,29,.34) 100%); }.app.title-art { background:var(--lab-night); }
+.hdr { min-height:62px; padding:9px clamp(12px,3vw,30px); border-bottom:1px solid var(--lab-line); background:linear-gradient(180deg,rgba(6,15,45,.96),rgba(10,24,64,.77)); box-shadow:0 6px 22px rgba(0,0,0,.24); backdrop-filter:blur(16px); }.logo { font-size:clamp(15px,2vw,19px); letter-spacing:.05em; background:linear-gradient(90deg,#fff,var(--lab-cyan) 58%,#d8c5ff); -webkit-background-clip:text; background-clip:text; }.chip { min-height:32px; border:1px solid rgba(190,222,255,.31); background:rgba(13,31,75,.72)!important; color:var(--lab-text); box-shadow:inset 0 1px rgba(255,255,255,.1); }.cc { color:var(--lab-gold)!important; }.cx { color:var(--lab-cyan)!important; }.cs { color:#ffc997!important; }.xpm { background:rgba(183,216,255,.18); }.xpt { color:var(--lab-muted); }
+.content { max-width:760px; padding:clamp(15px,3vw,28px); }.glass,.nb-item { border:1px solid var(--lab-line); border-radius:var(--lab-radius); background:linear-gradient(135deg,rgba(25,57,126,.82),rgba(32,20,86,.73)); box-shadow:var(--lab-shadow); backdrop-filter:blur(14px); }.glass { padding:clamp(14px,2.4vw,19px); }.slbl { color:var(--lab-gold); letter-spacing:.13em; }.pg-ttl { font-size:clamp(21px,4.3vw,29px); line-height:1.28; letter-spacing:.025em; text-shadow:0 2px 18px rgba(123,226,255,.25); }.pg-sub { color:var(--lab-muted); font-size:13px; line-height:1.65; }.back-btn,.title-link { min-height:40px; border:1px solid var(--lab-line)!important; background:rgba(15,38,89,.78)!important; color:var(--lab-text)!important; border-radius:12px; box-shadow:inset 0 1px rgba(255,255,255,.12); }.back-btn:hover,.title-link:hover { background:rgba(40,83,155,.76)!important; transform:translateY(-1px); }
+
+/* カードと CTA */
+.mode-grid { gap:13px; }.mode-card { min-height:148px; border:1px solid var(--lab-line-strong)!important; border-radius:19px; box-shadow:var(--lab-shadow); position:relative; overflow:hidden; }.mode-card::after,.chap-card::after,.lv-card::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(118deg,rgba(255,255,255,.18),transparent 38%); }.mode-card:hover,.chap-card:hover,.lv-card:hover { filter:brightness(1.12); box-shadow:0 18px 34px rgba(0,2,26,.4),inset 0 1px rgba(255,255,255,.17); }.mta { background:linear-gradient(135deg,#2456a4,#734bc4)!important; }.msl { background:linear-gradient(135deg,#156477,#277bb2)!important; }.mba { background:linear-gradient(135deg,#75438f,#345da6)!important; }.mut { background:linear-gradient(135deg,#795127,#a95d8c)!important; }.msh { background:linear-gradient(135deg,#24547e,#4d48aa)!important; }.mch,.msk { background:linear-gradient(135deg,#5c469e,#9b4db7)!important; }.chap-card,.lv-card { position:relative; overflow:hidden; min-height:78px; border:1px solid var(--lab-line)!important; box-shadow:var(--lab-shadow); background:linear-gradient(135deg,rgba(28,66,141,.88),rgba(67,37,122,.84))!important; }.chap-em,.lv-em { background:rgba(226,245,255,.14); border:1px solid rgba(220,244,255,.18); }.easy-bg { background:linear-gradient(135deg,#16646a,#268886)!important; }.std-bg { background:linear-gradient(135deg,#4059ad,#7848b9)!important; }.adv-bg { background:linear-gradient(135deg,#9e467e,#733c93)!important; }.nb-btn { min-height:48px; border-color:var(--lab-line); background:rgba(16,42,96,.68); color:var(--lab-text); border-radius:14px; }.nb-btn:hover { background:rgba(44,87,158,.72); }
+
+/* 問題・結果は明るい紙面として計算に集中できるようにする。 */
+.qcard,.res-card { border:1px solid rgba(203,237,255,.76); border-radius:21px; background:linear-gradient(145deg,#f9fcff,#e7efff); box-shadow:0 17px 40px rgba(0,3,25,.34),inset 0 1px #fff; }.qcard { padding:clamp(16px,3vw,23px); }.q-pill { background:linear-gradient(135deg,#345fd1,#8252c5); }.q-text,.stat-n { color:#182c63; }.choice-btn { min-height:58px; border-color:#4d74d9; border-radius:15px; background:linear-gradient(135deg,#f6faff,#dbe8ff); color:#15295e; box-shadow:0 4px 0 #aec8f4,0 8px 15px rgba(24,47,101,.16); }.choice-btn:hover:not(:disabled) { background:linear-gradient(135deg,#fff,#cbdcff); box-shadow:0 6px 0 #a4c2f2,0 13px 23px rgba(24,47,101,.2); }.choice-btn.correct { border-color:#159c70; background:linear-gradient(135deg,#e8fff5,#baf7db); color:#075b43; }.choice-btn.wrong { border-color:#d84d6d; background:linear-gradient(135deg,#fff0f3,#ffd0dc); color:#87213b; }.ans-in { min-height:48px; border-color:#aec5e6; background:#fff; color:#182c63; }.ans-in:focus { border-color:#547ce0; box-shadow:0 0 0 3px rgba(96,165,250,.22); }.ok-btn,.rbtn.p { min-height:48px; background:linear-gradient(135deg,#3567dc,#8652cb); box-shadow:0 8px 18px rgba(63,80,190,.32); }.rbtn.s { color:#264271; background:#dfeaff; }.stat-box { background:#eaf1ff; }.stat-l { color:#60759c; }.xp-pill { background:#fff5d8; color:#74500d; }
+
+/* インライン指定の多い各画面にも共通のガラス質を波及させる。 */
+.content button[style] { box-shadow:inset 0 1px rgba(255,255,255,.12); }.content button[style*="rgba(255,255,255,.05)"],.content button[style*="rgba(255,255,255,.06)"],.content button[style*="rgba(255,255,255,.08)"] { border-color:var(--lab-line)!important; background-color:rgba(15,38,88,.72)!important; }.content button[style*="linear-gradient"] { border-color:rgba(208,235,255,.58)!important; box-shadow:0 10px 24px rgba(0,5,35,.33),inset 0 1px rgba(255,255,255,.18)!important; }.content button:hover:not(:disabled) { transform:translateY(-2px); filter:brightness(1.1); transition:transform .16s ease,filter .16s ease,box-shadow .16s ease; }.content textarea,.content input:not(.ans-in),.content select { border-color:var(--lab-line)!important; background:rgba(7,24,66,.68)!important; color:var(--lab-text)!important; box-shadow:inset 0 1px rgba(255,255,255,.08); }
+.deco-layer { opacity:.4; mix-blend-mode:screen; }.deco-blob { filter:blur(60px); }.deco-sym { color:#bceeff; opacity:.15; }.bubble-ico { background:linear-gradient(135deg,#5bc7e9,#8f6ae0); box-shadow:0 6px 16px rgba(26,74,150,.4); }.bubble-txt { border:1px solid rgba(194,227,255,.7); box-shadow:0 9px 24px rgba(0,6,34,.3); }.bubble-txt span { color:#1b376d; }.mute-btn { width:46px; height:46px; border-color:var(--lab-line); background:rgba(9,27,70,.84); box-shadow:var(--lab-shadow); }.lvup-overlay,.gacha-ov,.bigword-overlay { background:radial-gradient(ellipse at center,rgba(89,99,220,.44),rgba(3,7,30,.9)); }.lvup-title { color:var(--lab-gold); text-shadow:0 0 28px rgba(255,218,132,.8),0 3px 0 rgba(0,0,0,.32); }.title-art::before { content:''; position:fixed; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at 50% 38%,transparent 0 26%,rgba(3,7,28,.3) 78%),linear-gradient(90deg,rgba(3,7,28,.42),transparent 28% 72%,rgba(3,7,28,.42)); }
+@media (max-width:560px) { .hdr { min-height:56px; }.chip { padding:4px 7px; }.chip.cs { display:none; }.mode-card { min-height:132px; }.content { padding:14px 12px 24px; }.pg-ttl { font-size:21px; } } @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; scroll-behavior:auto!important; transition-duration:.01ms!important; } }
