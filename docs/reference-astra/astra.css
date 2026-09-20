@@ -1,0 +1,40 @@
+/* math-world / Astra Academy art direction — designed to sit over the existing learning systems. */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap');
+
+:root { --astra-ink:#070a24; --astra-panel:rgba(10,18,61,.86); --astra-line:rgba(169,216,255,.43); --astra-cyan:#76e9ff; --astra-gold:#ffd77a; --astra-violet:#aa8cff; }
+body { background:#070a24; font-family:'Noto Sans JP','Zen Kaku Gothic New',sans-serif; }
+.app:not(.title-art) { position:relative; isolation:isolate; background:linear-gradient(180deg,rgba(5,10,39,.47),rgba(5,8,29,.91)),url('/astral/menu-academy.png') center/cover fixed !important; color:#f6f8ff; }
+.app:not(.title-art)::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(circle at 50% 15%,transparent 0 25%,rgba(6,9,37,.28) 70%),linear-gradient(0deg,rgba(4,7,29,.8),transparent 50%); }
+.deco-layer { opacity:.26; mix-blend-mode:screen; }
+.deco-blob { filter:blur(65px) !important; }
+
+.hdr { min-height:64px; padding:10px clamp(12px,3vw,28px); border-bottom:1px solid var(--astra-line); background:linear-gradient(180deg,rgba(5,8,33,.94),rgba(8,14,48,.69)); box-shadow:0 4px 20px rgba(0,0,0,.25); backdrop-filter:blur(14px); }
+.logo { font-family:Cinzel,'Noto Sans JP',sans-serif; font-size:18px; letter-spacing:.04em; background:linear-gradient(90deg,#fff,#9ceeff 58%,#d7bbff); -webkit-background-clip:text; }
+.chip { padding:5px 9px; border:1px solid rgba(192,215,255,.35); background:rgba(7,14,49,.7)!important; box-shadow:inset 0 1px rgba(255,255,255,.1); }
+.cc { color:#ffe18c!important; }.cx { color:#80ebff!important; }.cs { color:#ffc57a!important; }
+.content { max-width:720px; padding:clamp(14px,3vw,25px); }
+.glass { border:1px solid var(--astra-line); background:linear-gradient(135deg,rgba(19,34,95,.84),rgba(34,20,91,.76)); box-shadow:0 12px 30px rgba(4,8,35,.34),inset 0 1px rgba(255,255,255,.12); border-radius:18px; backdrop-filter:blur(12px); }
+.pg-ttl,.slbl { font-family:Cinzel,'Noto Sans JP',sans-serif; }.slbl { color:#ffe198; }.pg-sub { color:#c9d6fb; }
+.back-btn,.title-link { border:1px solid rgba(184,218,255,.38)!important; background:rgba(16,28,81,.78)!important; color:#eef6ff!important; box-shadow:inset 0 1px rgba(255,255,255,.1); }
+
+.mode-card { min-height:148px; border:1px solid rgba(191,221,255,.54)!important; box-shadow:0 10px 25px rgba(2,6,29,.36),inset 0 1px rgba(255,255,255,.15)!important; position:relative; overflow:hidden; }
+.mode-card::after { content:''; position:absolute; inset:0; background:linear-gradient(120deg,rgba(255,255,255,.13),transparent 36%); pointer-events:none; }
+.mta { background:linear-gradient(135deg,#214d9b,#5d46c5)!important; }.mut { background:linear-gradient(135deg,#155e76,#3347a5)!important; }.mba { background:linear-gradient(135deg,#713e94,#274f9e)!important; }.mch { background:linear-gradient(135deg,#956338,#9c3e69)!important; }.msh { background:linear-gradient(135deg,#2c438e,#5141ad)!important; }
+.mode-grid { gap:13px; }.nb-badge { background:#ff6b92!important; box-shadow:0 0 14px #ff6b92; }
+
+/* Existing inline home entry cards retain their actions; this restores one shared celestial surface. */
+.content button[style*="linear-gradient"] { border-color:rgba(222,234,255,.48)!important; box-shadow:0 9px 22px rgba(5,8,34,.35),inset 0 1px rgba(255,255,255,.16)!important; }
+.content button:hover:not(:disabled) { filter:brightness(1.12); transform:translateY(-2px); transition:.18s ease; }
+
+/* Battle: keep all original mechanics, replace only the stage and UI language. */
+.battle-app { background:linear-gradient(180deg,rgba(3,7,27,.2),rgba(4,5,26,.8)),url('/astral/battle-observatory.png') center/cover fixed!important; color:#edf4ff!important; font-family:'Noto Sans JP',sans-serif!important; }
+.battle-app::before { content:''; position:fixed; inset:0; pointer-events:none; background:linear-gradient(90deg,rgba(2,5,22,.42),transparent 48%,rgba(2,5,22,.28)); }
+.battle-stars,.battle-ground,.bt-moon { opacity:0!important; }
+.battle-content { max-width:680px; padding:clamp(10px,2vw,18px); gap:9px; }
+.bt-panel,.bt-q-panel,.bt-skill-bar { background:linear-gradient(135deg,rgba(8,18,61,.92),rgba(34,15,81,.88))!important; border:1px solid rgba(161,211,255,.56)!important; border-radius:14px!important; box-shadow:0 10px 24px rgba(2,5,25,.45),inset 0 1px rgba(255,255,255,.11)!important; backdrop-filter:blur(12px); }
+.bt-enemy-name { color:#d8ceff!important; font-family:Cinzel,'Noto Sans JP',sans-serif; letter-spacing:.08em; }.bt-enemy-theme,.bt-hp-label,.bt-q-theme { color:#b7c9f5!important; }.bt-hp-track,.bt-timer-track { border:1px solid rgba(175,204,255,.4)!important; background:#080d31!important; border-radius:999px!important; }.bt-hp-fill { box-shadow:0 0 10px currentColor; }.bt-hp-num,.bt-player-name,.bt-log { color:#eef5ff!important; }
+.bt-stage { height:220px; }.bt-stage::before { content:''; position:absolute; width:min(62vw,310px); height:72px; bottom:16px; border-radius:50%; background:radial-gradient(ellipse,rgba(99,227,255,.38),rgba(116,101,255,.12) 49%,transparent 70%); filter:blur(4px); }
+.bt-q-text { color:#fff!important; font-size:clamp(19px,3.7vw,25px)!important; }.bt-choice { background:linear-gradient(135deg,rgba(43,63,151,.95),rgba(51,26,117,.96))!important; border:1px solid rgba(188,219,255,.62)!important; border-radius:12px!important; color:#f8fbff!important; box-shadow:inset 0 1px rgba(255,255,255,.13); }.bt-choice:hover:not(:disabled) { background:linear-gradient(135deg,#527ce0,#895de1)!important; box-shadow:0 0 20px rgba(104,227,255,.48)!important; }
+.bt-skill-btn { border:1px solid rgba(172,209,255,.36)!important; border-radius:11px!important; background:rgba(15,24,76,.84)!important; color:#cbd9ff!important; }.bt-skill-btn.ready { box-shadow:0 0 16px color-mix(in srgb,var(--sc) 65%,transparent)!important; }.bt-sp-cell { background:#090f36!important; border-color:#425493!important; border-radius:5px!important; }.bt-sp-cell.on { background:linear-gradient(180deg,#9af5ff,#6c8dff)!important; border-color:#b0f7ff!important; }.bt-combo { color:#ffe18a!important; }
+.correct-ring { border-color:#78efff!important; box-shadow:0 0 30px #68e5ff,0 0 70px #8c72ff,inset 0 0 28px #6be7ff!important; }.correct-flash { background:radial-gradient(circle,rgba(126,235,255,.36),transparent 63%)!important; }
+@media (max-width:560px){.hdr{padding:8px 10px}.logo{font-size:14px}.hdr-r{gap:4px}.chip{padding:4px 6px}.chip.cs{display:none}.bt-stage{height:175px}.battle-content{padding:9px}.mode-card{min-height:132px}}
