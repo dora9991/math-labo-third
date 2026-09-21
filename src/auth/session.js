@@ -13,3 +13,14 @@ export function setActiveUid(uid) {
 }
 export function getActiveUid() { return _uid; }
 export function onActiveUid(fn) { subs.add(fn); return () => subs.delete(fn); }
+
+// ---- ゲスト（2026-09-21）：ログインせずに遊ぶ。データはこのタブの「メモリ」にだけ置き、閉じる/再読み込みで消える。
+//  保存(localStorage)・サーバーへの記録には一切書かない。ゲストが変わる(入り直す)たびに空のメモリになる。
+let _guest = false;
+let _guestMem = new Map();
+export function setGuest(on) {
+  _guest = !!on;
+  if (_guest) _guestMem = new Map(); // 入るたびに空から
+}
+export function isGuest() { return _guest; }
+export function guestMem() { return _guestMem; }

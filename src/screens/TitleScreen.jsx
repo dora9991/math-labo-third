@@ -56,7 +56,6 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
       <nav className="title-menu" aria-label="タイトルメニュー">
         <button onClick={onEnter}><span>◇</span> はじめる <span>◇</span></button>
         {onHowTo && <button onClick={onHowTo}><span>◇</span> 遊び方 <span>◇</span></button>}
-        {onCharacter && <button onClick={onCharacter}><span>◇</span> キャラ <span>◇</span></button>}
       </nav><div className="title-audio-note">SOUND ON　·　音楽が流れます</div>
       {!complete && <div className="title-skip-note">TAP OUTSIDE THE TITLE TO SKIP</div>}
     </main>

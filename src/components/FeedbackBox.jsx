@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { AUTH_ENABLED, supabase } from "../auth/supabase.js";
 
-const PASS_KEY = "ml2_teacher_pass";
+const PASS_KEY = "ml3_teacher_pass";
 const CAT_LABEL = {
   good: { label: "⭐️ たのしい", color: "#fbbf24" },
   trouble: { label: "😕 こまった", color: "#f87171" },

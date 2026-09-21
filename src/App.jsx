@@ -7,6 +7,12 @@
 // このファイルは「つなぐだけ」。
 // ============================================================
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { worldBattleFor } from "./third/link.js";
+import ThirdMenu from "./third/menu/ThirdMenu.jsx";
+import AlarmOverlay from "./third/menu/AlarmOverlay.jsx";
+import MedalToast from "./third/menu/MedalToast.jsx";
+import { isBattleOpen } from "./third/medals.js";
+import { thirdApi } from "./third/thirdApi.js";
 import * as store from "./store/localStore.js"; // ★将来ここを supabase.js に差し替える
 import { submitAttempt, serverActive, loadServerState } from "./sync/serverSync.js"; // サーバー権威(Lv2)。AUTH無効時はno-op
 import { AUTH_ENABLED } from "./auth/supabase.js";
@@ -24,7 +30,6 @@ import * as sfx from "./audio/sfx.js";
 import StartScreen from "./screens/StartScreen.jsx";
 import Opening from "./screens/Opening.jsx";
 import Transfer from "./screens/Transfer.jsx";
-import LoginBonusOverlay from "./components/LoginBonusOverlay.jsx";
 import { computeLogin, canClaimLogin, goldenMultiplier, eventXpMult, eventCoinMult, eventCrystalMult, eventRelearnMult, eventCalcMult, eventTaCoinMult, eventGachaBonus } from "./engine/daily.js";
 import TitleScreen from "./screens/TitleScreen.jsx";
 import AudioToggle from "./components/AudioToggle.jsx";
@@ -58,6 +63,7 @@ import Feedback from "./screens/Feedback.jsx";
 import { HERO_PRICE } from "./data/heroes.js";
 import HowTo from "./screens/HowTo.jsx";
 import Clinic from "./screens/Clinic.jsx";
+const ThirdApp = lazy(() => import("./third/ThirdApp.jsx")); // math-worldのバトル/パーティ編成（pixi.jsが重いので開いた時だけ）
 const DialogueLesson = lazy(() => import("./screens/DialogueLesson.jsx")); // 対話授業（試作）。questionBank等を開いた時だけ読む
 const TeacherMode = lazy(() => import("./screens/TeacherMode.jsx")); // 教師モード（誤答駆動ノードグラフ＋黒板＋TTS）。1139問ぶんのteacher_modeを再生
 import Collection from "./screens/Collection.jsx";
@@ -94,21 +100,30 @@ const HAICHI_PASS_XP = 30, HAICHI_PASS_COIN = 30;
 export default function App() {
   const [data, setData] = useState(() => store.load());
   const [screen, setScreen] = useState("start");
+  const [menuPos, setMenuPos] = useState({ view: "main" }); // メニューの現在位置（はいち/練習/バトルから戻った時に同じ画面へ戻す）
+  // ---- メダル（サーバーが付与）：れんしゅう・確認問題の解答をサーバーへ送り、認められたメダルだけを表示する ----
+  const [thirdState, setThirdState] = useState(null); // サーバーの状態（メダル・仲間・チケット…）。未取得の間は null
+  const [medalToast, setMedalToast] = useState(null);
+  const practiceBufRef = useRef([]);
+  const confirmBufRef = useRef([]);
+  const flushTimerRef = useRef(null);
+  const [alarmRinging, setAlarmRinging] = useState(false); // 設定のアラームが鳴っている
+  const [thirdStart, setThirdStart] = useState(null); // 数学ラボ3：ワールド式バトル/パーティ編成の開始画面
   // 初回起動か？（v4からの引き継ぎ画面を出すか）。既に進捗がある人には出さない。
   //  ログイン制（Supabase認証）の生徒は「前のアプリ」を触ったことが無く、戦闘システムも
   //  刷新済みで旧データの引き継ぎに意味が無いため、引き継ぎ画面自体を出さない。
   const [needsOnboard, setNeedsOnboard] = useState(() => {
     if (AUTH_ENABLED) return false;
-    try { if (localStorage.getItem("ml5_2_onboarded")) return false; } catch {}
+    try { if (localStorage.getItem("ml3_onboarded")) return false; } catch {}
     const p = store.load().player || {};
     const wx = p.worldXp || {};
     const hasProgress =
       ((wx[1] || 0) + (wx[2] || 0) + (wx[3] || 0)) > 0 || (p.xp || 0) > 0 ||
       (p.coins || 0) > 0 || (p.stars && Object.keys(p.stars).length > 0) || (p.name || "").length > 0;
-    if (hasProgress) { try { localStorage.setItem("ml5_2_onboarded", "1"); } catch {} return false; }
+    if (hasProgress) { try { localStorage.setItem("ml3_onboarded", "1"); } catch {} return false; }
     return true;
   });
-  const markOnboarded = () => { try { localStorage.setItem("ml5_2_onboarded", "1"); } catch {} setNeedsOnboard(false); };
+  const markOnboarded = () => { try { localStorage.setItem("ml3_onboarded", "1"); } catch {} setNeedsOnboard(false); };
   const [mode, setMode] = useState("timeAttack"); // どのモードで章選択に来たか
   // 選択中の学年＝現在いる「ワールド」。完全ワールド分離でレベル(atk/HP)もこの学年のもの。
   const [grade, setGrade] = useState(() => data.player.world || 1);
@@ -135,7 +150,6 @@ export default function App() {
   const [lessonUnit, setLessonUnit] = useState(null); // 「動画＋ワークシート」レッスンの対象単元
   const [haichiStudio, setHaichiStudio] = useState(null); // 他モードから開く動画スタジオ { grade, section, lesson, ret }
   const [levelUpTo, setLevelUpTo] = useState(null); // レベルアップ演出（上がった先のレベル）
-  const [loginBonus, setLoginBonus] = useState(null); // ログインボーナス演出 { reward, streak, isFifth }
   const loginCheckedRef = useRef(false);              // 今セッションでログイン判定済みか
   const [skillGet, setSkillGet] = useState(null); // スキル入手演出（章ボス撃破）
   const [crystalGet, setCrystalGet] = useState(null); // クリスタル入手演出 { amount }
@@ -270,6 +284,7 @@ export default function App() {
 
   // 動画が無い単元の講義クリア（教師モード＋確認問題5問・正答率80%以上）。1回だけ報酬。
   function markNoVideoLecturePassed(unitId) {
+    if (unitId) sendConfirm("nv:" + unitId); // 動画が無い単元の確認問題：メダルはサーバーが認めた時だけ付く
     if (!unitId || data.player.noVideoLecturePassed?.[unitId]) return;
     updatePlayer((p) => ({
       ...p,
@@ -739,8 +754,9 @@ export default function App() {
     }
   }
 
-  function recordStepAttempt({ skill, unitId, level, templateId, seed, userAnswer, ok, q, ans, mNew, relearn = false, cycleSkip = false, mistakeTag = null }) {
+  function recordStepAttempt({ skill, unitId, level, templateId, seed, userAnswer, ok, q, ans, mNew, relearn = false, cycleSkip = false, mistakeTag = null, pseed, ms }) {
     const sid = data.player.studentId;
+    if (cycleSkip && !relearn) queueConfirm({ unitId, level, pseed, userAnswer, ms }); // 確認問題(はいち)の解答＝合格判定のためサーバーへ
     const stepMode = relearn ? "relearn" : cycleSkip ? "confirm" : "practice";
     shadowSubmit({ unitId, level, templateId, seed, userAnswer, mode: stepMode });
     // 正答・誤答どちらも中身をサーバへ記録（教師が後から見返せるように。失敗しても進行には影響しない）。
@@ -806,6 +822,7 @@ export default function App() {
   }
   // はいちモード：その動画専用の練習で合格（正答率80%以上）したら、1回だけポイント付与
   function markHaichiPassed(key) {
+    if (key) sendConfirm(key); // メダルはサーバーが認めた時だけ付く（下の行は従来の学習記録用）
     if (!key || data.player.haichiPassed?.[key]) return; // 動画ごとに1回だけ
     updatePlayer((p) => ({
       ...p,
@@ -1418,6 +1435,7 @@ export default function App() {
 
   // 画面に合わせてBGMを切り替える（勝利/敗北/タイムアタック終了は各画面で再生）
   useEffect(() => {
+    if (screen === "third") return; // 仲間・ガチャ・バトル画面のBGMは ThirdApp / ThirdBattle が切り替える
     if (screen === "start") { bgm.stop(); return; }
     if (screen === "opening") { bgm.stop(); return; } // オープニング映像は映像側の音を使う（OP曲は止める）
     if (screen === "title") { bgm.play("op"); return; }
@@ -1435,24 +1453,76 @@ export default function App() {
     bgm.play("menu"); // home / chapter / notebook など
   }, [screen, battleMonster, utChapter, battleKey]);
 
-  // 1日1回のログインボーナス＆ゴールデンタイム開始（ホーム到達時に1セッション1回だけ判定）
+  // 【2026-09-21】ログインボーナス(コイン・演出)は廃止。「学習の記録」で使う連続日数と前回ログイン日だけ、1日1回記録する。
   useEffect(() => {
     if (screen !== "home" || loginCheckedRef.current) return;
     loginCheckedRef.current = true;
     const today = todayStr();
     if (!canClaimLogin(data.player, today)) return;
-    // ログインボーナスは常に100Gで固定（2026-07-19：5日連続の大ボーナス・曜日イベント倍率は廃止）
-    const { streak, reward } = computeLogin(data.player, today);
+    const { streak } = computeLogin(data.player, today);
     updatePlayer((p) => ({
       ...p,
-      coins: (p.coins || 0) + reward,
       loginStreak: streak,
+      prevLoginDate: p.lastLoginDate || null, // 「学習の記録」に出す「前回のログイン日」
       lastLoginDate: today,
     }));
-    // 演出はホーム画面が落ち着いてから少し間を置いて出す（いきなり出ると慌ただしいため）
-    const t = setTimeout(() => setLoginBonus({ reward, streak, crystal: 0, isFifth: false }), 1000);
-    return () => clearTimeout(t);
   }, [screen]); // eslint-disable-line
+
+  async function loadThird() {
+    const r = await thirdApi.getState();
+    if (r.status === 200) setThirdState(r.body.state);
+  }
+  function applyMedalResponse(r) {
+    if (r.status === 200) {
+      setThirdState(r.body.state);
+      if (r.body.newMedals?.length) setMedalToast(r.body.newMedals);
+    }
+  }
+  async function sendWithRetry(fn) {
+    let r = await fn();
+    if (r.status === 409) { await new Promise((res) => setTimeout(res, 500)); r = await fn(); }
+    applyMedalResponse(r);
+  }
+  // れんしゅうの解答：少しためてまとめて送る（サーバーが seed から問題を作り直して採点）。
+  function queuePractice(a) {
+    if (a?.pseed == null) return;
+    if (practiceBufRef.current.some((x) => x.seed === a.pseed && x.unitId === a.unitId)) return;
+    practiceBufRef.current.push({ unitId: a.unitId, level: a.level, seed: a.pseed, answer: String(a.userAnswer), ms: a.ms || 0 });
+    clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = setTimeout(flushPractice, 3500);
+  }
+  function flushPractice() {
+    clearTimeout(flushTimerRef.current);
+    const at = practiceBufRef.current.splice(0);
+    if (at.length) sendWithRetry(() => thirdApi.practice(at));
+  }
+  // 確認問題(はいち)の解答：直近5問(＝1ラウンド)だけ持っておく。
+  function queueConfirm(a) {
+    if (a?.pseed == null) return;
+    if (confirmBufRef.current.some((x) => x.seed === a.pseed && x.unitId === a.unitId)) return;
+    confirmBufRef.current = [...confirmBufRef.current, { unitId: a.unitId, level: a.level, seed: a.pseed, answer: String(a.userAnswer), ms: a.ms || 0 }].slice(-5);
+  }
+  function sendConfirm(key) {
+    const at = confirmBufRef.current.slice(-5);
+    confirmBufRef.current = [];
+    if (at.length) sendWithRetry(() => thirdApi.confirm(key, at));
+  }
+  useEffect(() => { loadThird(); }, []); // eslint-disable-line
+  useEffect(() => { flushPractice(); if (screen === "home") loadThird(); }, [screen]); // eslint-disable-line
+  useEffect(() => {
+    const f = () => flushPractice();
+    window.addEventListener("pagehide", f);
+    return () => window.removeEventListener("pagehide", f);
+  }, []); // eslint-disable-line
+
+  // 設定のアラーム：セットした時刻(player.alarm.endAt)を過ぎたら、どの画面でも鳴らす。
+  useEffect(() => {
+    const id = setInterval(() => {
+      const end = data.player.alarm?.endAt;
+      if (end && Date.now() >= end) setAlarmRinging(true);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [data.player.alarm?.endAt]); // eslint-disable-line
 
   // 画面の振り分け
   const goChapter = (m) => { setMode(m); setScreen("chapter"); };
@@ -1533,19 +1603,18 @@ export default function App() {
       }
     }
   }
+  // 「⚔️ バトル」ボタンの行き先（数学ラボ3）。旧バトル（主人公がターン制で戦う）は外し、
+  //  仲間5体が戦う新バトルだけにした。メダル2枚(はいち＋れんしゅう)が揃っていれば新バトルへ、
+  //  まだならホーム（メダル画面）へ戻す。旧バトルの実装(TurnBattle/Battle)はコードとして残している。
   function goBattleForUnit(unit) {
-    const monster = unit && MONSTERS.find((m) => m.kind === "unit" && m.unitId === unit.id);
-    if (monster) {
-      battleDiffRef.current = initDifficulty("standard"); // ④ この演習バトルは「ふつう」から始める
-      battleMistakeSourceRef.current = null;
-      // 学習サイクルの「ためす→バトル」は、未解放でもその小単元の敵と直接たたかう（一覧へは飛ばさない）。
-      setBattleMonster(monster);
-      setBattlePractice(unit); // ★演習バトル：出題をこの単元の適応問題にし、習熟＋サイクルを更新
-      setBattleKey((k) => k + 1);
-    } else {
-      setBattleMonster(null); setBattlePractice(null); // その単元に対応する敵がいない場合のみ相手選択へ
+    const chapter = unit && findChapterByUnitId(unit.id);
+    const params = chapter && worldBattleFor(grade, chapter, unit);
+    if (params && isBattleOpen(thirdState, unit.id)) {
+      setThirdStart({ screen: "battle", params });
+      setScreen("third");
+      return;
     }
-    setScreen("battle");
+    setScreen("home");
   }
 
   // 「章のまとめにチャレンジ！」：その章のボスの梯子で、まだ倒していない最初の段に挑む
@@ -1579,7 +1648,7 @@ export default function App() {
 
   const renderScreen = () => {
   if (screen === "start") {
-    return <StartScreen onStart={() => setScreen("opening")} />;
+    return <StartScreen onStart={() => setScreen(needsOnboard ? "transfer" : "title")} />; // オープニング映像は廃止（数学ラボ3）
   }
 
   // オープニング映像（タップでスキップ可）→ ブラックアウト→1秒後にタイトル（初回は引き継ぎ画面）へ
@@ -1627,6 +1696,15 @@ export default function App() {
   // 困り感クリニック（試作：1スキル）
   if (screen === "clinic") {
     return <Clinic player={data.player} onComplete={saveClinicResult} onHome={() => setScreen("home")} />;
+  }
+
+  // 数学ラボ3：math-worldのバトル／パーティ編成
+  if (screen === "third") {
+    return (
+      <Suspense fallback={<div className="app"><div className="content"><div className="glass" style={{ padding: 20, textAlign: "center" }}>読み込み中…</div></div></div>}>
+        <ThirdApp player={data.player} start={thirdStart} onExit={() => setScreen("home")} />
+      </Suspense>
+    );
   }
 
   // 対話型数学授業（試作）：黒板＋AI先生と発問でやり取り
@@ -1829,7 +1907,7 @@ export default function App() {
         unit={sel.unit}
         level={sel.level}
         onComplete={saveTimeAttackResult}
-        onAttempt={(a) => shadowSubmit({ ...a, mode: "practice" })}
+        onAttempt={(a) => { shadowSubmit({ ...a, mode: "practice" }); queuePractice(a); }}
         onBackToMap={() => setScreen("chapter")}
         onHome={() => setScreen("home")}
         onHaichi={() => openHaichiStudio(sel.unit, "timeAttack")}
@@ -1881,7 +1959,7 @@ export default function App() {
         unit={sel.unit}
         level={sel.level}
         onComplete={saveSlowResult}
-        onAttempt={(a) => shadowSubmit({ ...a, mode: "practice" })}
+        onAttempt={(a) => { shadowSubmit({ ...a, mode: "practice" }); queuePractice(a); }}
         onBackToMap={() => setScreen("home")}
         onHome={() => setScreen("home")}
         onRelearn={() => setScreen("relearn")}
@@ -1901,11 +1979,12 @@ export default function App() {
         level={sel.level}
         anshin
         navDifficulty={!!sel.nav}
+        fixedLevel={!!sel.fixed}
         initialNavLevel={(data.player.navLevel && data.player.navLevel[sel.unit.id]) || "standard"}
         onNavLevelChange={(lv) => updatePlayer((p) => ({ ...p, navLevel: { ...(p.navLevel || {}), [sel.unit.id]: lv } }))}
-        cyclePracticeN={(data.player.cycle && data.player.cycle[sel.unit.id]?.practiceN) || 0}
+        cyclePracticeN={thirdState?.medals?.practiceN?.[sel.unit.id] || 0} // れんしゅうメダルの進捗（サーバーが認めた正解数）
         onComplete={saveSlowResult}
-        onAttempt={(a) => shadowSubmit({ ...a, mode: "practice" })}
+        onAttempt={(a) => { shadowSubmit({ ...a, mode: "practice" }); queuePractice(a); }}
         onBackToMap={() => setScreen("home")}
         onHome={() => setScreen("home")}
         onRelearn={() => setScreen("relearn")}
@@ -2215,68 +2294,28 @@ export default function App() {
   const _cyclesToday = (data.player.daily && data.player.daily.date === todayStr()) ? (data.player.daily.cycles || 0) : 0;
   const restActive = _cyclesToday >= REST_CYCLES_SOFT;
   return (
-    <Home
-      cycle={homeCycle}
-      restActive={restActive}
+    <ThirdMenu
       player={data.player}
       records={data.records}
-      mistakeCount={data.mistakes.length}
-      mistakeUnitIds={[...new Set((data.mistakes || []).map((m) => m.unitId).filter(Boolean))]}
       grade={grade}
       onSetGrade={setWorld}
-      onAnshin={() => goChapter("anshin")}
-      onTimeAttack={() => goChapter("timeAttack")}
-      onChallenge={(ch, u) => {
-        // 小単元ごとの「🧮 応用」＝その小単元だけの疑似章を作って直接チャレンジへ（単元をまたがない）。
-        //  引数なし（章えらび画面などの一般入口）は従来どおり一覧(calcKingPick)へ。
-        if (u) {
-          setCalcChapter({ id: u.id, name: u.name, color: ch?.color, units: [u] });
-          challengeBackRef.current = "home";
-          setScreen("challenge");
-        } else {
-          setScreen("calcKingPick");
-        }
-      }}
-      onBattle={() => setScreen("battle")}
-      onBossChallenge={challengeChapterBoss}
-      onStatusMeter={() => setScreen("statusMeter")}
-      onStudyLog={() => setScreen("studyLog")}
-      onUnitBoss={challengeUnitBoss}
-      onRelearn={(unit) => { setRelearnFocus(unit?.id || null); setScreen("relearn"); }}
-      onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
-      onDialogue={() => setScreen("dialogue")}
-      onLoadout={() => setScreen("loadout")}
-      onItems={() => setScreen("items")}
-      onUltimates={() => setScreen("ultimates")}
-      onFeedback={() => setScreen("feedback")}
-      onHaichi={() => setScreen("haichi")}
-      onUnitHaichi={(unit) => openHaichiStudio(unit, "home")}
-      onUnitTeacher={(unit) => { const ch = findChapterByUnitId(unit.id); setTeacherFocus({ chapterId: ch?.id || null, unit }); setScreen("teacherMode"); }}
-      onDiagnose={(ch) => { setDiagnoseChapter(ch); setScreen("diagnose"); }}
-      onUnitPractice={(chapter, unit) => { setSel({ chapter, unit, level: "standard", nav: true }); setScreen("anshin"); }}
+      updatePlayer={updatePlayer}
+      medalState={thirdState}
+      pos={menuPos}
+      setPos={setMenuPos}
       quizWeakUnits={quizWeakUnits}
       onQuizWeakUnitClick={(unitId) => {
         const unit = findUnitById(unitId);
         const chapter = findChapterByUnitId(unitId);
         if (unit && chapter) { setSel({ chapter, unit, level: "standard", nav: true }); setScreen("anshin"); }
       }}
-      onUnitBattle={(unit) => goBattleForUnit(unit)}
-      onClinic={() => setScreen("clinic")}
-      onUnitTest={() => { setUtChapter(null); setScreen("unitTest"); }}
-      onStepUp={() => setScreen("stepUp")}
-      mode={homeMode}
-      onSetMode={chooseHomeMode}
-      canPrestige={maouCleared(grade)}
-      prestige={curPrestige(grade)}
-      onPrestige={() => setPrestigeAsk(true)}
-      onStartGolden={startGolden}
-      onShop={() => setScreen("shop")}
-      onSkill={() => setScreen("skill")}
-      onCollection={() => setScreen("collection")}
-      onPartners={() => setScreen("partners")}
-      onDetail={() => setScreen("status")}
-      onHowTo={() => setScreen("howto")}
-      onCharacter={() => setScreen("character")}
+      onHaichi={(unit) => openHaichiStudio(unit, "home")}
+      onPractice={(chapter, unit, level) => { setSel({ chapter, unit, level: level || "standard", nav: false, fixed: true }); setScreen("anshin"); }} // 練習：えらんだ難度で出題（簡単/普通/難しい/鬼）
+      onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: true } }); setScreen("third"); } }}
+      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: true } }); setScreen("third"); }}
+      onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
+      onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
+      onFeedback={() => setScreen("feedback")}
     />
   );
   };
@@ -2319,13 +2358,11 @@ export default function App() {
           onSkip={() => setApplyGate(null)}
         />
       )}
-      {loginBonus && (
-        <LoginBonusOverlay
-          reward={loginBonus.reward}
-          streak={loginBonus.streak}
-          crystal={loginBonus.crystal}
-          isFifth={loginBonus.isFifth}
-          onDone={() => setLoginBonus(null)}
+      {medalToast && <MedalToast medals={medalToast} onDone={() => setMedalToast(null)} />}
+      {alarmRinging && (
+        <AlarmOverlay
+          minutes={data.player.alarm?.min || 0}
+          onStop={() => { setAlarmRinging(false); updatePlayer((p) => ({ ...p, alarm: { min: p.alarm?.min || 15, endAt: null } })); }}
         />
       )}
       {skillGet && <SkillGetOverlay skill={skillGet} onDone={() => setSkillGet(null)} />}

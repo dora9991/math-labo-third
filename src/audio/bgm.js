@@ -9,24 +9,27 @@
 // 公開先のフォルダ階層が変わっても鳴るよう、相対パス（BASE_URL）を前につける。
 const BASE = import.meta.env.BASE_URL; // 例: "./" や "/リポジトリ名/"
 const FILES = {
-  op: BASE + "bgm/op.mp3",                 // タイトル（OP）
-  menu: BASE + "bgm/menu.mp3",             // メニュー（以前のBGMに戻す）
+  op: BASE + "bgm/title.m4a",              // タイトル（2026-09-21：数学ラボ3のタイトルBGMに差し替え）
+  menu: BASE + "bgm/menu3.m4a",            // メニュー画面（数学ラボ3）
   calcplay: BASE + "bgm/menu_select.mp3",   // 計算王への道のプレイ中（スタート後）
   timeattack: BASE + "bgm/timeattack.mp3", // タイムアタック中
   timeattack_end: BASE + "bgm/timeattack_end.mp3", // タイムアタック終了時
-  slow: BASE + "bgm/slow.mp3",             // じっくり
+  slow: BASE + "bgm/practice.m4a",         // れんしゅうモード（じっくり・ステップアップ・学び直し・確認問題の練習）
   unittest: BASE + "bgm/unittest.mp3",     // 単元テスト
-  battle: BASE + "bgm/battle.mp3",         // 通常戦闘
-  boss: BASE + "bgm/boss.mp3",             // ボス戦
-  victory: BASE + "bgm/victory.mp3",       // 勝利
-  defeat: BASE + "bgm/defeat.mp3",         // 敗北
+  battle: BASE + "bgm/battle3.m4a",        // 通常戦闘（雑魚の波）
+  boss: BASE + "bgm/subboss.m4a",          // 小単元ボス戦闘
+  chapterboss: BASE + "bgm/chapterboss.m4a", // 章のボス（章ボス／最終ボス）
+  victory: BASE + "bgm/victory3.m4a",      // 戦闘勝利（1回だけ流す）
+  defeat: BASE + "bgm/defeat3.m4a",        // 戦闘敗北（1回だけ流す）
+  ending: BASE + "bgm/ending.m4a",         // エンディング（最終ボス撃破のごほうび画面）
+  coop: BASE + "bgm/coop.m4a",             // 協力プレイ（パーティ編成・ガチャ＝仲間と協力する画面）
 };
 
 let el = null;          // 再生用の <audio>
 let current = null;     // 今鳴っている曲名
 let unlocked = false;
 let muted = false;
-try { muted = localStorage.getItem("bgm_muted") === "1"; } catch {}
+try { muted = localStorage.getItem("ml3_bgm_muted") === "1"; } catch {}
 
 // 曲ごとの音量。タイトル(op)は大きめ、その他は控えめ（効果音を聞き取りやすく）。
 const VOLUME = { op: 0.6 };
@@ -71,7 +74,7 @@ export function stop() {
 /** ミュート切替（true=ミュート中を返す） */
 export function toggleMute() {
   muted = !muted;
-  try { localStorage.setItem("bgm_muted", muted ? "1" : "0"); } catch {}
+  try { localStorage.setItem("ml3_bgm_muted", muted ? "1" : "0"); } catch {}
   if (el) el.muted = muted;
   return muted;
 }

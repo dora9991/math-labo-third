@@ -9,12 +9,17 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && gh-pages -d dist",
-    "teacher": "node --env-file=.env.local scripts/teacher-server.mjs"
+    "teacher": "node --env-file=.env.local scripts/teacher-server.mjs",
+    "prebuild": "node scripts/gen-problem-version.mjs",
+    "build:third-api": "node scripts/build-third-api.mjs",
+    "test:third-api": "node scripts/test-third-api.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@supabase/supabase-js": "^2.110.0",
     "pdfjs-dist": "^4.10.38",
+    "pixi.js": "^7.4.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

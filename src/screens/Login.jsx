@@ -13,7 +13,7 @@ import { useState } from "react";
 import { loginKid, registerKid } from "../auth/kidAuth.js";
 import { getRememberedId, setRememberedId, getAutoLogin, setAutoLogin } from "../auth/loginPrefs.js";
 
-export default function Login({ onDone }) {
+export default function Login({ onDone, onGuest }) {
   const remembered = getRememberedId();
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [id, setId] = useState(remembered);
@@ -101,6 +101,18 @@ export default function Login({ onDone }) {
           cursor: ready && !busy ? "pointer" : "not-allowed", fontSize: 16, fontWeight: 900, color: "#fff",
           background: ready && !busy ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,.12)",
         }}>{busy ? "…" : isRegister ? "▶ とうろくする" : "▶ ログイン"}</button>
+
+        {onGuest && (
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+            <button type="button" onClick={onGuest} data-sfx="none" style={{
+              width: "100%", padding: "12px", borderRadius: 13, cursor: "pointer", fontSize: 14.5, fontWeight: 800, color: "#e2e8f0",
+              background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.25)",
+            }}>👤 ゲストで遊ぶ</button>
+            <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.5)", marginTop: 6, lineHeight: 1.6 }}>
+              ログインしなくても すぐ遊べるよ。<b>データは のこりません</b>（とじると きえます）。
+            </div>
+          </div>
+        )}
 
         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.4)", marginTop: 14, lineHeight: 1.6 }}>
           {isRegister

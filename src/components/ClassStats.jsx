@@ -9,7 +9,7 @@ import { useState } from "react";
 import { AUTH_ENABLED, supabase } from "../auth/supabase.js";
 import { CHAPTERS } from "../data/index.js";
 
-const PASS_KEY = "ml2_teacher_pass";
+const PASS_KEY = "ml3_teacher_pass";
 
 // 小単元ID → { name, chapter } の逆引き（表示順は CHAPTERS の並び）
 const UNIT_INDEX = [];

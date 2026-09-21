@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import App from "../App.jsx";
 import Login from "../screens/Login.jsx";
 import { AUTH_ENABLED, supabase } from "./supabase.js";
-import { setActiveUid, getActiveUid } from "./session.js";
+import { setActiveUid, getActiveUid, setGuest } from "./session.js";
 import { getAutoLogin, setAutoLogin, setRememberedId } from "./loginPrefs.js";
 import { touchLastLogin } from "./kidAuth.js";
 
@@ -17,6 +17,9 @@ export default function AuthGate() {
   if (!AUTH_ENABLED) return <App />; // 認証OFF＝従来どおり
 
   const [user, setUser] = useState(undefined); // undefined=判定中 / null=未ログイン / obj=ログイン中
+  const [guest, setGuestState] = useState(false); // ゲストで遊び中（データは残らない）
+  const startGuest = () => { setActiveUid(null); setGuest(true); setGuestState(true); };
+  const endGuest = () => { setGuest(false); setGuestState(false); };
 
   useEffect(() => {
     let alive = true;
@@ -43,10 +46,22 @@ export default function AuthGate() {
     return () => { alive = false; sub?.subscription?.unsubscribe(); };
   }, []);
 
+  if (guest) {
+    return (
+      <>
+        <App key="guest" />
+        <button data-sfx="none" onClick={endGuest} title="ゲストをおわる（データは消えます）"
+          style={{ position: "fixed", top: 8, right: 8, zIndex: 300, padding: "6px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 800,
+            border: "1px solid rgba(255,255,255,.25)", background: "rgba(0,0,0,.55)", color: "#fff", cursor: "pointer" }}>
+          👤 ゲスト中（データは残りません）・おわる
+        </button>
+      </>
+    );
+  }
   if (user === undefined) {
     return <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh", color: "rgba(255,255,255,.6)" }}>よみこみ中…</div>;
   }
-  if (!user) return <Login onDone={() => { /* onAuthStateChange が拾う */ }} />;
+  if (!user) return <Login onDone={() => { /* onAuthStateChange が拾う */ }} onGuest={startGuest} />;
 
   return (
     <>

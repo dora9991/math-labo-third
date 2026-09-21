@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { UPDATES } from "../data/updates.js";
 
-const SEEN_KEY = "ml2_last_seen_update";
+const SEEN_KEY = "ml3_last_seen_update";
 
 function fmtDate(iso) {
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
