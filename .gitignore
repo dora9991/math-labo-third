@@ -1,0 +1,28 @@
+# 依存パッケージ（npm install で復元できるので追跡しない）
+node_modules/
+
+# APIキーなどの秘密（絶対にgitに上げない）
+.env
+.env.local
+.env.*.local
+
+# ビルド成果物（npm run build / deploy で生成。gh-pages ブランチに公開される）
+dist/
+
+# Vite の一時ファイル
+vite.config.js.timestamp-*
+
+# macOS が作る不要ファイル
+.DS_Store
+
+# ログ
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# エディタ設定
+.vscode/
+.idea/
+
+# Supabase CLI のローカルキャッシュ（supabase link/functions deploy が作る）
+supabase/.temp/
