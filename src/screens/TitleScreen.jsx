@@ -5,8 +5,9 @@
 //  ・画像にすでに数式・図形が多いので、装飾の動きは控えめ（淡い浮遊シンボル＋きらめき）。
 //  ・タイトル文字を5回すばやくタップで管理用モード（隠しコマンド）。
 // ============================================================
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as bgm from "../audio/bgm.js";
+import { getFxSpeed, prefersReducedMotion } from "../engine/fxSpeed.js";
 
 const GLYPHS = [
   { c: "π", x: "7%", y: "21%", d: 0 }, { c: "∑", x: "89%", y: "27%", d: 1.2 },
@@ -16,7 +17,17 @@ const GLYPHS = [
 export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) {
   const tapRef = useRef({ n: 0, t: 0 });
   const holdRef = useRef(null);
-  useEffect(() => { bgm.play("op"); return () => clearTimeout(holdRef.current); }, []);
+  const speedRef = useRef(getFxSpeed());
+  const [complete, setComplete] = useState(() => speedRef.current === "off" || prefersReducedMotion());
+  const finishRef = useRef(null);
+  useEffect(() => {
+    bgm.play("op");
+    const speed = speedRef.current;
+    if (speed !== "off" && !prefersReducedMotion()) {
+      finishRef.current = setTimeout(() => setComplete(true), speed === "fast" ? 1500 : 3000);
+    }
+    return () => { clearTimeout(holdRef.current); clearTimeout(finishRef.current); };
+  }, []);
   function secretTap() {
     const now = Date.now();
     const s = tapRef.current;
@@ -27,7 +38,13 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
 
   function beginHold() { holdRef.current = setTimeout(() => { tapRef.current.n = 0; onAdmin?.(); }, 1100); }
   function endHold() { clearTimeout(holdRef.current); holdRef.current = null; }
-  return <div className="app title-art">
+  function skipIntro(e) {
+    if (complete || e.target.closest("button, .title-lockup")) return;
+    clearTimeout(finishRef.current);
+    setComplete(true);
+  }
+  return <div className={`app title-art title-speed-${speedRef.current} ${complete ? "title-ready" : "title-entering"}`} onPointerDown={skipIntro}>
+    <div className="title-whiteout" aria-hidden />
     <div className="title-sky" aria-hidden /><div className="title-vignette" aria-hidden />
     <div className="title-sigil" aria-hidden><span>∴</span><span>△</span><span>∑</span><span>◇</span></div>
     {GLYPHS.map((g) => <span className="title-glyph" key={g.c} style={{ left: g.x, top: g.y, animationDelay: `${g.d}s` }} aria-hidden>{g.c}</span>)}
@@ -41,6 +58,7 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
         {onHowTo && <button onClick={onHowTo}><span>◇</span> 遊び方 <span>◇</span></button>}
         {onCharacter && <button onClick={onCharacter}><span>◇</span> キャラ <span>◇</span></button>}
       </nav><div className="title-audio-note">SOUND ON　·　音楽が流れます</div>
+      {!complete && <div className="title-skip-note">TAP OUTSIDE THE TITLE TO SKIP</div>}
     </main>
   </div>;
 }

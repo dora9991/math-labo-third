@@ -29,7 +29,7 @@ export default function Diagnose({ player, chapter, onApply, onStartUnit, onBack
 
   if (!items.length) {
     return (
-      <div className="app">
+      <div className="app legacy-diagnose">
         <Header player={player} back="もどる" onBack={onBack} />
         <div className="content"><div className="glass">この章のチェック問題が見つかりませんでした。</div></div>
       </div>
@@ -57,7 +57,7 @@ export default function Diagnose({ player, chapter, onApply, onStartUnit, onBack
     return (
       <div className="app">
         <Header player={player} back="とじる" onBack={onBack} />
-        <div className="content">
+        <div className="content legacy-diagnose__content">
           <div className="pg-ttl">🩺 {chapter.name}のチェックけっか</div>
           <div className="pg-sub">できてる所はとばしてOK。<b style={{ color: "#fde047" }}>🔧 の所から</b>はじめよう。</div>
 
@@ -96,9 +96,9 @@ export default function Diagnose({ player, chapter, onApply, onStartUnit, onBack
   // ── 出題 ──
   const it = items[idx];
   return (
-    <div className="app">
+    <div className="app legacy-diagnose">
       <Header player={player} back="やめる" onBack={onBack} />
-      <div className="content">
+      <div className="content legacy-diagnose__content">
         <div className="pg-ttl">🩺 {chapter.name}のチェック</div>
         <div className="pg-sub">どこができてるか、さっと見るだけ。まちがえてもOK！</div>
 

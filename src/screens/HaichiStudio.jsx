@@ -200,11 +200,11 @@ export default function HaichiStudio({ player, grade, section, lesson, watchedMa
   const seg = (active) => ({ ...toolBtn, background: active ? "#6366f1" : "rgba(255,255,255,.08)" });
 
   return (
-    <div className="app">
+    <div className="app haichi-studio">
       <Header player={player} back="一覧へ" onBack={onBack} />
       <div className="content" style={{ paddingBottom: 24 }}>
         {/* ── ツールバー ── */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
+        <div className="haichi-toolbar" style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
           {/* レッスン送り */}
           <div style={grp}>
             <button data-sfx="none" onClick={() => onChangeLesson(lessons[(idx - 1 + lessons.length) % lessons.length])} style={toolBtn}>◀ 前</button>
@@ -235,8 +235,8 @@ export default function HaichiStudio({ player, grade, section, lesson, watchedMa
           <div style={grp}>
             <span style={lbl}>ペン</span>
             {PEN_COLORS.map((c) => (
-              <button key={c} data-sfx="none" onClick={() => { setColor(c); setErasing(false); setMode("draw"); }}
-                style={{ width: 22, height: 22, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
+              <button key={c} data-sfx="none" className="pen-swatch" onClick={() => { setColor(c); setErasing(false); setMode("draw"); }}
+                style={{ "--pen": c, width: 22, height: 22, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
                   border: color === c && !erasing && drawMode ? "3px solid #fff" : "2px solid rgba(255,255,255,.25)" }} />
             ))}
             {PEN_SIZES.map((s) => (
@@ -249,7 +249,7 @@ export default function HaichiStudio({ player, grade, section, lesson, watchedMa
         </div>
 
         {/* ── ステージ（動画／プリントの分割表示＋手書き） ── */}
-        <div
+        <div className="haichi-stage"
           ref={splitRef}
           style={{ display: "flex", flexDirection: splitDir === "vert" ? "column" : "row", width: "100%", height: "76vh" }}
         >
@@ -301,7 +301,7 @@ export default function HaichiStudio({ player, grade, section, lesson, watchedMa
 
         {/* ── 練習問題ボタン（下に固定。合格でバッジ） ── */}
         {onPractice && hasPractice && (
-          <button
+          <button className="haichi-practice-command"
             data-sfx="none"
             onClick={() => onPractice(L)}
             style={{

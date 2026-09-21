@@ -50,7 +50,7 @@ function Toggle({ on, onChange, label, desc }) {
 
 export default function HowTo({ player, onExport, onImport, onSetting, onBack }) {
   return (
-    <div className="app">
+    <div className="app legacy-howto">
       <Header player={player} back="ホーム" onBack={onBack} />
       <div className="content">
         <div className="pg-ttl">📖 遊び方</div>

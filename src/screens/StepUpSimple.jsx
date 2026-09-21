@@ -125,7 +125,7 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
     const soloUnit = units.length === 1 ? units[0] : null;
     const um = soloUnit ? ((player.unitMastery || {})[soloUnit.id] || { pt: 0, ok: false }) : null;
     return (
-      <div className="app">
+      <div className="app legacy-stepup">
         <Header player={player} back="ホーム" onBack={onHome} />
         <div className="content">
           <div className="pg-ttl">🌱 セットクリア！</div>
@@ -221,7 +221,7 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
 
   if (!cur) {
     return (
-      <div className="app">
+      <div className="app legacy-stepup">
         <Header player={player} back="ホーム" onBack={onHome} />
         <div className="content"><div className="glass">いま出せる問題が見つかりませんでした。</div></div>
       </div>
@@ -230,7 +230,7 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
 
   const { unit, problem } = cur;
   return (
-    <div className="app">
+    <div className="app legacy-stepup">
       {showRing && <div className="correct-flash show" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 55 }} />}
       <Header player={player} back="ホーム" onBack={onHome} />
       <div className="content">

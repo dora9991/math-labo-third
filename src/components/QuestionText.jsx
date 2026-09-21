@@ -38,17 +38,14 @@ export default function QuestionText({ text, furigana = false, readAloud = false
   }, [text, readAloud, canSpeak]);
 
   return (
-    <span style={style}>
+    <span className="question-text" style={style}>
       {furigana ? <RubyText text={text} /> : <MathText>{text}</MathText>}
       {showButton && canSpeak && (
         <button
           type="button" data-sfx="none" title="読み上げ"
           onClick={(e) => { e.stopPropagation(); speakText(text); }}
-          style={{
-            marginLeft: 8, verticalAlign: "middle", border: "none", cursor: "pointer",
-            background: "rgba(99,102,241,.14)", borderRadius: 9, padding: "3px 8px", fontSize: ".7em",
-          }}
-        >🔊</button>
+          className="question-text__speak"
+        ><span className="sr-only">問題を</span>読み上げ</button>
       )}
     </span>
   );

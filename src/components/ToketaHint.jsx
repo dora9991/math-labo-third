@@ -9,13 +9,13 @@ import MathText from "./MathText.jsx";
 import { SYM, CONTRAST, hintTags } from "../data/toketa/help.js";
 import { MISC } from "../data/toketa/index.js";
 
-const BOX = { background: "#fef9c3", border: "1px solid #fde047", borderRadius: 11, padding: "10px 12px", marginBottom: 11, color: "#854d0e" };
-const PICK = { display: "block", width: "100%", textAlign: "left", margin: "5px 0", padding: "9px 11px", borderRadius: 9, border: "1px solid #fcd34d", background: "#fffbeb", color: "#854d0e", fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit" };
-const SUBBTN = { padding: "7px 11px", borderRadius: 9, border: "1px solid #fcd34d", background: "#fffbeb", color: "#92400e", fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" };
+const BOX = { marginBottom: 11 };
+const PICK = {};
+const SUBBTN = {};
 
 function ContrastBox({ data }) {
   return (
-    <div style={{ background: "#fffbeb", border: "1px dashed #f59e0b", borderRadius: 9, padding: "8px 10px", margin: "6px 0" }}>
+    <div className="toketa-hint__contrast">
       <div style={{ fontSize: 12, fontWeight: 900, color: "#b45309", marginBottom: 4 }}>⚖️ {data.ttl}</div>
       {data.rows.map((r, i) => (
         <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "baseline", fontSize: 13, padding: "2px 0" }}>
@@ -24,7 +24,7 @@ function ContrastBox({ data }) {
           {r.n && <span style={{ fontSize: 11, color: "#a16207" }}>{r.n}</span>}
         </div>
       ))}
-      {data.tip && <div style={{ fontSize: 12, fontWeight: 800, color: "#b45309", marginTop: 4 }}>💡 {data.tip}</div>}
+      {data.tip && <div style={{ fontSize: 12, fontWeight: 800, color: "#805b16", marginTop: 4 }}>{data.tip}</div>}
     </div>
   );
 }
@@ -42,23 +42,23 @@ export default function ToketaHint({ problem, compact = false }) {
 
   if (!reveal) {
     return (
-      <button className="rbtn s" style={{ fontSize: 12, padding: "7px 13px", marginBottom: 11 }} onClick={() => setReveal(true)}>
-        💡 ヒントを見る
+      <button className="legacy-help-btn" style={{ fontSize: 12, marginBottom: 11 }} onClick={() => setReveal(true)}>
+        ヒントを見る
       </button>
     );
   }
 
   return (
-    <div style={BOX}>
+    <div className="toketa-hint" style={BOX}>
       {/* ① つまづき選択メニュー */}
       {!hintTag && stepN === 0 && (
         <>
           <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 4 }}>どこで まよってる？ えらんでね 👇</div>
           {tags.map((tag) => (
             // 「計算ミス」は抽象的な励ましではなく、具体的なお手本（式の計算）へ直行する
-            <button key={tag} style={PICK} onClick={() => (tag === "calc" ? setStepN(1) : setHintTag(tag))}>{SYM[tag] || (MISC[tag]?.label ? `「${MISC[tag].label}」かも` : "ここ かも")}</button>
+            <button key={tag} className="toketa-hint__pick" style={PICK} onClick={() => (tag === "calc" ? setStepN(1) : setHintTag(tag))}>{SYM[tag] || (MISC[tag]?.label ? `「${MISC[tag].label}」かも` : "ここ かも")}</button>
           ))}
-          <button style={{ ...PICK, background: "#eef2ff", border: "1px solid #c7d2fe", color: "#3730a3" }} onClick={() => setStepN(1)}>🪜 解き方を じゅんばんに見る（お手本）</button>
+          <button className="toketa-hint__pick" style={PICK} onClick={() => setStepN(1)}>解き方を じゅんばんに見る（お手本）</button>
         </>
       )}
 
@@ -69,8 +69,8 @@ export default function ToketaHint({ problem, compact = false }) {
           {MISC[hintTag]?.coach && <div style={{ fontSize: 13, fontWeight: 700, margin: "4px 0" }}>🧭 {MISC[hintTag].coach}</div>}
           {CONTRAST[hintTag] && <ContrastBox data={CONTRAST[hintTag]} />}
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            <button style={SUBBTN} onClick={() => setHintTag(null)}>← ほかのつまづき</button>
-            {steps.length > 0 && stepN === 0 && <button style={SUBBTN} onClick={() => setStepN(1)}>🪜 お手本も見る</button>}
+            <button className="toketa-hint__sub" style={SUBBTN} onClick={() => setHintTag(null)}>ほかのつまづき</button>
+            {steps.length > 0 && stepN === 0 && <button className="toketa-hint__sub" style={SUBBTN} onClick={() => setStepN(1)}>お手本も見る</button>}
           </div>
         </>
       )}
@@ -82,7 +82,7 @@ export default function ToketaHint({ problem, compact = false }) {
             <div key={i} style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.6, padding: "2px 0" }}>💡 <MathText>{s}</MathText></div>
           ))}
           {stepN < steps.length && (
-            <button style={{ ...SUBBTN, marginTop: 6 }} onClick={() => setStepN((v) => Math.min(steps.length, v + 1))}>▼ もうちょっと</button>
+            <button className="toketa-hint__sub" style={{ ...SUBBTN, marginTop: 6 }} onClick={() => setStepN((v) => Math.min(steps.length, v + 1))}>もうちょっと</button>
           )}
         </div>
       )}

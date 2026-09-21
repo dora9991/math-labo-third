@@ -58,7 +58,7 @@ export default function Login({ onDone }) {
   const lbl = { fontSize: 12, fontWeight: 800, color: "#c7d2fe", margin: "0 0 5px 2px" };
 
   return (
-    <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh", padding: 20 }}>
+    <div className="app legacy-auth" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh", padding: 20 }}>
       <form onSubmit={submit} className="glass" style={{ width: "100%", maxWidth: 360, padding: "26px 22px", textAlign: "center" }}>
         <div style={{ fontSize: 30 }}>📐</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", margin: "2px 0 2px" }}>数学ラボ3</div>

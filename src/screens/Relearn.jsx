@@ -40,7 +40,7 @@ export default function Relearn({ player, mistakes = [], onRelearn, onHaichi, on
   const focusEmpty = focusUnitId && keys.length === 0;
 
   return (
-    <div className="app">
+    <div className="app legacy-relearn">
       <Header player={player} back="ホーム" onBack={onBack} />
       <div className="content">
         <div className="pg-ttl">{focusUnitId ? `📖 学び直し・${focusUnit ? focusUnit.name : "この単元"}` : "🩹 弱点克服モード"}</div>

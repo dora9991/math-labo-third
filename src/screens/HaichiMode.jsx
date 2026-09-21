@@ -145,9 +145,9 @@ export default function HaichiMode({ player, grade = 1, onSetGrade, onAttempt, o
 
   // ── ① 大単元えらび（学年→大単元）──
   return (
-    <div className="app">
+    <div className="app haichi-mode">
       <Header player={player} back="ホーム" onBack={onBack} />
-      <div className="content">
+      <div className="content haichi-mode__content">
         <div className="pg-ttl" style={{ fontSize: 20 }}>📺 はいちモード</div>
         <div className="pg-sub">葉一さん（19ch）の授業を見ながらプリントに書きこみ、学んだ単元の練習問題を解こう</div>
 
