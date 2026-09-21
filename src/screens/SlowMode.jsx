@@ -20,6 +20,7 @@ import DrawPad from "../components/DrawPad.jsx";
 import * as sfx from "../audio/sfx.js";
 import { logAnswer } from "../store/answerLog.js";
 import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { generatePracticeAvoiding } from "../third/problemSource.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
 import { isCorrect, SLOW_TARGET, xpRepeatMultiplier, CYCLE_PRACTICE_TARGET, slowPointsForLevel } from "../engine/scoring.js";
@@ -44,12 +45,9 @@ const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
 const ansEq = (val, q) => (hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : isCorrect(val, q.ans));
 
 // 正負(u1〜u5)は toketa のヒント付き問題に差し替え。無ければ seed 付き生成（サーバー採点の下地）。
+// 【数学ラボ3】seed から完全に再現できる問題を作る（サーバーが同じ問題を作り直して採点し、メダルを付与する）。
 function genPractice(unit, level, lastId) {
-  if (unit && hasToketa(unit.id)) {
-    const t = genToketa(unit.id);
-    if (t) return t;
-  }
-  return genProblemSeeded(unit, level, lastId);
+  return generatePracticeAvoiding(unit, level, lastId);
 }
 
 export default function SlowMode({ player, chapter, unit, level, anshin = false, navDifficulty = false, initialNavLevel = "standard", onNavLevelChange, cyclePracticeN = 0, onComplete, onBackToMap, onHome, onRelearn, onBattle, onHaichi, onAttempt }) {
@@ -65,6 +63,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
   // 出題する難易度：nav時は前回到達レベル開始／あんしんは「かんたん」開始／じっくりは選んだ level
   const firstLevel = navDifficulty ? initialNavLevel : anshin ? "easy" : level;
   const [q, setQ] = useState(() => genPractice(unit, firstLevel));
+  const shownAtRef = useRef(Date.now()); // 問題を出した時刻（解答にかかった時間をサーバーへ送る）
   const [choices, setChoices] = useState(() => (q ? choicesFor(q) : []));
   const [streak, setStreak] = useState(0);
   const [total, setTotal] = useState(0);
@@ -87,6 +86,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
     const lv = navDifficulty ? diffRef.current.level : level; // nav時は自動調整された難易度
     const nq = genPractice(unit, lv, q?.id); // 2問目以降は選んだ難易度（正負は toketa 差し替え）
     if (nq) { setQ(nq); setChoices(choicesFor(nq)); }
+    shownAtRef.current = Date.now();
     setSelected(null); setLocked(false); setHintLevel(0); setDontKnow(false);
   }
 
@@ -134,7 +134,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
     setTotal((t) => t + 1);
     updateNavDifficulty(ok); // ④ 次の問題の難易度を調整（nav時のみ）
     // サーバー権威(Lv2)の影運用：seedがある問題（toketa/DB以外）だけ裏で送信
-    onAttempt?.({ unitId: q.unitId, level: q.level, templateId: q.id, seed: q.seed ?? null, userAnswer: String(val), ok, skill: q.skill });
+    onAttempt?.({ unitId: q.unitId, level: q.plevel || q.level, templateId: q.id, seed: q.seed ?? null, userAnswer: String(val), ok, skill: q.skill, pseed: q.pseed, ms: Math.max(0, Date.now() - shownAtRef.current) });
     // 正答・誤答どちらも中身をサーバへ記録（教師が後から見返せるように。失敗しても進行には影響しない）。
     logAnswer({ unitId: q.unitId, level: q.level, mode: anshin ? "slow-anshin" : "slow", q: q.q, ans: q.ans, userAnswer: String(val), ok, mistakeTag });
 
@@ -250,7 +250,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
   // ---- プレイ中 ----
   return (
     <div className="app">
-      {phase === "intro" && <BigWord text={anshin ? "スタート！" : "START!"} color="#4ade80" onDone={() => setPhase("playing")} />}
+      {phase === "intro" && <BigWord text={anshin ? "スタート！" : "START!"} color="#4ade80" onDone={() => { shownAtRef.current = Date.now(); setPhase("playing"); }} />}
       {showRing && <div className="correct-flash show" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 55 }} />}
       {/* 5連正解で難化したときの大きな「レベルアップ！」演出 */}
       {levelUpFx && (

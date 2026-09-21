@@ -13,6 +13,7 @@ import MathText from "../components/MathText.jsx";
 import QuestionText from "../components/QuestionText.jsx";
 import * as sfx from "../audio/sfx.js";
 import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { generatePracticeAvoiding } from "../third/problemSource.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
 import { isCorrect } from "../engine/scoring.js";
@@ -55,6 +56,7 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
   const [done, setDone] = useState(0);
   const [result, setResult] = useState(null);
   const roundRef = useRef({ n: 0, correct: 0, wrongs: [] });
+  const shownAtRef = useRef(Date.now()); // 問題を出した時刻
 
   function next() {
     clearTimeout(advanceTimer.current);
@@ -63,9 +65,10 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
       const unit = units[Math.floor(Math.random() * units.length)];
       const level = LEVELS[Math.floor(Math.random() * LEVELS.length)];
       // 中1の toketa 対応単元はヒント付き問題に差し替え。無ければ seed 付き生成（サーバー採点の下地）。
-      const problem = (hasToketa(unit.id) && genToketa(unit.id)) || genProblemSeeded(unit, level, recentRef.current);
+      const problem = generatePracticeAvoiding(unit, level, recentRef.current); // seedから再現できる問題（サーバー採点用）
       if (problem) {
         recentRef.current = [...recentRef.current, problem.id].slice(-6);
+        shownAtRef.current = Date.now();
         setCur({ unit, level, problem });
         setChoices(choicesFor(problem));
         setSelected(null); setFb(null); setPadKey((k) => k + 1);
@@ -96,7 +99,7 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
     setDone(r.n);
     const roundDone = r.n >= ROUND;
 
-    onAttempt?.({ skill: null, unitId: unit.id, level, templateId: problem.id, seed: problem.seed ?? null, ok, q: problem.q, ans: problem.ans, userAns: String(choice), userAnswer: String(choice), mNew: null, mistakeTag: ok ? null : tagForChoice(problem, choice) });
+    onAttempt?.({ skill: null, unitId: unit.id, level, templateId: problem.id, seed: problem.seed ?? null, ok, q: problem.q, ans: problem.ans, userAns: String(choice), userAnswer: String(choice), pseed: problem.pseed, ms: Math.max(0, Date.now() - shownAtRef.current), mNew: null, mistakeTag: ok ? null : tagForChoice(problem, choice) });
 
     if (ok) advanceTimer.current = setTimeout(() => (roundDone ? finishRound() : next()), AUTO_NEXT_MS);
   }

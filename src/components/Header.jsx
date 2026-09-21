@@ -12,14 +12,14 @@ export default function Header({ player, back, onBack }) {
   const pct = total > 0 ? Math.min(100, (cleared / total) * 100) : 0;
   return (
     <div className="hdr">
-      <span className="logo">✦ 数学ラボ3</span>
+      <span className="logo"><small>ASTRA ACADEMY</small> 数学ラボ3</span>
       <div className="hdr-r">
         {back ? (
           <button className="back-btn" onClick={onBack}>← {back}</button>
         ) : (
           <>
-            <div className="chip cc">💰{player.coins ?? 0}</div>
-            <div className="chip cs">🔥{player.streaks}日</div>
+            <div className="chip cc"><span aria-hidden>◇</span>{player.coins ?? 0}</div>
+            <div className="chip cs"><span aria-hidden>✦</span>{player.streaks}日</div>
             <div className="chip cl">
               <span style={{ fontSize: 11, fontWeight: 700, color: col }}>Lv.{lv}</span>
               <div className="xpm"><div className="xpf" style={{ width: pct + "%", background: col }} /></div>
