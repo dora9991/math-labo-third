@@ -27,6 +27,19 @@ function byArt(glob) {
   return m;
 }
 
+// ID専用の敵画像（2026-09-21〜 敵デザイン刷新）。by-id/{full,small}/<monsterId>.webp があればそれを最優先で使い、
+// hue-rotate も掛けない。無い敵は従来どおりアート型(13種)＋色違いにフォールバックする。
+const idFullGlob = import.meta.glob("../assets/monsters/by-id/full/*.webp", { eager: true, query: "?url", import: "default" });
+const idSmallGlob = import.meta.glob("../assets/monsters/by-id/small/*.webp", { eager: true, query: "?url", import: "default" });
+const byId = (glob) => { const m = {}; for (const path in glob) m[path.split("/").pop().replace(".webp", "")] = glob[path]; return m; };
+export const MON_IMG_BY_ID_FULL = byId(idFullGlob);
+export const MON_IMG_BY_ID_SMALL = byId(idSmallGlob);
+import { ENEMY_ALIAS } from "./enemyAlias.js";
+/** ID専用画像が無い敵の「色違い」割り当て（docs/enemy-work/make-alias.py が自動生成）。 */
+export function enemyAliasOf(character) { return (character?.id && ENEMY_ALIAS[character.id]) || null; }
+/** この敵にID専用の画像があるか。 */
+export function hasIdImage(character) { return !!(character && character.id && MON_IMG_BY_ID_FULL[character.id]); }
+
 export const MON_IMG_FULL = byArt(fullGlob);
 export const MON_IMG_SMALL = byArt(smallGlob);
 
@@ -42,6 +55,15 @@ export function monsterImgArt(character) {
 
 /** アート種別＋サイズから画像URLを返す（無ければnull＝呼び出し側でプレースホルダーにフォールバック）。 */
 export function monsterImageUrl(character, size = "full") {
+  if (character?.id) {
+    const own = (size === "small" ? MON_IMG_BY_ID_SMALL : MON_IMG_BY_ID_FULL)[character.id] || MON_IMG_BY_ID_FULL[character.id];
+    if (own) return own;
+    const al = ENEMY_ALIAS[character.id];
+    if (al) {
+      const via = (size === "small" ? MON_IMG_BY_ID_SMALL : MON_IMG_BY_ID_FULL)[al.base] || MON_IMG_BY_ID_FULL[al.base];
+      if (via) return via;
+    }
+  }
   const art = monsterImgArt(character);
   if (!art) return null;
   const table = size === "small" ? MON_IMG_SMALL : MON_IMG_FULL;
@@ -65,6 +87,9 @@ export function hueFromId(id = "") {
 
 /** キャラのリカラー用CSS filter。imgHueがあればそれを使う。 */
 export function monsterImgFilter(character) {
+  if (hasIdImage(character)) return "none"; // ID専用画像は元の色のまま
+  const al = enemyAliasOf(character); // 色違い割り当て: 元の絵を章のアクセント色へ回す
+  if (al && MON_IMG_BY_ID_FULL[al.base]) return al.hue ? `hue-rotate(${al.hue}deg)` : "none";
   const hue = Number.isFinite(character?.imgHue) ? character.imgHue : hueFromId(character?.id || "");
   if (!hue) return "none";
   return `hue-rotate(${hue}deg)`;
