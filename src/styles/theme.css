@@ -551,3 +551,12 @@ html, body { min-height:100%; background:var(--lab-night); } body { color:var(--
 @keyframes astraRuneTurn { to { transform:translate(-50%,-50%) rotate(360deg); } } @keyframes astraParticle { 50% { transform:translateY(-8px); opacity:.65; } }
 @media (max-width:680px) { .astra-menu-tiles { grid-template-columns:1fr; }.astra-menu-tiles__support { grid-template-columns:1fr; }.astra-menu-tiles__primary { min-height:162px!important; }.astra-menu-tiles__primary .game-btn__label strong { font-size:28px; } }
 @media (max-height:460px) and (orientation:landscape) { .home-content { padding-top:8px!important; }.menu-title-lockup { margin-bottom:9px; }.astra-menu-tiles { grid-template-columns:1.15fr 1fr; }.astra-menu-tiles__primary { min-height:150px!important; }.astra-menu-tiles__support { grid-template-columns:1fr 1fr; }.astra-menu-tiles__support .game-btn:last-child { grid-column:span 2; }.astra-menu-tiles__support .game-btn { min-height:62px!important; } }
+
+/* 仕上げ(A): 設定操作・メダル表示も共通の黒曜石／淡金／淡シアン言語に寄せる。 */
+.menu-step-btn { width:44px; height:44px; padding:0; clip-path:polygon(16% 0,100% 0,84% 100%,0 100%); border:1px solid var(--astra-gold); color:var(--astra-ivory); background:linear-gradient(135deg,rgba(20,40,58,.96),rgba(74,48,24,.96)); box-shadow:inset 0 1px rgba(255,255,255,.18),0 0 12px rgba(223,189,115,.2); font:700 22px Cinzel,serif; cursor:pointer; transition:transform .12s ease,filter .12s ease; }
+.menu-step-btn:active { transform:translateY(2px) scale(.96); filter:brightness(1.35); }
+.menu-range { appearance:none; height:12px; border-radius:0; outline:none; background:linear-gradient(90deg,var(--astra-gold),var(--astra-cyan)); box-shadow:inset 0 0 0 2px rgba(3,8,17,.8),0 0 12px rgba(155,231,239,.22); }
+.menu-range::-webkit-slider-thumb { appearance:none; width:24px; height:24px; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); border:2px solid #fff0bf; background:var(--astra-cyan); box-shadow:0 0 14px var(--astra-cyan); cursor:pointer; }
+.menu-range::-moz-range-thumb { width:20px; height:20px; border:2px solid #fff0bf; border-radius:0; background:var(--astra-cyan); box-shadow:0 0 14px var(--astra-cyan); cursor:pointer; }
+.menu-range-labels { font:600 12px 'Noto Serif JP',serif; }
+.menu-medal-case [style*="font-size: 9"],.menu-medal-case [style*="font-size: 10"],.menu-medal-case [style*="font-size: 11"] { font-size:12px!important; color:rgba(229,237,240,.8)!important; }
