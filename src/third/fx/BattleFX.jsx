@@ -649,6 +649,82 @@ function spawnClawSlash(app, rect, variantIndex) {
   });
 }
 
+// 通常攻撃の見た目。計算・命中・ダメージ表示の責務は playHit 側に残し、
+// ここでは「何で殴ったように見せるか」だけを変える。
+function spawnAttackKind(app, kind, { color, from, to, offset, isCrit }) {
+  const point = to ?? defaultImpactPoint(app);
+  const x = point.x + (offset?.dx || 0);
+  const y = point.y + (offset?.dy || 0);
+  if (kind === "magic") {
+    spawnProjectile(app, { color, size: isCrit ? 19 : 15, frames: isCrit ? 15 : 12, from, to, offset,
+      onArrive: () => { spawnBurst(app, { crit: isCrit, x, y }); spawnMagicCircle(app, x, y, color); } });
+    return;
+  }
+  if (kind === "claw") { spawnClawSlash(app, { x: x - 48, y: y - 34, width: 96, height: 68 }); return; }
+  if (kind === "strike") { spawnImpactRings(app, x, y, color, 3); return; }
+  if (kind === "sword") { spawnSwordCross(app, x, y, color, isCrit ? 4 : 2); return; }
+  spawnExplosion(app, x, y, color, isCrit); // explosion
+}
+
+function spawnMagicCircle(app, x, y, color) {
+  const g = new PIXI.Graphics();
+  g.lineStyle(3, color, 0.9).drawCircle(0, 0, 34).drawCircle(0, 0, 18);
+  g.moveTo(-38, 0).lineTo(38, 0).moveTo(0, -38).lineTo(0, 38);
+  g.x = x; g.y = y; g.life = 1; g.__t = 0; g.blendMode = PIXI.BLEND_MODES.ADD; app.stage.addChild(g);
+  addTicked(app, [g], (n, d) => { n.__t += d; n.rotation += .04 * d; n.scale.set(1 + n.__t / 20); n.alpha = Math.max(0, 1 - n.__t / 20); n.life = n.__t < 20 ? 1 : 0; });
+}
+function spawnImpactRings(app, x, y, color, count = 2) {
+  const items = Array.from({ length: count }, (_, i) => {
+    const g = new PIXI.Graphics(); g.lineStyle(7 - i, i ? 0xffffff : color, .9).drawCircle(0, 0, 12 + i * 8);
+    g.x = x; g.y = y; g.life = 1; g.__t = -i * 2; g.blendMode = PIXI.BLEND_MODES.ADD; app.stage.addChild(g); return g;
+  });
+  addTicked(app, items, (n, d) => { n.__t += d; if (n.__t < 0) return; n.scale.set(1 + n.__t / 7); n.alpha = Math.max(0, 1 - n.__t / 14); n.life = n.__t < 14 ? 1 : 0; });
+}
+function spawnSwordCross(app, x, y, color, count = 2) {
+  const items = Array.from({ length: count }, (_, i) => {
+    const g = new PIXI.Graphics(); const a = (i % 2 ? -1 : 1) * (.55 + i * .12); const len = 90 + i * 14;
+    g.lineStyle(10, color, .9).moveTo(-Math.cos(a) * len / 2, -Math.sin(a) * len / 2).lineTo(Math.cos(a) * len / 2, Math.sin(a) * len / 2);
+    g.lineStyle(2, 0xffffff, .95).moveTo(-Math.cos(a) * len / 2, -Math.sin(a) * len / 2).lineTo(Math.cos(a) * len / 2, Math.sin(a) * len / 2);
+    g.x = x; g.y = y; g.life = 1; g.__t = -i * 1.5; g.blendMode = PIXI.BLEND_MODES.ADD; app.stage.addChild(g); return g;
+  });
+  addTicked(app, items, (n, d) => { n.__t += d; if (n.__t < 0) return; n.alpha = Math.max(0, 1 - n.__t / 12); n.life = n.__t < 12 ? 1 : 0; });
+}
+function spawnExplosion(app, x, y, color, crit = false) { spawnBurst(app, { crit, x, y }); spawnImpactRings(app, x, y, color, 3); flashScreen(app, color, .18); }
+
+// 敵の八系統。どれも party rect 内に完結するため、横画面でも画面外へ飛び出さない。
+function spawnEnemyAttack(app, kind, rect, variantIndex) {
+  const cx = rect ? rect.x + rect.width / 2 : app.screen.width / 2;
+  const cy = rect ? rect.y + rect.height / 2 : app.screen.height / 2;
+  const w = rect?.width ?? app.screen.width * .7;
+  if (kind === "claw") return spawnClawSlash(app, rect, variantIndex);
+  if (kind === "bite") return spawnTeeth(app, cx, cy);
+  if (kind === "fireball") return spawnEnemyOrb(app, cx + w * .42, cy - 30, cx, cy, 0xff6a32, true);
+  if (kind === "ice") return spawnSpikes(app, cx, cy, 0xa9efff);
+  if (kind === "darkSpike") return spawnSpikes(app, cx, cy, 0x6b3b9b);
+  if (kind === "sonic") return spawnImpactRings(app, cx, cy, 0xc777ff, 4);
+  if (kind === "poison") return spawnPoisonMist(app, cx, cy);
+  if (kind === "tackle") return spawnTackle(app, cx, cy, w);
+  return spawnLightning(app, cx, cy);
+}
+function spawnTeeth(app, x, y) { const g = new PIXI.Graphics(); g.beginFill(0xffffff, .94).lineStyle(4, 0xff4f4f, .9); for (let i = -2; i <= 2; i++) g.drawPolygon([i * 19 - 8, -26, i * 19 + 8, -26, i * 19, 4]); g.endFill(); g.x=x; g.y=y; g.life=1; g.__t=0; app.stage.addChild(g); addTicked(app,[g],(n,d)=>{n.__t+=d;n.scale.set(1+n.__t/10);n.alpha=Math.max(0,1-n.__t/15);n.life=n.__t<15?1:0;}); }
+function spawnEnemyOrb(app, sx, sy, x, y, color, boom) { spawnProjectile(app,{ color, size:20, frames:13, from:{x:sx,y:sy},to:{x,y},onArrive:()=>boom&&spawnExplosion(app,x,y,color,false)}); }
+function spawnSpikes(app, x, y, color) { const items=[]; for(let i=-3;i<=3;i++){const g=new PIXI.Graphics();g.beginFill(color,.9).drawPolygon([i*22-9,24,i*22+9,24,i*22,-40-Math.random()*28]).endFill();g.x=x;g.y=y;g.life=1;g.__t=-Math.abs(i)*.8;g.blendMode=PIXI.BLEND_MODES.ADD;app.stage.addChild(g);items.push(g);} addTicked(app,items,(n,d)=>{n.__t+=d;if(n.__t<0)return;n.alpha=Math.max(0,1-n.__t/18);n.life=n.__t<18?1:0;}); }
+function spawnPoisonMist(app,x,y){const ps=[];for(let i=0;i<14;i++){const p=new PIXI.Sprite(makeGlowTexture(0xbb56d8,96));p.anchor.set(.5);p.x=x+(Math.random()-.5)*100;p.y=y+(Math.random()-.5)*42;p.width=p.height=22+Math.random()*28;p.life=1;p.vx=(Math.random()-.5)*1.2;p.vy=-.5-Math.random();app.stage.addChild(p);ps.push(p);}addTicked(app,ps,(p,d)=>{p.life-=.035*d;p.x+=p.vx*d;p.y+=p.vy*d;p.alpha=Math.max(0,p.life*.65);});}
+function spawnHealingPetals(app,x,y){const ps=[];for(let i=0;i<20;i++){const p=new PIXI.Sprite(makeGlowTexture(i%2?0xffd6a3:0xeaffff,96));p.anchor.set(.5);p.x=x+(Math.random()-.5)*110;p.y=y+25+(Math.random()-.5)*40;p.width=12+Math.random()*16;p.height=20+Math.random()*20;p.life=1;p.vx=(Math.random()-.5)*1.4;p.vy=-1.2-Math.random()*1.6;p.rotation=Math.random()*Math.PI;app.stage.addChild(p);ps.push(p);}addTicked(app,ps,(p,d)=>{p.life-=.025*d;p.x+=p.vx*d;p.y+=p.vy*d;p.rotation+=.06*d;p.alpha=Math.max(0,p.life*.8);});}
+function spawnTackle(app,x,y,w){const g=new PIXI.Graphics();g.beginFill(0xffb347,.85).drawRoundedRect(-w*.45,-16,w*.9,32,16).endFill();g.x=x;g.y=y;g.life=1;g.__t=0;g.blendMode=PIXI.BLEND_MODES.ADD;app.stage.addChild(g);addTicked(app,[g],(n,d)=>{n.__t+=d;n.scale.x=1+n.__t/6;n.alpha=Math.max(0,1-n.__t/13);n.life=n.__t<13?1:0;});}
+function spawnLightning(app,x,y){const g=new PIXI.Graphics();g.lineStyle(9,0xfff3a2,.95).moveTo(0,-90).lineTo(-18,-28).lineTo(10,-28).lineTo(-12,48).lineTo(28,-8).lineTo(2,-8);g.x=x;g.y=y;g.life=1;g.__t=0;g.blendMode=PIXI.BLEND_MODES.ADD;app.stage.addChild(g);addTicked(app,[g],(n,d)=>{n.__t+=d;n.alpha=Math.max(0,1-n.__t/12);n.life=n.__t<12?1:0;});flashScreen(app,0xf7ed9b,.22);}
+
+function spawnUltimate(app, { category, color, targets = [], rect, damage, isCrit }) {
+  const points = targets.length ? targets : [defaultImpactPoint(app)];
+  const partyX = rect ? rect.x + rect.width / 2 : app.screen.width / 2;
+  const partyY = rect ? rect.y + rect.height / 2 : app.screen.height * .72;
+  if (category === "aoeDamage") { flashScreen(app, color, .5); points.forEach((p, i) => { spawnSwordCross(app, p.x, p.y, color, 4); spawnExplosion(app, p.x, p.y, color, true); }); return; }
+  if (category === "singleDamage") { const p = points[0]; spawnEnemyOrb(app, partyX, partyY, p.x, p.y, color, true); spawnSwordCross(app, p.x, p.y, color, 5); return; }
+  if (category === "buffAtk" || category === "buffGuard") { spawnImpactRings(app, partyX, partyY, color, 4); spawnMagicCircle(app, partyX, partyY, color); return; }
+  if (category === "heal" || category === "cure") { spawnHealingPetals(app, partyX, partyY); spawnImpactRings(app, partyX, partyY, 0xeaffff, 3); spawnColorBurst(app, { x: partyX, y: partyY, color, count: 28 }); return; }
+  spawnBurst(app, { crit: isCrit, x: partyX, y: partyY });
+}
+
 const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
   const containerRef = useRef(null);
   const appRef = useRef(null);
@@ -686,7 +762,7 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
   useImperativeHandle(ref, () => ({
     // from/to: {x,y}（舞台=stage基準のCSSピクセル座標）。渡さなければ既定位置にフォールバック。
     // offset: {dx,dy} 複数ヒットが完全に重ならないようにする微調整。
-    playHit({ damage, isCrit, subject, from, to, offset = { dx: 0, dy: 0 } }) {
+    playHit({ damage, isCrit, subject, kind = "magic", from, to, offset = { dx: 0, dy: 0 } }) {
       const app = appRef.current;
       if (!app) return;
       const color = SUBJECT_COLOR[subject] ?? 0xffffff;
@@ -696,6 +772,15 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
         const x = point.x + offset.dx;
         const y = point.y + offset.dy;
         spawnBurst(app, { crit: isCrit, x, y });
+        spawnDamageText(app, damage, isCrit, x, y);
+        playImpactSound({ crit: isCrit });
+        return;
+      }
+      if (kind !== "magic") {
+        spawnAttackKind(app, kind, { color, from, to, offset, isCrit });
+        const point = to ?? defaultImpactPoint(app);
+        const x = point.x + offset.dx;
+        const y = point.y + offset.dy;
         spawnDamageText(app, damage, isCrit, x, y);
         playImpactSound({ crit: isCrit });
         return;
@@ -755,10 +840,10 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
     // rect: パーティ表示エリアの{x,y,width,height}（舞台基準）。
     // variantIndex: 引っ掻きの向き(0-3、CLAW_VARIANTS参照)。省略時はランダム。
     // damage: 渡すと引っ掻きのすぐ近くに被ダメージ数値(-◯◯)を出す。
-    playEnemyCounter({ rect, variantIndex, damage } = {}) {
+    playEnemyCounter({ rect, variantIndex, kind = "claw", damage } = {}) {
       const app = appRef.current;
       if (!app) return;
-      spawnClawSlash(app, rect, variantIndex);
+      spawnEnemyAttack(app, kind, rect, variantIndex);
       playEnemyHitSound();
       if (damage != null) {
         const cx = rect ? rect.x + rect.width / 2 : app.screen.width / 2;
@@ -778,6 +863,29 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
       if (text) spawnFloatingLabel(app, { text, x: cx, y: cy - 30, color });
       flashScreen(app, color, 0.28);
       playImpactSound({ crit: false });
+    },
+    // 必殺技専用。通常攻撃と共有しない大技のシルエットを category ごとに描く。
+    playUltimate({ category, subject, color, targets, rect, damage, isCrit, text } = {}) {
+      const app = appRef.current;
+      if (!app) return;
+      const ultimateColor = typeof color === "string"
+        ? Number.parseInt(color.replace("#", ""), 16)
+        : (color ?? SUBJECT_COLOR[subject] ?? 0xffffff);
+      if (speedRef.current === "off") {
+        const p = targets?.[0] ?? (rect ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } : defaultImpactPoint(app));
+        flashScreen(app, ultimateColor, .35);
+        if (damage != null) spawnDamageText(app, damage, isCrit, p.x, p.y);
+        return;
+      }
+      spawnUltimate(app, { category, color: ultimateColor, targets, rect, damage, isCrit });
+      const p = targets?.[0];
+      if (damage != null && p) spawnDamageText(app, damage, isCrit, p.x, p.y);
+      if (text) {
+        const x = rect ? rect.x + rect.width / 2 : app.screen.width / 2;
+        const y = rect ? rect.y + rect.height / 2 : app.screen.height * .7;
+        spawnFloatingLabel(app, { text, x, y: y - 30, color: ultimateColor });
+      }
+      playImpactSound({ crit: !!isCrit });
     },
   }));
 

@@ -24,10 +24,10 @@ export const DIFFICULTY_KEYS = ["easy", "standard", "advanced", "oni"];
 export const DIFFICULTY_LABEL = { easy: "簡単", standard: "普通", advanced: "難しい", oni: "鬼" };
 // dmgMult＝ダメージ倍率 / capFrac＝1回の正解で1体の敵から削れる上限（敵最大HPの割合）
 export const DIFFICULTIES = {
-  easy: { dmgMult: 0.6, capFrac: 0.15 },
+  easy: { dmgMult: 0.7, capFrac: 0.15 },
   standard: { dmgMult: 1.0, capFrac: 0.25 },
-  advanced: { dmgMult: 1.8, capFrac: 0.35 },
-  oni: { dmgMult: 3.0, capFrac: 0.5 },
+  advanced: { dmgMult: 1.2, capFrac: 0.35 },
+  oni: { dmgMult: 1.5, capFrac: 0.5 },
 };
 export const DIFFICULTY_DAMAGE_MULTIPLIER = Object.fromEntries(DIFFICULTY_KEYS.map((k) => [k, DIFFICULTIES[k].dmgMult]));
 // スキル(全体/単体ダメージ)が1体から削れる上限（敵最大HPの割合）

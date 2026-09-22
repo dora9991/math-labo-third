@@ -41,8 +41,14 @@ import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
 import { chaptersForGrade } from "../../data/index.js";
 import { gaugeSecondsFor } from "../gaugeTime.js";
 
-// スキルゲージの満タン値（2026-09-18：10→4に変更。4問正解でスキルが使えるようになる）。
-const SKILL_GAUGE_MAX = 4;
+// スキルゲージの満タン値（2026-09-22：スキルの強さ(tier 1〜4)に応じて必要正解数を変える。
+//   弱いスキルほど早く貯まり、強いスキルほど問題数を稼げる＝学習量が増える）。
+const SKILL_GAUGE_MAX = 4; // 互換用の既定値（tierが無いスキル用）
+const SKILL_GAUGE_BY_TIER = { 1: 6, 2: 9, 3: 12, 4: 15 };
+function skillGaugeMaxFor(character) {
+  const tier = character?.skill?.tier;
+  return SKILL_GAUGE_BY_TIER[tier] ?? SKILL_GAUGE_MAX;
+}
 
 // 状態異常アイコン（2026-09-18追加）。パーティ側の各ポートレートの下に表示する。
 const STATUS_ICON = {
@@ -126,6 +132,31 @@ function rectOf(el, stageEl) {
   return { x: r.left - s.left, y: r.top - s.top, width: r.width, height: r.height };
 }
 
+function stableKind(key, kinds) {
+  return [...String(key || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7) % kinds.length;
+}
+function playerAttackKind(character) {
+  const art = String(character?.art || "").toLowerCase();
+  if (/beast|animal|bug|dice|speed/.test(art) || /獣|動物|虫/.test(String(character?.roleTag || ""))) return "claw";
+  if (/bomb|explosion|fire/.test(art)) return "explosion";
+  if (/geo|angle|prime/.test(art)) return "sword";
+  if (/volume|balance/.test(art) || /guard|tank/.test(String(character?.role || ""))) return "strike";
+  if (/calc|wave/.test(art)) return "magic";
+  return ["claw", "magic", "strike", "sword", "explosion"][stableKind(character?.id, [0, 1, 2, 3, 4])];
+}
+function enemyAttackKind(enemy) {
+  const art = String(enemy?.art || enemy?.id || "").toLowerCase();
+  if (/prime/.test(art)) return "bite";
+  if (/calc/.test(art)) return "fireball";
+  if (/geo|angle/.test(art)) return "ice";
+  if (/maou|boss/.test(art)) return "darkSpike";
+  if (/wave/.test(art)) return "sonic";
+  if (/dice/.test(art)) return "poison";
+  if (/speed|volume/.test(art)) return "tackle";
+  if (/fraction|balance/.test(art)) return "lightning";
+  return ["claw", "bite", "fireball", "ice", "darkSpike", "sonic", "poison", "tackle", "lightning"][stableKind(enemy?.instanceId || enemy?.id, Array(9))];
+}
+
 export default function Battle({ nav, params }) {
   const { grade, chapterId, kind } = params;
   const { save, actions, charactersById } = useGame();
@@ -191,6 +222,7 @@ export default function Battle({ nav, params }) {
   const gaugeRef = useRef(gaugeMax);
   const [penaltyFlash, setPenaltyFlash] = useState(0);
   const latestRef = useRef({}); // タイマーから「最新の描画時点の関数」を呼ぶための入れ物
+  const enemyFxTimersRef = useRef(new Set());
   const [totals, setTotals] = useState({ exp: 0, coins: 0 });
   // 【リアルタイム化】演出を待たず即座に次の問題へ進むため、ロジックは同期的に読み書きできるrefを正とする。
   const enemiesRef = useRef(enemies);
@@ -262,6 +294,18 @@ export default function Battle({ nav, params }) {
   // 速さは見た目の待ち時間だけに適用する。ゲーム進行用のタイマーや計算値には使わない。
   const fxDelay = (ms) => Math.max(1, Math.round(ms * fxScale(fxSpeed)));
   const changeFxSpeed = (speed) => setBattleFxSpeed(setFxSpeed(speed));
+  function scheduleEnemyFx(callback, ms) {
+    const timer = window.setTimeout(() => {
+      enemyFxTimersRef.current.delete(timer);
+      callback();
+    }, ms);
+    enemyFxTimersRef.current.add(timer);
+    return timer;
+  }
+  useEffect(() => () => {
+    enemyFxTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    enemyFxTimersRef.current.clear();
+  }, []);
 
   function triggerEnemyShakeFor(ids, ms) {
     if (!ids.length) return;
@@ -384,10 +428,11 @@ export default function Battle({ nav, params }) {
         const c = charactersById[d.charId];
         if (c?.skill) {
           const currentGauge = gauge[d.charId] || 0;
-          if (currentGauge >= SKILL_GAUGE_MAX) {
+          const gaugeMax = skillGaugeMaxFor(c);
+          if (currentGauge >= gaugeMax) {
             setSkillConfirm(d.charId);
           } else {
-            showTapInfo(d.charId, `スキル発動まであと${SKILL_GAUGE_MAX - currentGauge}問`);
+            showTapInfo(d.charId, `スキル発動まであと${gaugeMax - currentGauge}問`);
           }
         }
       }
@@ -404,21 +449,28 @@ export default function Battle({ nav, params }) {
   }
 
   // 不正解：その小単元の満タン時間の半分だけ敵の行動ゲージが進む。0以下ならすぐ敵が行動する。
+  // 戻り値: 敵の反撃(doEnemyCycle)が発生したか。呼び出し側(pickChoice)は、発生した場合
+  // 次の問題を即座には出さず、doEnemyCycleの演出が終わった後に出す（でないと、敵の行動中
+  // ロック(phase="enemyAttack")が同じ描画の中で"question"に上書きされてしまい、ロックが
+  // 一瞬たりとも見えなくなる不具合になる。2026-09-22 実機確認で発見）。
   function applyWrongPenalty() {
     gaugeRef.current -= gaugeMaxRef.current / 2; // 不正解＝その波のゲージの半分が進む
     setPenaltyFlash((n) => n + 1);
     if (gaugeRef.current <= 0) {
-      doEnemyCycle();
-      return;
+      doEnemyCycle({ nextQuestionDiff: difficultyRef.current });
+      return true;
     }
     setGaugeSec(gaugeRef.current);
+    return false;
   }
 
-  // ゲージが0：生きている敵が全員行動する。【リアルタイム化】ダメージ・状態異常は即座に反映し、
-  // 引っ掻きなどの演出は「見た目だけ」を並行して再生する（演出中もゲージ・出題は止まらない）。
-  function doEnemyCycle() {
+  // ゲージが0：敵行動中は問題の選択肢をロックし、全演出後に問題へ戻す。
+  //   nextQuestionDiff を渡した場合（＝不正解でゲージが尽きた場合）は演出後に新しい問題を出す。
+  //   渡さない場合（＝時間切れで自然にゲージが尽きた場合）は今の問題のまま続けられるようにする。
+  function doEnemyCycle({ nextQuestionDiff } = {}) {
     const pool = enemiesRef.current.filter((en) => en.hp > 0);
     if (!pool.length) return;
+    setPhase("enemyAttack");
     const guardMult = partyBuffsRef.current.guard?.multiplier ?? 1;
     const variantOrder = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
     const memberIds = partyMembers.map((c) => c.id);
@@ -429,7 +481,7 @@ export default function Battle({ nav, params }) {
       const attacker = pool[i];
       const dmg = Math.round(resolveEnemyAction(attacker) * guardMult);
       hp = Math.max(0, hp - dmg);
-      events.push({ attacker, dmg, variantIndex: variantOrder[i % variantOrder.length] });
+      events.push({ attacker, dmg, variantIndex: variantOrder[i % variantOrder.length], kind: enemyAttackKind(attacker) });
       // 命中した相手にランダムで状態異常も仕掛けてくる（石化していない生存メンバーから1体）。
       const eligibleIds = memberIds.filter((id) => !partyStatusRef.current[id]?.petrification);
       if (eligibleIds.length) {
@@ -448,21 +500,21 @@ export default function Battle({ nav, params }) {
     // 演出（見た目だけ）
     const partyRect = rectOf(partyAreaRef.current, stageRef.current);
     events.forEach((ev, i) => {
-      setTimeout(() => {
+      scheduleEnemyFx(() => {
         setLungingIds((prev) => new Set([...prev, ev.attacker.instanceId]));
         playEnemyAttackStartSound();
-        setTimeout(() => {
-          fxRef.current?.playEnemyCounter({ rect: partyRect, variantIndex: ev.variantIndex, damage: ev.dmg });
-          triggerPartyShake(260);
-          setTimeout(() => {
+        scheduleEnemyFx(() => {
+          fxRef.current?.playEnemyCounter({ rect: partyRect, variantIndex: ev.variantIndex, kind: ev.kind, damage: ev.dmg });
+          triggerPartyShake(fxDelay(260));
+          scheduleEnemyFx(() => {
             setLungingIds((prev) => {
               const next = new Set(prev);
               next.delete(ev.attacker.instanceId);
               return next;
             });
-          }, ENEMY_LUNGE_CLEAR_MS);
-        }, ENEMY_STRIKE_WINDUP_MS);
-      }, i * ENEMY_ATTACK_STEP_MS);
+          }, fxDelay(ENEMY_LUNGE_CLEAR_MS));
+        }, fxDelay(ENEMY_STRIKE_WINDUP_MS));
+      }, fxDelay(i * ENEMY_ATTACK_STEP_MS));
     });
 
     // ゲージ1周ぶんの経過：バフ・状態異常を1つ進める（毒ダメージもここ）。
@@ -482,6 +534,11 @@ export default function Battle({ nav, params }) {
     }
     gaugeRef.current = gaugeMaxRef.current;
     setGaugeSec(gaugeMaxRef.current);
+    const finishDelay = fxDelay(Math.max(ENEMY_STRIKE_WINDUP_MS + ENEMY_LUNGE_CLEAR_MS, (events.length - 1) * ENEMY_ATTACK_STEP_MS + ENEMY_STRIKE_WINDUP_MS + ENEMY_LUNGE_CLEAR_MS));
+    scheduleEnemyFx(() => {
+      if (nextQuestionDiff) startQuestion(nextQuestionDiff);
+      else setPhase("question");
+    }, finishDelay);
   }
 
   // 波を全滅させた：撃破演出を少し見せてから、次の波（最後ならクリア画面）へ。
@@ -515,20 +572,22 @@ export default function Battle({ nav, params }) {
     if (!skill) return;
     const effects = partyStatus[characterId];
     if (!canActThisRound(effects) || !canUseSkillThisRound(effects)) return;
-    if ((gauge[characterId] || 0) < SKILL_GAUGE_MAX) return;
-
-    setCutIn({ id: `${characterId}-${Date.now()}`, character: c, skill });
-
-    const level = levelFromExp(save.owned[c.id]?.exp || 0, c.rarity);
-    const charSubject = subjectFor(c);
-    const atkBuffMultiplier = partyBuffs.atk?.multiplier ?? 1;
-    const stageEl = stageRef.current;
-    const from = pointOf(portraitRefs.current[c.id], stageEl);
-    const partyRect = rectOf(partyAreaRef.current, stageEl);
+    if ((gauge[characterId] || 0) < skillGaugeMaxFor(c)) return;
 
     setGauge((g) => ({ ...g, [characterId]: 0 }));
     setPoppedOut((p) => ({ ...p, [characterId]: true }));
     setTimeout(() => setPoppedOut((p) => ({ ...p, [characterId]: false })), fxDelay(POPUP_LEAD_MS + 260));
+    // カットインの決めフラッシュだけを先に見せる。HP反映とFXは onComplete 後。
+    setPhase("skill");
+    setCutIn({ id: `${characterId}-${Date.now()}`, character: c, skill });
+  }
+
+  function resolveSkillAfterCutIn({ character: c, skill }) {
+    const level = levelFromExp(save.owned[c.id]?.exp || 0, c.rarity);
+    const charSubject = subjectFor(c);
+    const atkBuffMultiplier = partyBuffsRef.current.atk?.multiplier ?? 1;
+    const stageEl = stageRef.current;
+    const partyRect = rectOf(partyAreaRef.current, stageEl);
 
     if (skill.category === "aoeDamage" || skill.category === "singleDamage") {
       const live = enemiesRef.current.filter((en) => en.hp > 0);
@@ -548,17 +607,12 @@ export default function Battle({ nav, params }) {
         rawAttack.damage = Math.min(rawAttack.damage, Math.max(1, Math.round((enT?.maxHp ?? Infinity) * SKILL_CAP_FRAC)));
         damageByTarget[tid] = (damageByTarget[tid] || 0) + rawAttack.damage;
         if (rawAttack.isCrit) anyCrit = true;
-        const to = pointOf(enemyRefs.current[tid], stageEl);
-        setTimeout(() => {
-          fxRef.current?.playHit({
-            damage: rawAttack.damage,
-            isCrit: rawAttack.isCrit,
-            subject: charSubject,
-            from,
-            to,
-            offset: { dx: Math.random() * 12 - 6, dy: Math.random() * 14 - 7 },
-          });
-        }, idx * 40);
+      });
+
+      const targetPoints = targetIds.map((tid) => pointOf(enemyRefs.current[tid], stageEl)).filter(Boolean);
+      fxRef.current?.playUltimate({
+        category: skill.category, subject: charSubject, color: c.color, targets: targetPoints,
+        rect: partyRect, damage: damageByTarget[targetIds[0]], isCrit: anyCrit,
       });
 
       // 即座に反映（演出は並行）
@@ -570,17 +624,20 @@ export default function Battle({ nav, params }) {
       }, fxDelay(PROJECTILE_MS.normal));
       if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
       if (updatedEnemies.every((en) => en.hp <= 0)) onWaveCleared();
+      else setPhase("question");
       return;
     }
 
     if (skill.category === "buffAtk") {
       setPartyBuffs((prev) => ({ ...prev, atk: { multiplier: skill.multiplier, turnsLeft: skill.duration } }));
-      fxRef.current?.playPartySkillFx({ rect: partyRect, text: `攻撃力 ×${skill.multiplier}`, color: 0xff8a4d });
+      fxRef.current?.playUltimate({ category: skill.category, subject: charSubject, color: c.color, rect: partyRect, text: `攻撃力 ×${skill.multiplier}` });
+      setPhase("question");
       return;
     }
     if (skill.category === "buffGuard") {
       setPartyBuffs((prev) => ({ ...prev, guard: { multiplier: skill.multiplier, turnsLeft: skill.duration } }));
-      fxRef.current?.playPartySkillFx({ rect: partyRect, text: `被ダメ ×${skill.multiplier}`, color: 0x7fd0ff });
+      fxRef.current?.playUltimate({ category: skill.category, subject: charSubject, color: c.color, rect: partyRect, text: `被ダメ ×${skill.multiplier}` });
+      setPhase("question");
       return;
     }
     if (skill.category === "heal") {
@@ -589,14 +646,16 @@ export default function Battle({ nav, params }) {
       commitPartyHp(Math.min(partyMaxHp, partyHpRef.current + healAmount));
       // 「癒しの泉」(mode:"hot")は、いま回復＋以後の敵の行動ごとにもう一度ずつ回復する
       if (skill.mode === "hot") hotRef.current = { left: Math.max(0, (skill.duration || 3) - 1), amount: healAmount };
-      fxRef.current?.playPartySkillFx({ rect: partyRect, text: `+${healAmount}`, color: 0x7cff8a });
+      fxRef.current?.playUltimate({ category: skill.category, subject: charSubject, color: c.color || 0x7cff8a, rect: partyRect, text: `+${healAmount}` });
+      setPhase("question");
       return;
     }
     if (skill.category === "cure") {
       const nextStatus = cureStatusEffects(partyStatusRef.current, skill.cures);
       partyStatusRef.current = nextStatus;
       setPartyStatus(nextStatus);
-      fxRef.current?.playPartySkillFx({ rect: partyRect, text: "状態異常回復", color: 0xbfe3ff });
+      fxRef.current?.playUltimate({ category: skill.category, subject: charSubject, color: c.color || 0xbfe3ff, rect: partyRect, text: "状態異常回復" });
+      setPhase("question");
     }
   }
 
@@ -643,8 +702,10 @@ export default function Battle({ nav, params }) {
       const fromPoint = pointOf(portraitRefs.current[partyMembers[0]?.id], stageEl);
       const toPoint = live[0] ? pointOf(enemyRefs.current[live[0].instanceId], stageEl) : null;
       fxRef.current?.playMiss({ subject: subjectFor(partyMembers[0]), from: fromPoint, to: toPoint });
-      applyWrongPenalty();
-      if (partyHpRef.current > 0) startQuestion(difficultyRef.current);
+      const enemyCycleTriggered = applyWrongPenalty();
+      // 敵の反撃が起きた場合は、その演出が終わってから doEnemyCycle 側が次の問題を出す
+      // （ここで即座に出すと phase="enemyAttack" のロックが同じ描画内で上書きされてしまう）。
+      if (!enemyCycleTriggered && partyHpRef.current > 0) startQuestion(difficultyRef.current);
       return;
     }
 
@@ -705,14 +766,14 @@ export default function Battle({ nav, params }) {
       const stagger = h.charIndex * STAGGER_MS + Math.random() * STAGGER_JITTER_MS;
       const offset = { dx: Math.random() * 12 - 6, dy: Math.random() * 14 - 7 };
       setTimeout(() => {
-        fxRef.current?.playHit({ damage: h.attack.damage, isCrit: h.attack.isCrit, subject: h.subject, from: h.from, to: h.to, offset });
+        fxRef.current?.playHit({ damage: h.attack.damage, isCrit: h.attack.isCrit, subject: h.subject, kind: playerAttackKind(h.character), from: h.from, to: h.to, offset });
       }, fxDelay(stagger));
     });
 
     // ゲージ更新：行動できたキャラは+1（満タンで足止め、スキル使用時はactivateSkill側で0に戻す）。
     setGauge((g) => {
       const next = { ...g };
-      for (const id of actedCharacterIds) next[id] = Math.min(SKILL_GAUGE_MAX, (g[id] || 0) + 1);
+      for (const id of actedCharacterIds) next[id] = Math.min(skillGaugeMaxFor(charactersById[id]), (g[id] || 0) + 1);
       return next;
     });
 
@@ -859,7 +920,7 @@ export default function Battle({ nav, params }) {
             {partyMembers.map((c) => {
               const hasSkill = !!c.skill;
               const g = gauge[c.id] || 0;
-              const ready = hasSkill && g >= SKILL_GAUGE_MAX;
+              const ready = hasSkill && g >= skillGaugeMaxFor(c);
               const popped = !!poppedOut[c.id];
               const statusEffects = partyStatus[c.id];
               return (
@@ -937,7 +998,11 @@ export default function Battle({ nav, params }) {
           ultimate={{ icon: cutIn.skill.icon || "✦", name: cutIn.skill.name, color: cutIn.character.color || "#9be7ef" }}
           heroSrc={monsterImageUrl(cutIn.character, "full")}
           speed={fxSpeed}
-          onComplete={() => setCutIn(null)}
+          onComplete={() => {
+            const pending = cutIn;
+            setCutIn(null);
+            resolveSkillAfterCutIn(pending);
+          }}
         />
       )}
 
@@ -973,12 +1038,12 @@ export default function Battle({ nav, params }) {
         </div>
       )}
 
-      {phase === "question" && problem && (
-        <div className="mw-panel">
+      {(phase === "question" || phase === "enemyAttack" || phase === "skill") && problem && (
+        <div className={`mw-panel mw-question-panel ${phase === "enemyAttack" || phase === "skill" ? "mw-choices-locked" : ""} ${phase === "skill" ? "mw-skill-locked" : ""}`}>
           <div className="mw-question"><QuestionText text={problem.question} /></div>
           <div className="mw-choices">
             {problem.choices.map((choice, i) => (
-              <button key={i} className="mw-choice" onClick={() => pickChoice(i)}>
+              <button key={i} className="mw-choice" disabled={phase !== "question"} onClick={() => pickChoice(i)}>
                 <MathText>{choice}</MathText>
               </button>
             ))}
@@ -989,6 +1054,7 @@ export default function Battle({ nav, params }) {
               <button
                 key={d}
                 className={`mw-diff-btn ${difficulty === d ? "selected" : ""}`}
+                disabled={phase !== "question"}
                 onClick={() => pickDifficulty(d)}
               >
                 {DIFFICULTY_LABEL[d]}
