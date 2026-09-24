@@ -12,6 +12,7 @@
     "teacher": "node --env-file=.env.local scripts/teacher-server.mjs",
     "prebuild": "node scripts/gen-problem-version.mjs",
     "build:third-api": "node scripts/build-third-api.mjs",
+    "build:story": "node scripts/build-story.mjs",
     "test:third-api": "node scripts/test-third-api.mjs",
     "release": "node scripts/release.mjs"
   },

@@ -20,6 +20,7 @@ import {
 import { generateBattleProblem } from "../problemSource.js";
 import { PROBLEM_VERSION } from "../problemVersion.js";
 import * as bgm from "../../audio/bgm.js";
+import { normalBattleTrack } from "../story/battleBgm.js";
 import {
   SKILL_CAP_FRAC,
   DIFFICULTY_KEYS,
@@ -330,7 +331,7 @@ export default function Battle({ nav, params }) {
     else if (phase === "claiming") return; // 勝利曲は結果画面で
     else if (isBossWave && (kind === "chapterBoss" || kind === "finalBoss")) bgm.play("chapterboss");
     else if (isBossWave) bgm.play("boss");
-    else bgm.play("battle");
+    else bgm.play(normalBattleTrack(grade, chapterId, params.subUnitId)); // 章・小単元ごとに曲を巡回（story/battleBgm.js）
   }, [isBossWave, phase, kind]);
   const aliveEnemies = enemies.filter((e) => e.hp > 0);
 

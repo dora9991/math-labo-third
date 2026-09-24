@@ -4,6 +4,7 @@
 //   ・party  … パーティ編成（PartyFormation）
 //   ・battle … バトル（ThirdBattle）→ 勝利で reward。メダル2枚(はいち＋れんしゅう)が無い小単元は入れない
 //  world側の nav API（go/back/resetTo/flashTo）をそのまま提供し、exit() でラボ3のホームへ戻る。
+//  ストーリー（会話場面）は story/ … バトル前・勝利後に未視聴の場面を挟む。
 //  セーブは ThirdContext（localStorage: mathLabo3_third_save_v1）。将来はサーバーを正にする（設計メモ参照）。
 // ============================================================
 import { useEffect, useState } from "react";
@@ -17,6 +18,8 @@ import ThirdGacha from "./screens/ThirdGacha.jsx";
 import { isBattleOpen } from "./medals.js";
 import { labUnitIdForBattle } from "./link.js";
 import { getFxSpeed } from "../engine/fxSpeed.js";
+import StoryPlayer from "./story/StoryPlayer.jsx";
+import { scenesFor, loadSeen, saveSeen } from "./story/storyRun.js";
 import "./third.css";
 
 const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha };
@@ -76,22 +79,30 @@ export default function ThirdApp({ player, start, onExit }) {
   const nav = useNav(start || { screen: "party", params: {} }, onExit);
   const Screen = SCREENS[nav.screen] || PartyFormation;
 
+  // ストーリー：バトルの前／勝利の報酬の前に、まだ見ていない会話場面があれば先に出す（見終わるまで次の画面は開かない）
+  const [seen, setSeen] = useState(() => loadSeen());
+  const pending = scenesFor(nav, seen);
+  const finishScene = (key) => setSeen((prev) => { const n = new Set(prev); n.add(key); saveSeen(n); return n; });
+
   // 画面ごとのBGM（バトル中の曲＝通常/小単元ボス/章ボス/敗北は ThirdBattle が切り替える）
   useEffect(() => {
+    if (pending.length) return; // 会話場面の間は StoryPlayer が自分のBGMを鳴らす（終わったら pending が空になり、この effect が走る）
     if (nav.screen === "party" || nav.screen === "gacha") bgm.play("coop"); // 仲間と協力する画面
     else if (nav.screen === "reward") {
       const k = nav.params?.kind;
       if (k === "finalBoss") bgm.play("ending", { loop: false });
       else bgm.play("victory", { loop: false });
     }
-  }, [nav.screen, nav.params]);
+  }, [nav.screen, nav.params, pending.length]);
 
   return (
     <ThirdProvider>
       <div className="mw-app">
         <div key={nav.navKey} className={`mw-screen-enter mw-screen-enter--${getFxSpeed()}`}>
           <MedalGate nav={nav} onExit={onExit}>
-            <Screen params={nav.params} nav={nav} />
+            {pending.length
+              ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} />
+              : <Screen params={nav.params} nav={nav} />}
           </MedalGate>
         </div>
         <div className="mw-whiteout" style={{ opacity: nav.flashOpacity, pointerEvents: nav.flashOpacity > 0 ? "auto" : "none" }} />

@@ -1,0 +1,38 @@
+/* 会話画面（StoryPlayer）。下1/3は会話ウィンドウ、立ち絵はその後ろに少し重ねる */
+.st-root{position:fixed;inset:0;z-index:3000;background:#05060f;color:#f4f1ff;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;font-family:inherit}
+.st-bg{position:absolute;inset:0;background-size:cover;background-position:center;animation:st-fade .5s ease both}
+.st-shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(4,6,20,.25) 0%,rgba(4,6,20,0) 30%,rgba(4,6,20,.15) 60%,rgba(4,6,20,.55) 100%)}
+.st-title{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:16px;max-width:60%;padding:6px 14px;border:1px solid rgba(224,181,82,.7);background:rgba(8,10,30,.6);color:#f3d88a;font-size:.85rem;letter-spacing:.08em;border-radius:4px}
+.st-skip{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:16px;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(8,10,30,.6);color:#e9e5ff;font-size:.8rem;cursor:pointer}
+.st-skip:hover,.st-skip:focus-visible{border-color:#f3d88a;color:#fff;outline:none}
+.st-stage{position:absolute;inset:0;pointer-events:none}
+.st-chara,.st-foe{position:absolute;bottom:calc(22% - 6px);height:min(66%,640px);max-width:44%;object-fit:contain;object-position:bottom;filter:brightness(.62) saturate(.85);transition:filter .25s,transform .25s;animation:st-in .35s ease both}
+.st-chara.is-on,.st-foe.is-on{filter:none;transform:translateY(-6px)}
+.st-chara.is-mem{filter:sepia(.75) brightness(.8)}
+.st-chara.is-ally{height:min(40%,380px)}
+.st-slot-l1{left:2%}.st-slot-l2{left:24%}
+.st-slot-c{left:50%;margin-left:min(-17%,-120px)}
+.st-slot-r{right:2%}
+.st-foe{right:3%;height:min(68%,620px);max-width:52%}
+.st-box{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(920px,calc(100% - 32px));min-height:22%;box-sizing:border-box;padding:22px 26px 18px;border:1.5px solid rgba(224,181,82,.75);border-radius:8px;background:linear-gradient(180deg,rgba(10,13,38,.92),rgba(6,8,24,.95));box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.st-box p{margin:0;font-size:clamp(1rem,2.5vw,1.25rem);line-height:1.85;letter-spacing:.03em;white-space:pre-wrap}
+.st-box.is-nar p{color:#d7d2f0}
+.st-box.is-foe{border-color:rgba(176,132,232,.85);background:linear-gradient(180deg,rgba(28,14,48,.94),rgba(14,8,28,.96))}
+.st-foe-text{color:#e3cffb;letter-spacing:.08em}
+.st-name{position:absolute;top:-15px;left:22px;padding:2px 16px;border:1.5px solid rgba(224,181,82,.85);border-radius:4px;background:#101540;color:#f3d88a;font-size:.9rem;letter-spacing:.06em}
+.st-box.is-foe .st-name{border-color:rgba(176,132,232,.9);color:#e3cffb;background:#1c0f34}
+.st-caret{margin-left:6px;color:#f3d88a;font-size:.8em;animation:st-blink 1s steps(2) infinite}
+.st-label{position:absolute;inset:0;display:grid;place-content:center;gap:12px;text-align:center;background:rgba(3,4,14,.55)}
+.st-label span{font-size:clamp(1.4rem,4vw,2.2rem);letter-spacing:.2em;color:#f3d88a;font-family:"Shippori Mincho","Hiragino Mincho ProN",serif;padding:10px 26px;border-block:1px solid rgba(224,181,82,.7)}
+.st-label i{font-style:normal;font-size:.8rem;color:#b9b2da}
+@keyframes st-fade{from{opacity:0}to{opacity:1}}
+@keyframes st-in{from{opacity:0;translate:0 14px}to{opacity:1;translate:0 0}}
+@keyframes st-blink{50%{opacity:0}}
+@media (max-width:640px){
+  .st-chara,.st-foe{height:min(52%,420px);max-width:56%;bottom:calc(30% - 8px)}
+  .st-chara.is-ally{height:min(36%,300px)}
+  .st-slot-l1{left:-2%}.st-slot-l2{left:30%}.st-slot-c{left:50%;margin-left:-28%}.st-slot-r{right:-2%}
+  .st-box{min-height:26%;padding:20px 18px 14px}
+  .st-title{max-width:52%;font-size:.75rem}
+}
+@media (prefers-reduced-motion:reduce){.st-bg,.st-chara,.st-foe{animation:none}.st-caret{animation:none}}

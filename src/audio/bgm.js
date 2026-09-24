@@ -23,6 +23,23 @@ const FILES = {
   defeat: BASE + "bgm/defeat3.m4a",        // 戦闘敗北（1回だけ流す）
   ending: BASE + "bgm/ending.m4a",         // エンディング（最終ボス撃破のごほうび画面）
   coop: BASE + "bgm/coop.m4a",             // 協力プレイ（パーティ編成・ガチャ＝仲間と協力する画面）
+  // 【2026-09-25】ストーリー用BGM（Suno制作）。通常戦闘は章・小単元ごとに battle / battle_g1 / battle_g3 を巡回（飽き防止）。
+  battle_g1: BASE + "bgm/battle_g1.m4a",
+  battle_g3: BASE + "bgm/battle_g3.m4a",
+  story_prologue: BASE + "bgm/story_prologue.m4a",
+  story_daily: BASE + "bgm/story_daily.m4a",
+  story_dread: BASE + "bgm/story_dread.m4a",
+  story_relief: BASE + "bgm/story_relief.m4a",
+  story_g1: BASE + "bgm/story_g1.m4a",
+  story_g2: BASE + "bgm/story_g2.m4a",
+  story_g3: BASE + "bgm/story_g3.m4a",
+  story_memory: BASE + "bgm/story_memory.m4a",
+  story_boss_pre: BASE + "bgm/story_boss_pre.m4a",
+  story_sad: BASE + "bgm/story_sad.m4a",
+  story_finale_gate: BASE + "bgm/story_finale_gate.m4a",
+  story_epilogue_g1: BASE + "bgm/story_epilogue_g1.m4a",
+  story_epilogue_g2: BASE + "bgm/story_epilogue_g2.m4a",
+  story_epilogue_g3: BASE + "bgm/story_epilogue_g3.m4a",
 };
 
 let el = null;          // 再生用の <audio>
@@ -32,7 +49,25 @@ let muted = false;
 try { muted = localStorage.getItem("ml3_bgm_muted") === "1"; } catch {}
 
 // 曲ごとの音量。タイトル(op)は大きめ、その他は控えめ（効果音を聞き取りやすく）。
-const VOLUME = { op: 0.6 };
+const VOLUME = { op: 0.6,
+  // 新BGMの音量を実測(ブラウザでRMS)して既存曲に揃えた値。会話用は文字を読むので少し小さめ
+  battle_g1: 0.337,
+  battle_g3: 0.311,
+  story_prologue: 0.208,
+  story_daily: 0.194,
+  story_dread: 0.173,
+  story_relief: 0.217,
+  story_g1: 0.21,
+  story_g2: 0.194,
+  story_g3: 0.222,
+  story_memory: 0.208,
+  story_boss_pre: 0.198,
+  story_sad: 0.23,
+  story_finale_gate: 0.241,
+  story_epilogue_g1: 0.185,
+  story_epilogue_g2: 0.205,
+  story_epilogue_g3: 0.244,
+};
 const DEFAULT_VOLUME = 0.28;
 
 function ensure() {
