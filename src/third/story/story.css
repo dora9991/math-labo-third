@@ -21,6 +21,7 @@
 .st-foe-text{color:#e3cffb;letter-spacing:.08em}
 .st-name{position:absolute;top:-15px;left:22px;padding:2px 16px;border:1.5px solid rgba(224,181,82,.85);border-radius:4px;background:#101540;color:#f3d88a;font-size:.9rem;letter-spacing:.06em}
 .st-box.is-foe .st-name{border-color:rgba(176,132,232,.9);color:#e3cffb;background:#1c0f34}
+.st-rest{opacity:0} /* まだ出していない文字も場所は確保（打ち込み中に行の折り返しが変わらない） */
 .st-caret{margin-left:6px;color:#f3d88a;font-size:.8em;animation:st-blink 1s steps(2) infinite}
 .st-label{position:absolute;inset:0;display:grid;place-content:center;gap:12px;text-align:center;background:rgba(3,4,14,.55)}
 .st-label span{font-size:clamp(1.4rem,4vw,2.2rem);letter-spacing:.2em;color:#f3d88a;font-family:"Shippori Mincho","Hiragino Mincho ProN",serif;padding:10px 26px;border-block:1px solid rgba(224,181,82,.7)}

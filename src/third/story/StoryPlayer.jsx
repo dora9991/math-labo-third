@@ -25,26 +25,41 @@ function portraitUrl(who, e) {
 export default function StoryPlayer({ scene, onDone }) {
   const beats = scene.beats;
   const [i, setI] = useState(0);
-  const [shown, setShown] = useState(0);
+  const [typed, setTyped] = useState({ i: 0, n: 0 }); // どの行の何文字目まで出したか（行が変わった瞬間は 0 文字扱い＝前の行の全文が一瞬出るのを防ぐ）
   const doneRef = useRef(false);
   const b = beats[i];
 
-  // いまの行までの登場人物（最大3人・新しい順に入れ替え）と、最新の表情
-  const { cast, showFoe, bgId } = useMemo(() => {
-    const list = []; let foe = false; let bg = scene.bg;
+  // いまの行までの登場人物と最新の表情。立ち絵の「場所」は登場した時に決めたまま動かさない
+  //  （再び喋った人が末尾に回って左右が入れ替わる、を防ぐ）。場所が足りない時は、いちばん長く喋っていない人が退場する。
+  const { slots, showFoe, bgId, exprs } = useMemo(() => {
+    const sl = [null, null, null]; const used = {}; const ex = {}; let foe = false; let bg = scene.bg;
+    const cap = () => (foe ? 2 : 3);
+    const place = (who, n) => {
+      let at = sl.indexOf(who);
+      if (at < 0 || at >= cap()) {
+        if (at >= 0) sl[at] = null;
+        at = sl.findIndex((v, k) => v === null && k < cap());
+        if (at < 0) { // 満員：最後に喋ったのが最も古い人と入れ替える
+          let old = 0; for (let k = 1; k < cap(); k++) if ((used[sl[k]] ?? -1) < (used[sl[old]] ?? -1)) old = k;
+          at = old;
+        }
+        sl[at] = who;
+      }
+      used[who] = n;
+    };
     for (let n = 0; n <= i; n++) {
       const x = beats[n];
       if (x.bg) bg = x.bg;
       if (x.k !== "say") continue;
-      if (x.who === "foe") { foe = true; continue; }
+      if (x.who === "foe") {
+        if (!foe) { foe = true; if (sl[2]) { const w = sl[2]; sl[2] = null; place(w, used[w] ?? n); } }
+        continue;
+      }
       if (x.voice) continue; // 通信・声・日記は立ち絵なし
-      const at = list.findIndex((c) => c.who === x.who);
-      const item = { who: x.who, e: x.e || (at >= 0 ? list[at].e : null), mem: !!x.mem };
-      if (at >= 0) list.splice(at, 1);
-      list.push(item);
-      if (list.length > 3) list.shift();
+      place(x.who, n);
+      ex[x.who] = { e: x.e || ex[x.who]?.e || null, mem: !!x.mem };
     }
-    return { cast: list, showFoe: foe, bgId: bg };
+    return { slots: sl, showFoe: foe, bgId: bg, exprs: ex };
   }, [beats, i, scene.bg]);
 
   // BGM：行ごとの曲（同じ曲が続く間は途切れない。会話が終わったら次の画面のBGMに切り替わる）
@@ -53,17 +68,21 @@ export default function StoryPlayer({ scene, onDone }) {
   useEffect(() => { if (track) bgm.play(track); }, [track]);
 
   const text = b?.t || "";
+  const shown = typed.i === i ? typed.n : 0;
   useEffect(() => {
-    setShown(0);
     if (!text) return;
-    const id = setInterval(() => setShown((s) => { if (s >= text.length) { clearInterval(id); return s; } return s + 1; }), TYPE_MS);
+    const id = setInterval(() => setTyped((t) => {
+      const n = t.i === i ? t.n : 0;
+      if (n >= text.length) { clearInterval(id); return t; }
+      return { i, n: n + 1 };
+    }), TYPE_MS);
     return () => clearInterval(id);
   }, [i, text]);
 
   const finish = () => { if (doneRef.current) return; doneRef.current = true; onDone(); };
   const next = () => {
     if (!b) return;
-    if (shown < text.length) { setShown(text.length); return; }
+    if (shown < text.length) { setTyped({ i, n: text.length }); return; }
     if (i + 1 >= beats.length) finish(); else setI(i + 1);
   };
   useEffect(() => {
@@ -73,8 +92,7 @@ export default function StoryPlayer({ scene, onDone }) {
 
   const speaker = b?.k === "say" ? b : null;
   const enemyUrl = scene.enemyId ? monsterImageUrl({ id: scene.enemyId }, "full") : null;
-  const humanSlots = showFoe && enemyUrl ? ["st-slot-l1", "st-slot-l2"] : ["st-slot-l1", "st-slot-c", "st-slot-r"];
-  const visible = cast.slice(-humanSlots.length);
+  const slotClass = showFoe && enemyUrl ? ["st-slot-l1", "st-slot-l2"] : ["st-slot-l1", "st-slot-c", "st-slot-r"];
   const isLabel = b?.k === "label";
   const bgUrl = BGS[bgId] || BGS[scene.bg] || null;
 
@@ -89,11 +107,13 @@ export default function StoryPlayer({ scene, onDone }) {
         {showFoe && enemyUrl && (
           <img className={`st-foe ${speaker?.who === "foe" ? "is-on" : ""}`} src={enemyUrl} alt="" draggable={false} />
         )}
-        {visible.map((c, idx) => {
-          const url = portraitUrl(c.who, c.e);
+        {slots.slice(0, slotClass.length).map((who, idx) => {
+          if (!who) return null;
+          const c = exprs[who] || {};
+          const url = portraitUrl(who, c.e);
           if (!url) return null;
-          const active = speaker && !speaker.voice && speaker.who === c.who;
-          return <img key={c.who} className={`st-chara ${humanSlots[idx]} ${ALLY_ART[c.who] ? "is-ally" : ""} ${active ? "is-on" : ""} ${c.mem ? "is-mem" : ""}`} src={url} alt="" draggable={false} />;
+          const active = speaker && !speaker.voice && speaker.who === who;
+          return <img key={who} className={`st-chara ${slotClass[idx]} ${ALLY_ART[who] ? "is-ally" : ""} ${active ? "is-on" : ""} ${c.mem ? "is-mem" : ""}`} src={url} alt="" draggable={false} />;
         })}
       </div>
 
@@ -102,7 +122,7 @@ export default function StoryPlayer({ scene, onDone }) {
       ) : (
         <div className={`st-box ${speaker ? "is-say" : "is-nar"} ${speaker?.who === "foe" ? "is-foe" : ""}`}>
           {speaker && <div className="st-name">{speaker.n}{speaker.voice ? `（${speaker.voice}）` : ""}</div>}
-          <p className={speaker?.who === "foe" ? "st-foe-text" : ""}>{text.slice(0, shown)}<span className="st-caret">{shown >= text.length ? "▼" : ""}</span></p>
+          <p className={speaker?.who === "foe" ? "st-foe-text" : ""}><span>{text.slice(0, shown)}</span><span className="st-rest">{text.slice(shown)}</span>{shown >= text.length && <span className="st-caret">▼</span>}</p>
         </div>
       )}
     </div>
