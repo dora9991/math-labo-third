@@ -13,6 +13,15 @@ const SEEN_KEY = "mathLabo3_story_seen_v1";
 export function loadSeen() {
   try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch { return new Set(); }
 }
+
+// ---- 「ものがたりを自動で見る」の設定（既定ON。OFFでも、ものがたり画面からいつでも見られる）
+const AUTO_KEY = "mathLabo3_story_auto_v1";
+export function isStoryAuto() {
+  try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch { return true; }
+}
+export function setStoryAuto(on) {
+  try { localStorage.setItem(AUTO_KEY, on ? "1" : "0"); } catch { /* noop */ }
+}
 export function saveSeen(set) {
   try { localStorage.setItem(SEEN_KEY, JSON.stringify([...set])); } catch { /* 保存できなくても進行は止めない */ }
 }
@@ -90,4 +99,44 @@ export function bgmTracks(scene) {
       default: return null;
     }
   });
+}
+
+// ---- 「ものがたり」一覧（見返し用）。場面は「見た」か「その進み具合に届いた」ら見られる。未視聴は NEW ----
+/** 学年ごとの一覧。state＝サーバーの状態（cleared / bossDone）。返り値: [{ id, title, items:[{ label, unlocked, isNew, scenes }] }] */
+export function libraryFor(grade, state, seen) {
+  const data = STORY[grade];
+  if (!data) return [];
+  const cleared = state?.cleared || {}, bossDone = state?.bossDone || {};
+  // 1項目＝1〜2場面。「見た」か、その進み具合に届いていれば見られる（unlockedByProgress）。1つでも未視聴なら NEW
+  const entry = (label, keys, beatsList, propsList, unlockedByProgress) => {
+    const usable = keys.map((k, i) => ({ k, b: beatsList[i], p: propsList[i] })).filter((x) => x.b?.length);
+    if (!usable.length) return null;
+    const unlocked = usable.some((x) => seen.has(x.k)) || !!unlockedByProgress;
+    return { label, unlocked, isNew: unlocked && !usable.every((x) => seen.has(x.k)), scenes: usable.map((x) => ({ key: x.k, beats: x.b, ...x.p })) };
+  };
+  const groups = [{ id: "prologue", title: "プロローグ", items: [entry("はじまり", [`${grade}:prologue`], [data.prologue], [{ bg: "bg_hall", kind: "prologue", grade }], true)].filter(Boolean) }];
+  Object.keys(data.chapters).forEach((cid, ci) => {
+    const ch = data.chapters[cid], wc = getChapter(grade, cid);
+    const base = { bg: chapterBg(cid), grade, chapterId: cid };
+    const items = [entry("章のはじまり", [`${grade}:${cid}:door`], [ch.door], [{ ...base, kind: "door", title: `第${ci + 1}章　${ch.title}`, enemyId: wc?.chapterBoss?.id }], true)];
+    for (const sub of wc?.subUnits || []) {
+      const s = ch.subs[sub.order];
+      if (!s) continue;
+      const t = `${ci + 1}-${sub.order}　${s.title}`;
+      items.push(entry(t, [`${grade}:${cid}:s${sub.order}:pre`, `${grade}:${cid}:s${sub.order}:post`], [s.pre, s.post],
+        [{ ...base, kind: "pre", title: t, enemyId: sub.boss?.id }, { ...base, kind: "post", title: t, enemyId: sub.boss?.id }], !!cleared[`${grade}:${cid}:${sub.id}`]));
+    }
+    const bossHere = !!bossDone[`${grade}:${cid}`];
+    const bt = `${ch.title}の主`;
+    items.push(entry(bt, [`${grade}:${cid}:boss:pre`, `${grade}:${cid}:boss:post`], [ch.bossPre, ch.bossPost],
+      [{ ...base, kind: "bossPre", title: bt, enemyId: wc?.chapterBoss?.id }, { ...base, kind: "bossPost", title: bt, enemyId: wc?.chapterBoss?.id }], bossHere));
+    if (cid === LAST[grade] && data.finale?.length) items.push(entry("最終章", [`${grade}:finale`], [data.finale], [{ ...base, kind: "finale", title: "最終章" }], bossHere));
+    groups.push({ id: cid, title: `第${ci + 1}章　${ch.title}`, items: items.filter(Boolean) });
+  });
+  return groups;
+}
+
+/** ものがたりの NEW の数（メニューの目印用） */
+export function countNew(grade, state, seen) {
+  return libraryFor(grade, state, seen).reduce((a, g) => a + g.items.filter((i) => i.isNew).length, 0);
 }

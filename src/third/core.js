@@ -7,10 +7,11 @@
 //  設計: Obsidian 設計メモ_math-labo-third_ゲームシステム論点整理（2026-09-21）
 // ============================================================
 import { SPECIALIST_ROSTER } from "./specialistRoster.js";
-import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL } from "./gachaConfig.js";
+import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD } from "./gachaConfig.js";
 import { DIFFICULTY_KEYS } from "./balance.js";
 import { labUnitIdForBattle } from "./link.js";
-import { generateThirdProblem, generatePractice, practiceCorrect } from "./problemSource.js";
+import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfChapter } from "./problemSource.js";
+import { getChapter } from "./data/storyMap.js";
 import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js";
 import { getSubUnitClearExpReward } from "./expCurve.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
@@ -36,6 +37,8 @@ export function initialThirdState() {
     acqSeq: STARTER_PARTY.length,
     party: [...STARTER_PARTY],
     cleared: {}, // { "grade:chapter:subUnit": { first: ms, count } }
+    chapterDone: {}, // 章クリアボーナス（その章の小単元を全部はじめてクリア）を受け取った章 { "grade:chapter": ms }
+    bossDone: {}, // 章ボスを はじめて倒して報酬を受け取った章 { "grade:chapter": ms }
     pity: { pulls: 0, sinceSR: 0, sinceUR: 0 },
     seenSeeds: [], // 使用済みの解答(seed)。同じ解答の使い回しを防ぐ
     claimIds: [],
@@ -69,6 +72,8 @@ export function normalizeThirdState(s) {
   out.coins = Math.max(0, Number(out.coins) || 0);
   out.pity = { ...base.pity, ...(s.pity || {}) };
   out.cleared = s.cleared && typeof s.cleared === "object" ? s.cleared : {};
+  out.chapterDone = s.chapterDone && typeof s.chapterDone === "object" ? s.chapterDone : {};
+  out.bossDone = s.bossDone && typeof s.bossDone === "object" ? s.bossDone : {};
   out.seenSeeds = Array.isArray(s.seenSeeds) ? s.seenSeeds.slice(-VERIFY.seenSeedsKeep) : [];
   out.claimIds = Array.isArray(s.claimIds) ? s.claimIds.slice(-VERIFY.claimIdsKeep) : [];
   out.daily = { ...base.daily, ...(s.daily || {}) };
@@ -114,11 +119,12 @@ export function pullGacha(state, count, rand = Math.random) {
     const ids = POOL[rarity];
     const id = ids[Math.min(ids.length - 1, Math.floor(rand() * ids.length))];
     const cur = s.owned[id];
-    let isNew = false, converted = false;
+    let isNew = false, converted = false, refund = 0;
     if (!cur) { s.owned[id] = { exp: 0, breaks: 0, n: ++s.acqSeq }; isNew = true; }
-    else if (cur.breaks < GACHA.maxBreaks) cur.breaks += 1;
-    else { s.coins += GACHA.overflowCoins; converted = true; }
-    results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted });
+    else if (cur.breaks < GACHA.maxBreaks) { cur.breaks += 1; refund = CRYSTAL.dupRefund; }
+    else { s.coins += GACHA.overflowCoins; converted = true; refund = CRYSTAL.dupRefund; }
+    s.crystals += refund; // 被りの還元：外れた感じをやわらげる
+    results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted, refund });
   }
   return { ok: true, state: s, results };
 }
@@ -144,10 +150,19 @@ export function verifyClaim(claim, state, now) {
   if (claim.pv !== PROBLEM_VERSION) return fail("client-outdated"); // 問題データの版がずれている→再読み込み
   if (typeof claim.nonce !== "string" || claim.nonce.length < 8 || claim.nonce.length > 80) return fail("bad-nonce");
   if (state.claimIds.includes(claim.nonce)) return fail("duplicate-claim");
-  if (claim.kind !== "subUnit") return fail("unsupported-kind");
-  const unitId = labUnitIdForBattle({ grade: claim.grade, chapterId: claim.chapterId, subUnitId: claim.subUnitId });
-  if (!unitId) return fail("unknown-unit");
-  if (!unitMedalsOf(state, unitId).battleOpen) return fail("medals-missing"); // サーバーが認めたメダル2枚が無い小単元のバトルは受け付けない
+  if (claim.kind !== "subUnit" && claim.kind !== "chapterBoss") return fail("unsupported-kind");
+  let allowed, unitId;
+  if (claim.kind === "subUnit") {
+    unitId = labUnitIdForBattle({ grade: claim.grade, chapterId: claim.chapterId, subUnitId: claim.subUnitId });
+    if (!unitId) return fail("unknown-unit");
+    if (!unitMedalsOf(state, unitId).battleOpen) return fail("medals-missing"); // サーバーが認めたメダル2枚が無い小単元のバトルは受け付けない
+    allowed = [unitId];
+  } else { // 章ボス：その章の小単元のメダルがすべてそろっている（＝全部バトルが開いている）時だけ。出題はその章のどの単元でもよい
+    allowed = labUnitIdsOfChapter(claim.grade, claim.chapterId);
+    if (!allowed.length) return fail("unknown-unit");
+    if (!allowed.every((id) => unitMedalsOf(state, id).battleOpen)) return fail("medals-missing");
+    unitId = claim.chapterId;
+  }
   const at = Array.isArray(claim.attempts) ? claim.attempts : null;
   if (!at || !at.length || at.length > VERIFY.maxAttempts) return fail("bad-attempts");
   if (now - state.lastClaimAt < VERIFY.minClaimIntervalMs) return fail("too-soon");
@@ -156,18 +171,19 @@ export function verifyClaim(claim, state, now) {
   const rows = [];
   let correct = 0, sumMs = 0;
   for (const a of at) {
-    if (!a || a.unitId !== unitId || !DIFFICULTY_KEYS.includes(a.level) || !Number.isInteger(a.seed) || a.seed < 0 || a.seed > 0xffffffff) continue;
+    if (!a || !allowed.includes(a.unitId) || !DIFFICULTY_KEYS.includes(a.level) || !Number.isInteger(a.seed) || a.seed < 0 || a.seed > 0xffffffff) continue;
     const ms = Number(a.ms);
     if (!Number.isFinite(ms) || ms < 0 || ms > 10 * 60 * 1000) continue;
-    const key = `${unitId}:${a.level}:${a.seed}`;
+    const uid = a.unitId;
+    const key = `${uid}:${a.level}:${a.seed}`;
     if (seen.has(key)) continue; // 同じ問題の使い回しは数えない
     seen.add(key);
-    const p = generateThirdProblem(unitId, a.level, a.seed);
+    const p = generateThirdProblem(uid, a.level, a.seed);
     if (!p) continue;
     const ok = p.choices[p.correctIndex] === String(a.answer) && ms >= VERIFY.minMsPerAnswer;
     sumMs += ms;
     if (ok) correct += 1;
-    rows.push({ key, unitId, level: a.level, seed: a.seed, ok, ms, templateId: p.templateId ?? `${unitId}:${a.level}` });
+    rows.push({ key, unitId: uid, level: a.level, seed: a.seed, ok, ms, templateId: p.templateId ?? `${uid}:${a.level}` });
   }
   return { ok: true, unitId, rows, correct, total: rows.length, sumMs, seenSeeds: [...seen] };
 }
@@ -187,6 +203,14 @@ export function applyClaim(state, claim, now) {
   if (v.correct < VERIFY.minCorrect) {
     return { ok: true, state: s, rewards: { granted: false, reason: "not-enough-correct", crystals: 0, coins: 0, exp: 0, isFirstClear: false }, verified, rows: v.rows };
   }
+  if (claim.kind === "chapterBoss") { // 章ボス：はじめて倒した時だけ、クリスタルとコイン（周回は報酬なし）
+    const bkey = `${claim.grade}:${claim.chapterId}`;
+    const firstBoss = !s.bossDone[bkey];
+    let crystals = 0, coins = 0;
+    if (firstBoss) { crystals = CRYSTAL.chapterBossFirst; coins = BOSS_REWARD.firstCoins; s.bossDone[bkey] = now; }
+    s.crystals += crystals; s.coins += coins;
+    return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, coins, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
+  }
   const key = `${claim.grade}:${claim.chapterId}:${claim.subUnitId}`;
   const first = !s.cleared[key];
   const today = dayKey(now);
@@ -199,12 +223,19 @@ export function applyClaim(state, claim, now) {
     coins = REWARD.repeatCoins; exp = Math.round(baseExp * REWARD.repeatExpRate); s.daily.repeat += 1;
   } else reason = "daily-limit";
   s.cleared[key] = { first: s.cleared[key]?.first || now, count: (s.cleared[key]?.count || 0) + 1 };
-  s.crystals += crystals;
+  // 章クリアボーナス：その章の小単元を全部はじめてクリアした時（章ごとに1回）
+  let chapterBonus = 0;
+  const wc = getChapter(claim.grade, claim.chapterId);
+  const ck = `${claim.grade}:${claim.chapterId}`;
+  if (first && wc && !s.chapterDone[ck] && wc.subUnits.every((su) => s.cleared[`${claim.grade}:${claim.chapterId}:${su.id}`])) {
+    chapterBonus = CRYSTAL.chapterClear; s.chapterDone[ck] = now;
+  }
+  s.crystals += crystals + chapterBonus;
   s.coins += coins;
   const members = s.party.filter(Boolean);
   const perMember = members.length ? Math.floor(exp / members.length) : 0;
   for (const id of members) s.owned[id].exp += perMember;
-  return { ok: true, state: s, rewards: { granted: true, reason, crystals, coins, exp, perMember, isFirstClear: first }, verified, rows: v.rows };
+  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, coins, exp, perMember, isFirstClear: first }, verified, rows: v.rows };
 }
 
 // ---------------- 実時間の持ち分 ----------------

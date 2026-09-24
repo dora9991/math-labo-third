@@ -38,7 +38,12 @@ export const VERIFY = {
 //  ・確認問題（はいち）に初めて合格：1個（動画レッスンごとに1回）
 //  ・れんしゅう：難易度（簡単・普通・難しい・鬼）ごとに、その難易度の正解が5問に達した最初の1回：各1個
 //  ・バトル：小単元の初クリア：2個（REWARD.firstCrystals）
-export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5 };
+//  ・章クリアボーナス：その章の小単元バトルを全部はじめてクリアした時：5個（＝ガチャ1回。章ごとに1回）
+//  ・章ボス初撃破：メダル2枚をそろえた小単元がその章で全部ひらいている状態で、章ボスをはじめて倒した時：5個（章ごとに1回）
+//  ・被りの還元：ガチャで持っている仲間が出た（凸・コインになった）時：1個（外れた感じをやわらげる）
+export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5, chapterClear: 5, chapterBossFirst: 5, dupRefund: 1 };
+// 章ボス初撃破のコイン（周回では出さない）
+export const BOSS_REWARD = { firstCoins: 100 };
 
 // メダル（サーバーが付与）
 export const MEDAL = {

@@ -863,7 +863,7 @@ export default function Battle({ nav, params }) {
   // バトルに勝った：解答の記録をサーバーへ送り、**サーバーが認めた報酬**を受け取る（自己申告は使わない）。
   async function finishBattle() {
     winRef.current = true; // 勝ち（章ボス・お試しは報酬の申請が無いので、出る時の報告で解答を記録する）
-    if (kind !== "subUnit" || params.demo) { // 章ボス・デモ戦はサーバー申請なし（報酬なし）
+    if ((kind !== "subUnit" && kind !== "chapterBoss") || params.demo) { // お試し戦はサーバー申請なし（報酬なし）。章ボスは、その章の小単元のメダルが全部そろっていれば本番（申請する）
       nav.go("reward", { ...params, res: null }, { replace: true });
       return;
     }

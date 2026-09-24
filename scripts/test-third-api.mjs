@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -49,7 +49,7 @@ function makeClaim({ n = 12, correctRate = 1, ms = 3000, nonce = "n" + Math.rand
   let r = await call(s, "gacha", { count: 1 }); t("クリスタル0では引けない", r.status === 400 && r.body.error === "not-enough-crystals");
   // チケットを直接与える(=サーバー内の状態を用意)
   const cur = await s.load("stu1"); cur.state.crystals = 200; await s.save("stu1", cur.state, cur.version);
-  r = await call(s, "gacha", { count: 10 }); t("10連: クリスタル50個を消費して10体", r.status === 200 && r.body.results.length === 10 && r.body.state.crystals === 150);
+  r = await call(s, "gacha", { count: 10 }); t("10連: クリスタル50個を消費して10体（被りは1個ずつ戻る）", r.status === 200 && r.body.results.length === 10 && r.body.state.crystals === 150 + r.body.results.reduce((a, x) => a + (x.refund || 0), 0));
   t("10連: SR以上が最低1体(保証)", r.body.results.some((x) => x.rarity === "SR" || x.rarity === "UR"));
   r = await call(s, "gacha", { count: 3 }); t("1/10以外の回数は拒否", r.status === 400);
   // 統計：確率が設定どおり(大量に引く)
@@ -232,6 +232,54 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const s3 = makeStore(); const legacy = { v: 1, tickets: 3 }; await s3.save("old1", legacy, null);
   const lg = await call(s3, "get_state", {}, "old1");
   t("旧チケット3枚 → クリスタル15個に引き継ぎ", lg.body.state.crystals === 15 && lg.body.state.tickets === undefined, JSON.stringify(lg.body.state.crystals));
+}
+
+// ===== 9. クリスタルの入り口を増やす：被りの還元／章クリアボーナス／章ボス初撃破（2026-09-25）
+{ // 被りの還元：同じ仲間ばかり出る乱数で10連 → 最初の1体は新規、あとは被り。被り1回ごとにクリスタル1個
+  const s = makeStore(); await call(s, "get_state", {}, "dup1"); const g = await s.load("dup1"); g.state.crystals = 200; await s.save("dup1", g.state, g.version);
+  const r = await call(s, "gacha", { count: 10 }, "dup1", Date.now(), () => 0);
+  const dups = r.body.results.filter((x) => !x.isNew).length;
+  t(`被りの還元: 被り${dups}回ぶん、クリスタルが1個ずつ戻る`, r.status === 200 && dups >= 8 && r.body.state.crystals === 150 + dups * T.CRYSTAL.dupRefund && r.body.results.filter((x) => !x.isNew).every((x) => x.refund === T.CRYSTAL.dupRefund) && r.body.results.filter((x) => x.isNew).every((x) => !x.refund), JSON.stringify(r.body.state.crystals));
+}
+{ // 章クリアボーナス＆章ボス
+  const ch = T.chaptersForGrade(1)[0]; const units = ch.units.map((u) => u.id);
+  const mk = async (u, withMedals = true) => { // 全単元のメダル2枚をそろえた生徒
+    const s = makeStore(); await call(s, "get_state", {}, u, T0); const g = await s.load(u);
+    for (const id of units) { if (!withMedals && id === units[units.length - 1]) continue; g.state.medals.practiceN[id] = 5; g.state.medals.haichi[T.haichiKeyForUnit(id)] = T0; }
+    await s.save(u, g.state, g.version); return s;
+  };
+  const attemptsFor = (unitList, n, seedBase) => Array.from({ length: n }, (_, i) => {
+    const uid = unitList[i % unitList.length], level = ["easy", "standard", "advanced", "oni"][i % 4];
+    const p = T.generateThirdProblem(uid, level, seedBase + i) || T.generateThirdProblem(uid, "standard", seedBase + i);
+    return { unitId: uid, level: p.level, seed: seedBase + i, answer: p.choices[p.correctIndex], ms: 3000 };
+  });
+  const s = await mk("ch1"); let now = T0 + 5 * MIN; let bonuses = [], crystalsGot = 0;
+  for (let i = 0; i < ch.units.length; i++) {
+    const wbi = T.worldBattleFor(1, ch, ch.units[i]);
+    const claim = { nonce: "chap-" + i + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: wbi.chapterId, kind: "subUnit", subUnitId: wbi.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor([units[i]], 12, 5000000 + i * 100) };
+    const r = await call(s, "claim", { claim }, "ch1", now); now += 5 * MIN;
+    if (r.status !== 200) { t(`章クリア: ${i + 1}つ目の申請が通る(テスト前提)`, false, JSON.stringify(r.body)); break; }
+    bonuses.push(r.body.rewards.chapterBonus || 0); crystalsGot += r.body.rewards.crystals + (r.body.rewards.chapterBonus || 0);
+  }
+  t("章クリアボーナス: 最後の小単元を初クリアした時だけ5個（途中は0）", bonuses.slice(0, -1).every((b) => b === 0) && bonuses.at(-1) === T.CRYSTAL.chapterClear, JSON.stringify(bonuses));
+  // 同じ章を もう一度クリアしてもボーナスは出ない（章ごとに1回）
+  const wb0 = T.worldBattleFor(1, ch, ch.units[0]);
+  const again = await call(s, "claim", { claim: { nonce: "again-" + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: wb0.chapterId, kind: "subUnit", subUnitId: wb0.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor([units[0]], 12, 6000000) } }, "ch1", now); now += 5 * MIN;
+  t("章クリアボーナス: 章ごとに1回だけ（周回では出ない）", again.status === 200 && !again.body.rewards.chapterBonus && again.body.rewards.crystals === 0);
+  // 章ボス：はじめて倒すとクリスタル5個＋コイン
+  const bossClaim = (nonce, seedBase, ul = units) => ({ nonce, pv: T.PROBLEM_VERSION, grade: 1, chapterId: ch.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: attemptsFor(ul, 12, seedBase) });
+  const before = (await s.load("ch1")).state;
+  let b = await call(s, "claim", { claim: bossClaim("boss1-" + Math.random().toString(36).slice(2, 10), 7000000) }, "ch1", now); now += 5 * MIN;
+  t("章ボス初撃破: クリスタル5個＋コイン100", b.status === 200 && b.body.rewards.kind === "chapterBoss" && b.body.rewards.crystals === T.CRYSTAL.chapterBossFirst && b.body.rewards.coins === T.BOSS_REWARD.firstCoins && b.body.state.crystals === before.crystals + T.CRYSTAL.chapterBossFirst, JSON.stringify(b.body.rewards || b.body));
+  b = await call(s, "claim", { claim: bossClaim("boss2-" + Math.random().toString(36).slice(2, 10), 8000000) }, "ch1", now); now += 5 * MIN;
+  t("章ボス: 2回目以降は報酬なし（何度でも挑戦はできる）", b.status === 200 && b.body.rewards.crystals === 0 && b.body.rewards.coins === 0 && b.body.rewards.reason === "boss-repeat");
+  const foreign = { ...bossClaim("boss3-" + Math.random().toString(36).slice(2, 10), 9000000), attempts: Array.from({ length: 12 }, (_, i) => ({ unitId: "zzz", level: "easy", seed: 9000000 + i, answer: "1", ms: 3000 })) };
+  b = await call(s, "claim", { claim: foreign }, "ch1", now);
+  t("章ボス: その章に無い単元の解答は数えない（申請は不正で拒否 or 報酬なし）", b.status === 400 || (b.status === 200 && b.body.rewards.crystals === 0));
+  // メダルが1つでも欠けていると、章ボスの申請は受け付けない（学習に遡れない報酬は作らない）
+  const s2 = await mk("ch2", false);
+  const c2 = await call(s2, "claim", { claim: { ...bossClaim("boss4-" + Math.random().toString(36).slice(2, 10), 9100000), startedAt: T0, endedAt: T0 + 60000 } }, "ch2", T0 + 5 * MIN);
+  t("章ボス: メダルが全単元そろっていないと拒否", c2.status === 400 && c2.body.error === "medals-missing", JSON.stringify(c2.body.error));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

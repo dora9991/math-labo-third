@@ -19,7 +19,7 @@ import { isBattleOpen } from "./medals.js";
 import { labUnitIdForBattle } from "./link.js";
 import { getFxSpeed } from "../engine/fxSpeed.js";
 import StoryPlayer from "./story/StoryPlayer.jsx";
-import { scenesFor, loadSeen, saveSeen } from "./story/storyRun.js";
+import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
 import "./third.css";
 
 const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha };
@@ -81,7 +81,7 @@ export default function ThirdApp({ player, start, onExit }) {
 
   // ストーリー：バトルの前／勝利の報酬の前に、まだ見ていない会話場面があれば先に出す（見終わるまで次の画面は開かない）
   const [seen, setSeen] = useState(() => loadSeen());
-  const pending = scenesFor(nav, seen);
+  const pending = isStoryAuto() ? scenesFor(nav, seen) : []; // 設定で「自動で見る」をオフにすると出さない（ものがたり画面からは見られる）
   const finishScene = (key) => setSeen((prev) => { const n = new Set(prev); n.add(key); saveSeen(n); return n; });
 
   // 画面ごとのBGM（バトル中の曲＝通常/小単元ボス/章ボス/敗北は ThirdBattle が切り替える）

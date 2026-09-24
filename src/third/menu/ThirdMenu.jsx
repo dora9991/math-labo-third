@@ -14,6 +14,8 @@ import { unitMedals, medalSummary, MEDAL_PRACTICE_TARGET } from "../medals.js";
 import { getChapter } from "../data/storyMap.js";
 import { worldBattleFor } from "../link.js";
 import RecordScreen from "./RecordScreen.jsx";
+import StoryLibrary from "../story/StoryLibrary.jsx";
+import { countNew, loadSeen } from "../story/storyRun.js";
 import SettingsScreen from "./SettingsScreen.jsx";
 import { fxScale, getFxSpeed } from "../../engine/fxSpeed.js";
 import { pickToday } from "../todayPick.js";
@@ -88,6 +90,7 @@ export default function ThirdMenu(props) {
           <GameButton className="astra-menu-tiles__primary" tone="gold" icon="📚" onClick={() => go({ view: "units" })}><strong>学習を始める</strong><small>単元をえらんで学ぼう</small></GameButton>
           <div className="astra-menu-tiles__support">
             <GameButton tone="blue" icon="📊" onClick={() => go({ view: "record" })}><strong>学習の記録</strong><small>きょうの問題数・1週間のようす</small></GameButton>
+            <GameButton tone="gold" icon="📖" onClick={() => go({ view: "story" })}><strong>ものがたり{(() => { const n = countNew(grade, medalState, loadSeen()); return n > 0 ? `　NEW ${n}` : ""; })()}</strong><small>これまでのお話を見返そう</small></GameButton>
             <GameButton tone="violet" icon="🛡️" onClick={props.onParty}><strong>パーティ編成</strong><small>5体の仲間をえらぼう</small></GameButton>
             <GameButton tone="mint" icon="⚙️" onClick={() => go({ view: "settings" })}><strong>設定</strong><small>学年の変更・アラーム</small></GameButton>
           </div>
@@ -100,6 +103,14 @@ export default function ThirdMenu(props) {
     return (
       <Shell player={player} back="メニュー" onBack={() => go({ view: "main" })} transitionKey={view} reverse>
         <RecordScreen player={player} records={records} onWeakness={props.onWeakness} />
+      </Shell>
+    );
+  }
+
+  if (view === "story") {
+    return (
+      <Shell player={player} back="メニュー" onBack={() => go({ view: "main" })} transitionKey={view} reverse>
+        <StoryLibrary grade={grade} state={medalState} />
       </Shell>
     );
   }
@@ -150,7 +161,8 @@ export default function ThirdMenu(props) {
             );
           })}
           <GameButton tone="danger" icon="👑" disabled={!bossAvail} onClick={() => bossAvail && props.onChapterBoss?.(chapter)}>
-            <strong>章のボスと戦う</strong><small>{bossAvail ? `${chapter.name} の総まとめ！` : "準備中"}</small>
+            <strong>章のボスと戦う</strong>
+            <small>{!bossAvail ? "準備中" : chapter.units.every((u) => unitMedals(medalState, u.id).battleOpen) ? `${chapter.name} の総まとめ！ はじめて倒すと 💎+5` : `${chapter.name} の総まとめ（お試し）。小単元のメダルを全部そろえると、💎がもらえる本番になるよ`}</small>
           </GameButton>
         </div>
       </Shell>

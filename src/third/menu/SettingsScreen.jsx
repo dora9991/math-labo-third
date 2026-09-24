@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import GameButton from "../../components/GameButton.jsx";
 import { canLogout, requestLogout } from "../../auth/session.js";
 import { isGuest } from "../../auth/session.js";
+import { isStoryAuto, setStoryAuto } from "../story/storyRun.js";
 
 const fmt = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -14,6 +15,7 @@ export default function SettingsScreen({ player, grade, onSetGrade, updatePlayer
   const [gradeOpen, setGradeOpen] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
   const [msg, setMsg] = useState("");
+  const [storyAuto, setStoryAutoState] = useState(() => isStoryAuto());
   const [min, setMin] = useState(player.alarm?.min || 15);
   const endAt = player.alarm?.endAt || null;
   const [, tick] = useState(0);
@@ -50,6 +52,15 @@ export default function SettingsScreen({ player, grade, onSetGrade, updatePlayer
           </div>
         )}
         {msg && <div className="menu-confirmation">{msg}</div>}
+      </div>
+
+      <div className="glass menu-settings-card" style={{ padding: 14, marginBottom: 14 }}>
+        <div className="menu-card-heading">ものがたり</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 800 }}>
+          <input type="checkbox" checked={storyAuto} onChange={(e) => { setStoryAutoState(e.target.checked); setStoryAuto(e.target.checked); }} />
+          バトルの前とあとに、ものがたりを自動で見る
+        </label>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", marginTop: 8, lineHeight: 1.6 }}>オフにしても、メニューの「📖 ものがたり」からいつでも見られます。</div>
       </div>
 
       <div className="glass menu-settings-card" style={{ padding: 14, marginBottom: 14 }}>

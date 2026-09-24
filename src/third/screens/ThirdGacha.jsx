@@ -115,7 +115,7 @@ export default function ThirdGacha({ nav }) {
                       <div className={`mw-gacha-rarity-banner mw-rarity-banner-${top.rarity}`}>{cfg.label}{top.rarity === "SR" || top.rarity === "UR" ? "！！" : "！"}</div>
                       <div className={`mw-rarity mw-rarity-${top.rarity}`}>{top.rarity}</div>
                       <div className="mw-fantasy-title" style={{ fontSize: "1.15rem" }}>{topChar.name}</div>
-                      <div style={{ color: "#ffe9b3", opacity: 0.85 }}>{top.isNew ? "🆕 あたらしい仲間！" : top.converted ? `限界突破MAX → 🪙+${GACHA.overflowCoins}` : `限界突破 ★${top.breaks}`}</div>
+                      <div style={{ color: "#ffe9b3", opacity: 0.85 }}>{top.isNew ? "🆕 あたらしい仲間！" : top.converted ? `限界突破MAX → 🪙+${GACHA.overflowCoins}　💎+${top.refund || 0}` : `限界突破 ★${top.breaks}　💎+${top.refund || 0}`}</div>
                     </>
                   )}
                 </div>
@@ -133,7 +133,7 @@ export default function ThirdGacha({ nav }) {
             {results.map((r, i) => (
               <div key={i} style={{ position: "relative", textAlign: "center" }}>
                 <MonsterPortrait character={charactersById[r.id]} size="small" />
-                <div style={{ fontSize: 10, fontWeight: 900, color: r.isNew ? "#7cff8a" : "#ffe9b3" }}>{r.isNew ? "NEW" : r.converted ? `🪙+${GACHA.overflowCoins}` : `★${r.breaks}`}</div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: r.isNew ? "#7cff8a" : "#ffe9b3" }}>{r.isNew ? "NEW" : r.converted ? `🪙+${GACHA.overflowCoins}` : `★${r.breaks}`}{!r.isNew && r.refund ? ` 💎+${r.refund}` : ""}</div>
               </div>
             ))}
           </div>

@@ -2333,7 +2333,7 @@ export default function App() {
       onHaichi={(unit) => openHaichiStudio(unit, "home")}
       onPractice={(chapter, unit, level) => { setSel({ chapter, unit, level: level || "standard", nav: false, fixed: true }); setScreen("anshin"); }} // 練習：えらんだ難度で出題（簡単/普通/難しい/鬼）
       onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: !unitMedals(thirdState, unit.id).battleOpen } }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
-      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: true } }); setScreen("third"); }}
+      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battleOpen) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
       onFeedback={() => setScreen("feedback")}
