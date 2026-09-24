@@ -4,10 +4,24 @@
 //           logAttempts(userId,rows), logGacha(userId,rows) }
 //  ★状態の変更はすべてここ（サーバー）だけ。クライアントは結果を受け取って表示するだけ★
 // ============================================================
+import { recordLogs, checkReport } from "./logging.js";
 import { initialThirdState, normalizeThirdState, pullGacha, setParty, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
 
 export async function handle({ action, body = {}, userId, store, now = Date.now(), rand = Math.random }) {
   if (!userId) return { status: 401, body: { error: "unauthorized" } };
+  // 状態を読まない軽い操作：ログイン(滞在)の生存確認、バトル終了の報告（負け・途中でやめた・お試し・章ボスの解答も記録に残す）
+  if (action === "ping") { // 滞在時間の計測。1分おきに来る。時刻はサーバーの時計だけを使う
+    const sid = String(body.sid || "").slice(0, 64);
+    if (!sid) return { status: 400, body: { error: "bad-sid" } };
+    try { await store.ping?.(userId, sid, now); } catch { /* 記録の失敗でゲームを止めない */ }
+    return { status: 200, body: { ok: true, now } };
+  }
+  if (action === "report") {
+    const r = checkReport(body);
+    if (!r.ok) return { status: 400, body: { error: r.error } };
+    await recordLogs({ store, userId, mode: "battle", attempts: r.attempts, rows: [], ctx: r.ctx, now });
+    return { status: 200, body: { ok: true } };
+  }
   const loaded = await store.load(userId);
   const prevVersion = loaded ? loaded.version : null;
   const state = normalizeThirdState(loaded ? loaded.state : initialThirdState());
@@ -41,6 +55,7 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       if (!r.ok) return { status: 400, body: { error: r.error, state } };
       if (!(await commit(r.state))) return conflict;
       await store.logAttempts?.(userId, r.rows.map((x) => ({ ...x, mode: "practice" })));
+      await recordLogs({ store, userId, mode: "practice", attempts: body.attempts, rows: r.rows, newMedals: r.newMedals, now });
       return { status: 200, body: { state: r.state, verified: r.verified, newMedals: r.newMedals } };
     }
     case "confirm": { // はいち：確認問題の1ラウンドでメダル
@@ -48,6 +63,7 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       if (!r.ok) return { status: 400, body: { error: r.error, state } };
       if (!(await commit(r.state))) return conflict;
       await store.logAttempts?.(userId, r.rows.map((x) => ({ ...x, mode: "confirm" })));
+      await recordLogs({ store, userId, mode: "confirm", attempts: body.attempts, rows: r.rows, newMedals: r.newMedals, now });
       return { status: 200, body: { state: r.state, verified: r.verified, newMedals: r.newMedals } };
     }
     case "claim": {
@@ -55,6 +71,7 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       if (!r.ok) return { status: 400, body: { error: r.error, pv: PROBLEM_VERSION, state } };
       if (!(await commit(r.state))) return conflict;
       await store.logAttempts?.(userId, r.rows);
+      await recordLogs({ store, userId, mode: "battle", attempts: body.claim?.attempts, rows: r.rows, ctx: { grade: body.claim?.grade, chapterId: body.claim?.chapterId, subUnitId: body.claim?.subUnitId, result: "win" }, now });
       return { status: 200, body: { state: r.state, rewards: r.rewards, verified: r.verified } };
     }
     default:

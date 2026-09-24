@@ -13,6 +13,8 @@ import AlarmOverlay from "./third/menu/AlarmOverlay.jsx";
 import MedalToast from "./third/menu/MedalToast.jsx";
 import { isBattleOpen } from "./third/medals.js";
 import { thirdApi } from "./third/thirdApi.js";
+import { startSessionPing } from "./third/sessionPing.js";
+import { flushBattleLogs } from "./third/battleLog.js";
 import * as store from "./store/localStore.js"; // ★将来ここを supabase.js に差し替える
 import { submitAttempt, serverActive, loadServerState } from "./sync/serverSync.js"; // サーバー権威(Lv2)。AUTH無効時はno-op
 import { AUTH_ENABLED } from "./auth/supabase.js";
@@ -1508,6 +1510,8 @@ export default function App() {
     if (at.length) sendWithRetry(() => thirdApi.confirm(key, at));
   }
   useEffect(() => { loadThird(); }, []); // eslint-disable-line
+  // 学習ログ：ログイン(滞在)時間の計測を始め、前回送れなかったバトルの解答記録があれば送り直す
+  useEffect(() => { flushBattleLogs(); return startSessionPing(); }, []);
   useEffect(() => { flushPractice(); if (screen === "home") loadThird(); }, [screen]); // eslint-disable-line
   useEffect(() => {
     const f = () => flushPractice();

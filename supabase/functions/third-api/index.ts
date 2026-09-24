@@ -8,6 +8,7 @@
 // ============================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handle } from "./handler.js";
+import { dailyArgs } from "./logging.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +59,38 @@ Deno.serve(async (req: Request) => {
     async logAttempts(uid: string, rows: { unitId: string; level: string; seed: number; ok: boolean; mode?: string }[]) {
       if (!rows.length) return;
       await db.from("third_attempts").insert(rows.map((r) => ({ student_id: uid, unit_id: r.unitId, difficulty: r.level, seed: r.seed, ok: r.ok, mode: r.mode || "battle" })));
+    },
+    // ---- 学習ログ（記録の失敗はゲームを止めない。表が無い環境では何もしないだけ）
+    // 解答の中身：同じ問題(seed)は二重に入れない。新しく入った行だけを返す（1日の集計は、その行だけを足す）
+    async logAnswers(uid: string, rows: Record<string, unknown>[]) {
+      const { data, error } = await db.from("third_answer_log")
+        .upsert(rows.map((r) => ({ student_id: uid, ...r })), { onConflict: "student_id,mode,unit_id,difficulty,seed", ignoreDuplicates: true })
+        .select("ok, ms, mode");
+      if (error) { console.error("logAnswers:", error.message); return []; }
+      return data || [];
+    },
+    async logMedals(uid: string, medals: { unitId: string; kind: string }[], now: number) {
+      const { error } = await db.from("third_medals").upsert(medals.map((m) => ({ student_id: uid, unit_id: m.unitId, kind: m.kind, earned_at: new Date(now).toISOString() })), { onConflict: "student_id,unit_id,kind", ignoreDuplicates: true });
+      if (error) console.error("logMedals:", error.message);
+    },
+    async bumpDaily(uid: string, a: Record<string, unknown>) {
+      const { error } = await db.rpc("third_bump_daily", { p_student: uid, ...a });
+      if (error) console.error("bumpDaily:", error.message);
+    },
+    // 滞在時間：1分おきの ping。前回からの経過を足す（放置・スリープは 90 秒までしか数えない）
+    async ping(uid: string, sid: string, now: number) {
+      const { data: cur, error: e0 } = await db.from("third_sessions").select("last_seen_at").eq("student_id", uid).eq("sid", sid).maybeSingle();
+      if (e0) { console.error("ping:", e0.message); return; }
+      const iso = new Date(now).toISOString();
+      if (!cur) {
+        const { error } = await db.from("third_sessions").insert({ student_id: uid, sid, started_at: iso, last_seen_at: iso, active_ms: 0 });
+        if (!error) await this.bumpDaily(uid, dailyArgs({ logins: 1, now })); // 1日のログイン回数
+        return;
+      }
+      const delta = Math.max(0, Math.min(now - Date.parse(cur.last_seen_at), 90_000));
+      const { data: row } = await db.from("third_sessions").select("active_ms").eq("student_id", uid).eq("sid", sid).maybeSingle();
+      await db.from("third_sessions").update({ last_seen_at: iso, active_ms: (Number(row?.active_ms) || 0) + delta }).eq("student_id", uid).eq("sid", sid);
+      if (delta > 0) await this.bumpDaily(uid, dailyArgs({ activeMs: delta, now }));
     },
     async logGacha(uid: string, rows: { id: string; rarity: string; isNew: boolean }[]) {
       if (!rows.length) return;

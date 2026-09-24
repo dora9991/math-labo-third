@@ -56,6 +56,8 @@ export const thirdApi = {
   claim: (claim) => call("claim", { claim }),
   practice: (attempts) => call("practice", { attempts }),
   confirm: (key, attempts) => call("confirm", { key, attempts }),
+  report: (r) => call("report", r), // バトル終了の報告（負け・途中でやめた・お試し・章ボスの解答も学習ログに残す）
+  ping: (sid) => call("ping", { sid }), // 滞在時間の計測（1分おき）
 };
 
 // 開発用（ローカルモードのみ）：コンソールから ticket を付与して動作確認できる。サーバーモードでは存在しない。

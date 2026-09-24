@@ -21,6 +21,7 @@ import { generateBattleProblem } from "../problemSource.js";
 import { PROBLEM_VERSION } from "../problemVersion.js";
 import * as bgm from "../../audio/bgm.js";
 import { normalBattleTrack } from "../story/battleBgm.js";
+import { reportBattle } from "../battleLog.js";
 import {
   SKILL_CAP_FRAC,
   DIFFICULTY_KEYS,
@@ -333,6 +334,14 @@ export default function Battle({ nav, params }) {
     else if (isBossWave) bgm.play("boss");
     else bgm.play(normalBattleTrack(grade, chapterId, params.subUnitId)); // 章・小単元ごとに曲を巡回（story/battleBgm.js）
   }, [isBossWave, phase, kind]);
+  // 学習ログ：この画面を出る時に、解いた問題の記録(seed＋答え＋時間)をサーバーへ送る。勝ち／負け／途中でやめた、のどれでも残す。
+  //  （勝った小単元バトルは報酬の申請で記録済み。サーバーは同じ問題を二重に数えない）
+  const resultRef = useRef("abandon");
+  useEffect(() => { if (phase === "defeat") resultRef.current = "lose"; else if (phase === "claiming") resultRef.current = "win"; }, [phase]);
+  const winRef = useRef(false);
+  useEffect(() => () => {
+    reportBattle({ grade, chapterId, subUnitId: params.subUnitId, kind, result: winRef.current ? "win" : resultRef.current, attempts: attemptsRef.current });
+  }, []); // eslint-disable-line
   const aliveEnemies = enemies.filter((e) => e.hp > 0);
 
   // 章のステージなら章の系統に固定。大ボス戦(章なし)は、キャラ自身の得意系統で殴る。
@@ -838,6 +847,7 @@ export default function Battle({ nav, params }) {
 
   // バトルに勝った：解答の記録をサーバーへ送り、**サーバーが認めた報酬**を受け取る（自己申告は使わない）。
   async function finishBattle() {
+    winRef.current = true; // 勝ち（章ボス・お試しは報酬の申請が無いので、出る時の報告で解答を記録する）
     if (kind !== "subUnit" || params.demo) { // 章ボス・デモ戦はサーバー申請なし（報酬なし）
       nav.go("reward", { ...params, res: null }, { replace: true });
       return;
