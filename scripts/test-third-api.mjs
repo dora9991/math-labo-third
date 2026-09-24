@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -148,7 +148,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const replay = { ...claim, nonce: "another-nonce-1" }; r = await call(s, "claim", { claim: replay }, "stu1", now + 10 * MIN);
   t("同じ解答(seed)の使い回しは報酬にならない", r.status === 200 && r.body.rewards.granted === false && r.body.verified.correct === 0, JSON.stringify(r.body.verified));
   const c2 = makeClaim({ now: now + 20 * MIN }); r = await call(s, "claim", { claim: c2 }, "stu1", now + 20 * MIN);
-  t("2回目以降のクリアはクリスタル0(経験値・コインは少なめ)", r.status === 200 && r.body.rewards.granted && r.body.rewards.crystals === 0 && r.body.rewards.exp < 200 && !r.body.rewards.isFirstClear, JSON.stringify(r.body.rewards));
+  t("2回目以降のクリアは周回ボーナス💎1(経験値・コインは少なめ)", r.status === 200 && r.body.rewards.granted && r.body.rewards.crystals === T.REWARD.repeatCrystals && r.body.rewards.exp < 200 && !r.body.rewards.isFirstClear, JSON.stringify(r.body.rewards));
   // 5-5 全部まちがい
   const s3 = makeStore(); await earnMedals(s3, "u3", T0); r = await call(s3, "claim", { claim: makeClaim({ correctRate: 0, now }) }, "u3", now);
   t("正解ゼロの申請は報酬なし", r.status === 200 && r.body.rewards.granted === false && r.body.rewards.crystals === 0);
@@ -207,6 +207,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const s = makeStore();
   const T0 = Date.now() - 20 * 60000;
   await call(s, "get_state", {}, "cry1", T0);
+  { const g0 = await s.load("cry1"); g0.state.daily = { date: T.dayKey(T0), repeat: 0, ok: 0, mission: true }; await s.save("cry1", g0.state, g0.version); } // 毎日の目標は別の節でテスト（ここでは達成済みにしておく）
   // れんしゅう：簡単で5問正解 → クリスタル1（普通で5問 → もう1）。同じ難易度の周回では増えない
   const mk = (lv, base) => Array.from({ length: 5 }, (_, i) => { const seed = base + i; const p = T.generatePractice("u1", lv, seed); return { unitId: "u1", level: lv, seed, answer: p.ans, ms: 2500 }; });
   let r = await call(s, "practice", { attempts: mk("easy", 900100) }, "cry1", T0 + 60000);
@@ -265,7 +266,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   // 同じ章を もう一度クリアしてもボーナスは出ない（章ごとに1回）
   const wb0 = T.worldBattleFor(1, ch, ch.units[0]);
   const again = await call(s, "claim", { claim: { nonce: "again-" + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: wb0.chapterId, kind: "subUnit", subUnitId: wb0.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor([units[0]], 12, 6000000) } }, "ch1", now); now += 5 * MIN;
-  t("章クリアボーナス: 章ごとに1回だけ（周回では出ない）", again.status === 200 && !again.body.rewards.chapterBonus && again.body.rewards.crystals === 0);
+  t("章クリアボーナス: 章ごとに1回だけ（周回では出ない）", again.status === 200 && !again.body.rewards.chapterBonus && again.body.rewards.crystals === T.REWARD.repeatCrystals);
   // 章ボス：はじめて倒すとクリスタル5個＋コイン
   const bossClaim = (nonce, seedBase, ul = units) => ({ nonce, pv: T.PROBLEM_VERSION, grade: 1, chapterId: ch.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: attemptsFor(ul, 12, seedBase) });
   const before = (await s.load("ch1")).state;
@@ -280,6 +281,65 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const s2 = await mk("ch2", false);
   const c2 = await call(s2, "claim", { claim: { ...bossClaim("boss4-" + Math.random().toString(36).slice(2, 10), 9100000), startedAt: T0, endedAt: T0 + 60000 } }, "ch2", T0 + 5 * MIN);
   t("章ボス: メダルが全単元そろっていないと拒否", c2.status === 400 && c2.body.error === "medals-missing", JSON.stringify(c2.body.error));
+}
+
+// ===== 10. 周回ボーナス／毎日の目標／学年クリアボーナス（2026-09-25）
+{
+  const ch = T.chaptersForGrade(1)[0]; const units = ch.units.map((u) => u.id);
+  const allUnits = T.chaptersForGrade(1).flatMap((c) => c.units.map((u) => u.id));
+  const withMedals = async (u, list) => { const s = makeStore(); await call(s, "get_state", {}, u, T0); const g = await s.load(u); for (const id of list) { g.state.medals.practiceN[id] = 5; g.state.medals.haichi[T.haichiKeyForUnit(id)] = T0; } await s.save(u, g.state, g.version); return s; };
+  const attemptsFor = (unitList, n, seedBase) => Array.from({ length: n }, (_, i) => {
+    const uid = unitList[i % unitList.length], level = ["easy", "standard", "advanced", "oni"][i % 4];
+    let seed = seedBase + i, p = T.generateThirdProblem(uid, level, seed) || T.generateThirdProblem(uid, "standard", seed);
+    for (let k = 1; !p && k < 50; k++) { seed = seedBase + i + k * 1000; p = T.generateThirdProblem(uid, level, seed) || T.generateThirdProblem(uid, "standard", seed); }
+    return { unitId: uid, level: p.level, seed, answer: p.choices[p.correctIndex], ms: 3000 };
+  });
+  let nonceN = 0; const nonce = () => "n10-" + (nonceN++) + Math.random().toString(36).slice(2, 10);
+  const subClaim = (chapter, idx, seedBase, now) => { const w = T.worldBattleFor(1, chapter, chapter.units[idx]); return { nonce: nonce(), pv: T.PROBLEM_VERSION, grade: 1, chapterId: w.chapterId, kind: "subUnit", subUnitId: w.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor([chapter.units[idx].id], 12, seedBase) }; };
+
+  // --- 周回ボーナス：クリア済みの小単元に勝つと💎1、1日5回まで（6回目からはコイン・経験値のみ）
+  { const s = await withMedals("rp1", allUnits); let now = T0 + 5 * MIN;
+    const first = await call(s, "claim", { claim: subClaim(ch, 0, 10000000, now) }, "rp1", now); now += 5 * MIN;
+    const got = [];
+    for (let i = 0; i < 7; i++) { const r = await call(s, "claim", { claim: subClaim(ch, 0, 10100000 + i * 100, now) }, "rp1", now); now += 3 * MIN; got.push(r.body.rewards.crystals); }
+    t("周回ボーナス: 初回は💎2、2回目以降は1日5回まで💎1（6回目からは0）", first.body.rewards.crystals === T.REWARD.firstCrystals && JSON.stringify(got) === JSON.stringify([1, 1, 1, 1, 1, 0, 0]), JSON.stringify(got));
+    // 翌日はまた5回
+    now = T0 + 26 * 60 * MIN; const nx = await call(s, "claim", { claim: subClaim(ch, 0, 10900000, now) }, "rp1", now);
+    t("周回ボーナス: 翌日（日本時間）はまた💎1がもらえる", nx.body.rewards.crystals === 1, JSON.stringify(nx.body.rewards));
+  }
+  // --- 毎日の目標：その日の検証済みの正解が5問で💎1（1日1回）
+  { const s = makeStore(); await call(s, "get_state", {}, "dm1", T0);
+    let r = await call(s, "practice", { attempts: practiceAttempts3(3, 20000000) }, "dm1", T0 + 2 * MIN);
+    const before = r.body.state.crystals;
+    t("毎日の目標: 3問ではまだ", !r.body.crystalEvents.some((e) => /今日の目標/.test(e.label)) && r.body.state.daily.ok === 3);
+    r = await call(s, "practice", { attempts: practiceAttempts3(2, 20000100) }, "dm1", T0 + 4 * MIN);
+    t("毎日の目標: 5問正解でクリスタル1個", r.body.crystalEvents.some((e) => /今日の目標/.test(e.label) && e.n === T.CRYSTAL.dailyMission) && r.body.state.daily.mission === true, JSON.stringify(r.body.crystalEvents));
+    r = await call(s, "practice", { attempts: practiceAttempts3(5, 20000200) }, "dm1", T0 + 6 * MIN);
+    t("毎日の目標: 1日1回だけ", !r.body.crystalEvents.some((e) => /今日の目標/.test(e.label)));
+    r = await call(s, "practice", { attempts: practiceAttempts3(5, 20000300) }, "dm1", T0 + 26 * 60 * MIN);
+    t("毎日の目標: 翌日はまた達成できる", r.body.crystalEvents.some((e) => /今日の目標/.test(e.label)) && r.body.state.daily.ok === 5);
+    // まちがいは数えない
+    const s2 = makeStore(); await call(s2, "get_state", {}, "dm2", T0);
+    const w = await call(s2, "practice", { attempts: practiceAttempts3(8, 20000400, false) }, "dm2", T0 + 2 * MIN);
+    t("毎日の目標: まちがい・速すぎる解答は数えない", w.body.state.daily.ok === 0 && !w.body.state.daily.mission);
+  }
+  // --- 学年クリアボーナス：全章の「章クリアボーナス」と「章ボス初撃破」がそろった時に💎30（学年ごとに1回）
+  { const s = await withMedals("gr1", allUnits); let now = T0 + 5 * MIN; const chs = T.chaptersForGrade(1); let gradeBonuses = [], failed = null, seed = 30000000;
+    for (const c of chs) {
+      for (let i = 0; i < c.units.length; i++) { const r = await call(s, "claim", { claim: subClaim(c, i, seed, now) }, "gr1", now); seed += 100; now += 3 * MIN; if (r.status !== 200) { failed = JSON.stringify(r.body); break; } gradeBonuses.push(r.body.rewards.gradeBonus || 0); }
+      if (failed) break;
+      const bc = { nonce: nonce(), pv: T.PROBLEM_VERSION, grade: 1, chapterId: c.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: attemptsFor(c.units.map((u) => u.id), 12, seed) }; seed += 100;
+      const r = await call(s, "claim", { claim: bc }, "gr1", now); now += 3 * MIN;
+      if (r.status !== 200) { failed = JSON.stringify(r.body); break; }
+      gradeBonuses.push(r.body.rewards.gradeBonus || 0);
+    }
+    const st = (await s.load("gr1")).state;
+    t("学年クリアボーナス: 全章の章ボスまでそろった最後の1回だけ💎30", !failed && gradeBonuses.slice(0, -1).every((b) => b === 0) && gradeBonuses.at(-1) === T.CRYSTAL.gradeClear && !!st.gradeDone[1], failed || JSON.stringify(gradeBonuses.filter((b) => b)));
+    // 受け取り済みの学年で、もう一度章ボスを倒しても出ない
+    const c0 = chs[0]; const again = await call(s, "claim", { claim: { nonce: nonce(), pv: T.PROBLEM_VERSION, grade: 1, chapterId: c0.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: attemptsFor(c0.units.map((u) => u.id), 12, seed) } }, "gr1", now);
+    t("学年クリアボーナス: 学年ごとに1回だけ", again.status === 200 && !again.body.rewards.gradeBonus);
+  }
+  function practiceAttempts3(n, seedBase, correct = true) { return Array.from({ length: n }, (_, i) => { const seed = seedBase + i; const q = T.generatePractice(unitId, "standard", seed); return { unitId, level: "standard", seed, answer: correct ? String(q.ans) : "___wrong___", ms: correct ? 3000 : 300 }; }); }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

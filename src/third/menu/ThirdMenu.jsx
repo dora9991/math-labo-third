@@ -19,6 +19,16 @@ import { countNew, loadSeen } from "../story/storyRun.js";
 import SettingsScreen from "./SettingsScreen.jsx";
 import { fxScale, getFxSpeed } from "../../engine/fxSpeed.js";
 import { pickToday } from "../todayPick.js";
+import { DAILY, CRYSTAL } from "../gachaConfig.js";
+
+// 毎日の目標（その日の検証済みの正解が5問で 💎+1）の表示。日付は日本時間。
+function dailyGoalText(state) {
+  const key = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const d = state?.daily;
+  if (d?.date === key && d.mission) return "今日の目標 ✅ たっせい！";
+  const ok = d?.date === key ? d.ok || 0 : 0;
+  return `今日の目標：あと${Math.max(0, DAILY.missionTarget - ok)}問せいかいで 💎+${CRYSTAL.dailyMission}`;
+}
 
 function Shell({ player, back, onBack, children, transitionKey, reverse = false }) {
   const speed = getFxSpeed();
@@ -82,7 +92,7 @@ export default function ThirdMenu(props) {
         {today && (
           <div style={{ marginBottom: 14 }}>
             <GameButton tone="gold" icon="🌟" onClick={() => props.onTodayPick?.(today.chapter, today.unit)}>
-              <strong>今日のおすすめ（5問）</strong><small>{today.unit.emoji ? today.unit.emoji + " " : ""}{today.unit.name}　・　{today.reason}</small>
+              <strong>今日のおすすめ（5問）</strong><small>{today.unit.emoji ? today.unit.emoji + " " : ""}{today.unit.name}　・　{today.reason}　・　{dailyGoalText(medalState)}</small>
             </GameButton>
           </div>
         )}

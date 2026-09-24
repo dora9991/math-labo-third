@@ -21,6 +21,8 @@ export const REWARD = {
   repeatCoins: 15,
   repeatExpRate: 0.3, // 2回目以降の経験値は初回の30%
   repeatDailyMax: 10, // 1日に2回目以降で報酬を受け取れる回数
+  repeatCrystals: 1, // 2回目以降のクリアでも、クリスタルが少しずつ入る（周回ボーナス）
+  repeatCrystalMax: 5, // …ただし1日5回まで（それ以降はコイン・経験値のみ）
 };
 
 // バトル結果の検証（サーバー）
@@ -41,7 +43,11 @@ export const VERIFY = {
 //  ・章クリアボーナス：その章の小単元バトルを全部はじめてクリアした時：5個（＝ガチャ1回。章ごとに1回）
 //  ・章ボス初撃破：メダル2枚をそろえた小単元がその章で全部ひらいている状態で、章ボスをはじめて倒した時：5個（章ごとに1回）
 //  ・被りの還元：ガチャで持っている仲間が出た（凸・コインになった）時：1個（外れた感じをやわらげる）
-export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5, chapterClear: 5, chapterBossFirst: 5, dupRefund: 1 };
+//  ・周回ボーナス：クリア済みの小単元にもう一度勝つと 1個（1日5回まで）
+//  ・毎日の目標：その日の検証済みの正解が合計5問に届いたら 1個（1日1回）
+//  ・学年クリアボーナス：その学年の全章の章クリアボーナスと章ボス初撃破がそろったら 30個（学年ごとに1回）
+export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5, chapterClear: 5, chapterBossFirst: 5, dupRefund: 1, dailyMission: 1, gradeClear: 30 };
+export const DAILY = { missionTarget: 5 }; // 毎日の目標：検証済みの正解 5問
 // 章ボス初撃破のコイン（周回では出さない）
 export const BOSS_REWARD = { firstCoins: 100 };
 

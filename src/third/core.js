@@ -7,11 +7,11 @@
 //  設計: Obsidian 設計メモ_math-labo-third_ゲームシステム論点整理（2026-09-21）
 // ============================================================
 import { SPECIALIST_ROSTER } from "./specialistRoster.js";
-import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD } from "./gachaConfig.js";
+import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD, DAILY } from "./gachaConfig.js";
 import { DIFFICULTY_KEYS } from "./balance.js";
 import { labUnitIdForBattle } from "./link.js";
 import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfChapter } from "./problemSource.js";
-import { getChapter } from "./data/storyMap.js";
+import { getChapter, getGrade } from "./data/storyMap.js";
 import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js";
 import { getSubUnitClearExpReward } from "./expCurve.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
@@ -43,7 +43,8 @@ export function initialThirdState() {
     seenSeeds: [], // 使用済みの解答(seed)。同じ解答の使い回しを防ぐ
     claimIds: [],
     lastClaimAt: 0,
-    daily: { date: null, repeat: 0 },
+    daily: { date: null, repeat: 0, ok: 0, mission: false }, // 1日の集計：周回の回数／検証済みの正解数／毎日の目標を達成したか
+    gradeDone: {}, // 学年クリアボーナスを受け取った学年 { "1": ms }
     medals: { practiceN: {}, haichi: {}, pracLv: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
   };
@@ -74,6 +75,7 @@ export function normalizeThirdState(s) {
   out.cleared = s.cleared && typeof s.cleared === "object" ? s.cleared : {};
   out.chapterDone = s.chapterDone && typeof s.chapterDone === "object" ? s.chapterDone : {};
   out.bossDone = s.bossDone && typeof s.bossDone === "object" ? s.bossDone : {};
+  out.gradeDone = s.gradeDone && typeof s.gradeDone === "object" ? s.gradeDone : {};
   out.seenSeeds = Array.isArray(s.seenSeeds) ? s.seenSeeds.slice(-VERIFY.seenSeedsKeep) : [];
   out.claimIds = Array.isArray(s.claimIds) ? s.claimIds.slice(-VERIFY.claimIdsKeep) : [];
   out.daily = { ...base.daily, ...(s.daily || {}) };
@@ -189,7 +191,38 @@ export function verifyClaim(claim, state, now) {
 }
 
 /** 検証を通した申請にご褒美を与える。 */
+/** 日付が変わっていたら、1日の集計をリセットする（日本時間） */
+function rollDaily(s, now) {
+  const today = dayKey(now);
+  if (s.daily.date !== today) s.daily = { date: today, repeat: 0, ok: 0, mission: false };
+}
+/** 毎日の目標：その日の検証済みの正解が5問に届いたら、クリスタル1個（1日1回）。付けた個数を返す。 */
+function dailyMission(s, corrects, now) {
+  rollDaily(s, now);
+  s.daily.ok = (s.daily.ok || 0) + Math.max(0, corrects);
+  if (!s.daily.mission && s.daily.ok >= DAILY.missionTarget) { s.daily.mission = true; s.crystals += CRYSTAL.dailyMission; return CRYSTAL.dailyMission; }
+  return 0;
+}
+/** 学年クリアボーナス：その学年の全章で「章クリアボーナス」と「章ボス初撃破」がそろったら、クリスタル30個（学年ごとに1回）。付けた個数を返す。 */
+function awardGradeClear(s, grade, now) {
+  const g = getGrade(Number(grade));
+  if (!g || s.gradeDone[grade]) return 0;
+  const all = g.chapters.length > 0 && g.chapters.every((c) => s.chapterDone[`${grade}:${c.chapterId}`] && s.bossDone[`${grade}:${c.chapterId}`]);
+  if (!all) return 0;
+  s.gradeDone[grade] = now; s.crystals += CRYSTAL.gradeClear;
+  return CRYSTAL.gradeClear;
+}
+
 export function applyClaim(state, claim, now) {
+  const res = applyClaimCore(state, claim, now);
+  if (res.ok && res.state) { // どの結果でも、検証済みの正解は「毎日の目標」に数える
+    const dm = dailyMission(res.state, res.verified?.correct || 0, now);
+    if (res.rewards) res.rewards.dailyMission = dm;
+  }
+  return res;
+}
+
+function applyClaimCore(state, claim, now) {
   const v = verifyClaim(claim, state, now);
   if (!v.ok) return v;
   const s = structuredClone(state);
@@ -209,18 +242,20 @@ export function applyClaim(state, claim, now) {
     let crystals = 0, coins = 0;
     if (firstBoss) { crystals = CRYSTAL.chapterBossFirst; coins = BOSS_REWARD.firstCoins; s.bossDone[bkey] = now; }
     s.crystals += crystals; s.coins += coins;
-    return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, coins, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
+    const gradeBonus = firstBoss ? awardGradeClear(s, claim.grade, now) : 0;
+    return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, gradeBonus, coins, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
   }
   const key = `${claim.grade}:${claim.chapterId}:${claim.subUnitId}`;
   const first = !s.cleared[key];
-  const today = dayKey(now);
-  if (s.daily.date !== today) s.daily = { date: today, repeat: 0 };
+  rollDaily(s, now);
   let crystals = 0, coins = 0, exp = 0, reason = null;
   const baseExp = getSubUnitClearExpReward(claim.grade, claim.chapterId, claim.subUnitId);
   if (first) {
     crystals = REWARD.firstCrystals; coins = REWARD.firstCoins; exp = baseExp;
   } else if (s.daily.repeat < REWARD.repeatDailyMax) {
-    coins = REWARD.repeatCoins; exp = Math.round(baseExp * REWARD.repeatExpRate); s.daily.repeat += 1;
+    coins = REWARD.repeatCoins; exp = Math.round(baseExp * REWARD.repeatExpRate);
+    if (s.daily.repeat < REWARD.repeatCrystalMax) crystals = REWARD.repeatCrystals; // 周回ボーナス（1日5回まで）
+    s.daily.repeat += 1;
   } else reason = "daily-limit";
   s.cleared[key] = { first: s.cleared[key]?.first || now, count: (s.cleared[key]?.count || 0) + 1 };
   // 章クリアボーナス：その章の小単元を全部はじめてクリアした時（章ごとに1回）
@@ -232,10 +267,11 @@ export function applyClaim(state, claim, now) {
   }
   s.crystals += crystals + chapterBonus;
   s.coins += coins;
+  const gradeBonus = chapterBonus > 0 ? awardGradeClear(s, claim.grade, now) : 0;
   const members = s.party.filter(Boolean);
   const perMember = members.length ? Math.floor(exp / members.length) : 0;
   for (const id of members) s.owned[id].exp += perMember;
-  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, coins, exp, perMember, isFirstClear: first }, verified, rows: v.rows };
+  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, coins, exp, perMember, isFirstClear: first }, verified, rows: v.rows };
 }
 
 // ---------------- 実時間の持ち分 ----------------
@@ -330,6 +366,8 @@ export function applyPractice(state, req, now) {
     }
   }
   s.seenSeeds = [...seen].slice(-VERIFY.seenSeedsKeep);
+  const dm = dailyMission(s, correct, now);
+  if (dm) crystalEvents.push({ n: dm, label: "今日の目標（5問せいかい）" });
   return { ok: true, state: s, verified: { correct, total: rows.length }, newMedals, crystalEvents, rows };
 }
 
@@ -364,5 +402,7 @@ export function applyConfirm(state, req, now) {
     s.crystals += CRYSTAL.confirmFirst; // 確認問題にはじめて合格：クリスタル
     crystalEvents.push({ n: CRYSTAL.confirmFirst, label: "確認問題に はじめて合格" });
   }
+  const dm = dailyMission(s, correct, now);
+  if (dm) crystalEvents.push({ n: dm, label: "今日の目標（5問せいかい）" });
   return { ok: true, state: s, verified: { correct, total, passed }, newMedals, crystalEvents, rows };
 }
