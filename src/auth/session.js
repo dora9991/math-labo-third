@@ -24,3 +24,9 @@ export function setGuest(on) {
 }
 export function isGuest() { return _guest; }
 export function guestMem() { return _guestMem; }
+
+// ---- ログアウト／ゲスト終了の呼び出し口。AuthGate が中身を登録し、設定画面のボタンが呼ぶ。
+let _logoutFn = null;
+export function setLogoutHandler(fn) { _logoutFn = fn; }
+export function canLogout() { return !!_logoutFn; }
+export function requestLogout() { _logoutFn?.(); }

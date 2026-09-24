@@ -2,7 +2,7 @@
 // g3c2 — 中3「平方根」（★自動作問版）
 //  √ の簡約は sqrtStr。答えは a√b 形・整数・√結合など。
 // ============================================================
-import { sqrtStr, neg, exprChoices, numChoices } from "../_algebra.js";
+import { sqrtStr, neg, exprChoices, numChoices, sup } from "../_algebra.js";
 
 const p = (id, build, skill = null) => ({ id, build, skill });
 const rpick = (r, arr) => arr[r(0, arr.length - 1)];
@@ -110,6 +110,56 @@ function genDistr(r, level) {
   return { q: `(√${a}+√${b})² を計算しなさい。`, ans, choices: exprChoices(ans, [`${k}`, neg(k) + "+" + sqrtStr(1, a * b), neg(a * b) + "+" + rad], [neg(k + 1) + "+" + rad], r), h1: H.dist.h2, h2: `${a}+${b}+2√${a * b}` };
 }
 
+// u6 近似値と有効数字
+const EXPS = [-3, -2, -1, 1, 2, 3, 4, 5, 6];
+function mantissaOf(k, r) {
+  const digits = [r(1, 9)];
+  for (let i = 1; i < k; i++) digits.push(r(0, 9));
+  return digits;
+}
+const mantissaStr = (digits) => (digits.length === 1 ? String(digits[0]) : digits[0] + "." + digits.slice(1).join(""));
+
+function genSigFig(r) { // 有効数字の桁数
+  const k = r(1, 4);
+  const digits = mantissaOf(k, r);
+  const n = rpick(r, EXPS);
+  const m = mantissaStr(digits);
+  return { q: `次の近似値は、有効数字が何桁ですか。　${m}×10${sup(n)}`, ans: k, choices: numChoices(k, r, [k + 1, Math.max(1, k - 1)]), h1: "1≦a<10 の a の部分の桁数が、そのまま有効数字の桁数になる", h2: `${m} は ${k}桁` };
+}
+function genToSci(r) { // 測定値を a×10ⁿ の形に
+  const k = r(2, 3);
+  const digits = mantissaOf(k, r);
+  const s = r(1, 4);
+  const mantInt = Number(digits.join(""));
+  const V = mantInt * Math.pow(10, s);
+  const n = (k - 1) + s;
+  const m = mantissaStr(digits);
+  const ans = `${m}×10${sup(n)}`;
+  const wrongMant = `${mantInt}×10${sup(s)}`;
+  return { q: `${V}（有効数字${k}桁）を、整数部分が1けたの数×10の累乗の形で表しなさい。`, ans, choices: exprChoices(ans, [`${m}×10${sup(n + 1)}`, `${m}×10${sup(n - 1)}`, wrongMant], [`${m}×10${sup(n + 2)}`], r), h1: "整数部分が1桁になるよう小数点を動かした桁数ぶん、10の指数にする", h2: `${V}=${m}×10${sup(n)}` };
+}
+function genRange(r) { // 真の値の範囲（誤差の限界）
+  const wide = r(0, 1) === 0;
+  const half = wide ? 5 : 0.5;
+  const baseUnit = wide ? 10 : 1;
+  const M = r(3, 30) * baseUnit;
+  const lo = M - half, hi = M + half;
+  const askLo = r(0, 1) === 0;
+  const ans = askLo ? lo : hi;
+  return {
+    q: `${wide ? "十の位" : "小数第1位"}を四捨五入したところ、測定値は${M}になった。真の値の範囲を a≦真の値<b で表すとき、${askLo ? "a" : "b"}の値を求めなさい。`,
+    ans,
+    choices: numChoices(ans, r, [askLo ? hi : lo, M]),
+    h1: "四捨五入する前の値の範囲は、その位のちょうど半分ずつ前後に広がる",
+    h2: `真の値の範囲は ${lo}≦真の値<${hi}`,
+  };
+}
+function genApprox(r, level) {
+  if (level === "easy") return genSigFig(r);
+  if (level === "standard") return genToSci(r);
+  return genRange(r); // advanced
+}
+
 // 🔥鬼：有理化（分母に√）。答えが a√b になる形に限定（割り切れる）。
 function genOniSqrt(r) {
   const b = rpick(r, [2, 3, 5, 7]), k = r(2, 5), a = b * k;   // a/√b = k√b
@@ -144,5 +194,6 @@ export const chapter = {
     { id: "g3c2u3", name: "根号の乗法・除法", emoji: "✖️", desc: "√の積・商", problems: lv(genMulDiv, "g3c2u3", "S-SQRT-MULDIV") },
     { id: "g3c2u4", name: "根号の加法・減法", emoji: "➕", desc: "同類の√をまとめる", problems: lv(genAddSub, "g3c2u4", "S-SQRT-ADDSUB") },
     { id: "g3c2u5", name: "分配法則・展開と値の計算", emoji: "🟰", desc: "√の展開", problems: lv(genDistr, "g3c2u5", "S-SQRT-DIST") },
+    { id: "g3c2u6", name: "近似値と有効数字", emoji: "📏", desc: "a×10ⁿの形・真の値の範囲", problems: lv(genApprox, "g3c2u6", "S-SQRT-APPROX") },
   ],
 };

@@ -2,6 +2,8 @@
 //  アラームは player.alarm = { min, endAt } に保存（endAt＝鳴る時刻(ms)。null＝未セット）。鳴らすのは App の AlarmOverlay。
 import { useEffect, useState } from "react";
 import GameButton from "../../components/GameButton.jsx";
+import { canLogout, requestLogout } from "../../auth/session.js";
+import { isGuest } from "../../auth/session.js";
 
 const fmt = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -10,6 +12,7 @@ const fmt = (ms) => {
 
 export default function SettingsScreen({ player, grade, onSetGrade, updatePlayer, onFeedback }) {
   const [gradeOpen, setGradeOpen] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
   const [msg, setMsg] = useState("");
   const [min, setMin] = useState(player.alarm?.min || 15);
   const endAt = player.alarm?.endAt || null;
@@ -73,6 +76,25 @@ export default function SettingsScreen({ player, grade, onSetGrade, updatePlayer
       </div>
 
       {onFeedback && <GameButton tone="mint" icon="✉" onClick={onFeedback}><strong>ご意見箱</strong><small>先生にメッセージを送る</small></GameButton>}
+
+      {canLogout() && (
+        <div style={{ marginTop: 14 }}>
+          {!confirmOut ? (
+            <GameButton tone="danger" onClick={() => setConfirmOut(true)}>
+              <strong>{isGuest() ? "ゲストをおわる" : "ログアウト"}</strong>
+              <small>{isGuest() ? "データは消えます" : "べつの人がつかうとき"}</small>
+            </GameButton>
+          ) : (
+            <div className="glass menu-settings-card" style={{ padding: 14 }}>
+              <div style={{ fontWeight: 900, marginBottom: 10 }}>{isGuest() ? "ゲストをおわりますか？（データは消えます）" : "ログアウトしますか？"}</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <GameButton tone="danger" onClick={() => requestLogout()}>はい</GameButton>
+                <GameButton tone="blue" onClick={() => setConfirmOut(false)}>いいえ</GameButton>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

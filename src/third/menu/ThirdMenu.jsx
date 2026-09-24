@@ -16,6 +16,7 @@ import { worldBattleFor } from "../link.js";
 import RecordScreen from "./RecordScreen.jsx";
 import SettingsScreen from "./SettingsScreen.jsx";
 import { fxScale, getFxSpeed } from "../../engine/fxSpeed.js";
+import { pickToday } from "../todayPick.js";
 
 function Shell({ player, back, onBack, children, transitionKey, reverse = false }) {
   const speed = getFxSpeed();
@@ -61,6 +62,7 @@ export default function ThirdMenu(props) {
   // ---- メニュー
   if (view === "main") {
     const weak = props.quizWeakUnits || [];
+    const today = pickToday({ chapters, medalState, mistakes: props.mistakes || [], quizWeakUnits: weak });
     return (
       <Shell player={player} transitionKey={view}>
         <div className="menu-title-lockup">
@@ -74,6 +76,13 @@ export default function ThirdMenu(props) {
               <GameButton key={u.unitId} tone="gold" onClick={() => props.onQuizWeakUnitClick?.(u.unitId)}>{u.name || u.unitId}</GameButton>
             ))}
           </section>
+        )}
+        {today && (
+          <div style={{ marginBottom: 14 }}>
+            <GameButton tone="gold" icon="🌟" onClick={() => props.onTodayPick?.(today.chapter, today.unit)}>
+              <strong>今日のおすすめ（5問）</strong><small>{today.unit.emoji ? today.unit.emoji + " " : ""}{today.unit.name}　・　{today.reason}</small>
+            </GameButton>
+          </div>
         )}
         <div className="astra-menu-tiles">
           <GameButton className="astra-menu-tiles__primary" tone="gold" icon="📚" onClick={() => go({ view: "units" })}><strong>学習を始める</strong><small>単元をえらんで学ぼう</small></GameButton>
@@ -165,7 +174,7 @@ export default function ThirdMenu(props) {
 
   // ---- 学習：小単元を選んだ後の4つ
   const m = unitMedals(medalState, unit.id);
-  const battleAvail = !!worldBattleFor(grade, chapter, unit); // デモ：メダルによる解放を待たず、いつでも戦える
+  const battleAvail = !!worldBattleFor(grade, chapter, unit); // メダル2枚＝本番バトル（初クリアでクリスタル）。それまでは「お試し」でいつでも戦える
   return (
     <Shell player={player} back={chapter.name} onBack={() => go({ view: "subunits", chapterId: chapter.id })} transitionKey={`${view}:${unit.id}`} reverse>
       <Title sub={chapter.name}>{unit.emoji ? unit.emoji + " " : ""}{unit.name}</Title>
@@ -180,8 +189,8 @@ export default function ThirdMenu(props) {
         <GameButton tone="danger" icon="📺" onClick={() => props.onHaichi?.(unit)}><strong>学ぶ</strong><small>はいちモード（動画で学ぼう）</small></GameButton>
         <GameButton tone="mint" icon="✏️" onClick={() => go({ view: "practicePick", chapterId: chapter.id, unitId: unit.id })}><strong>練習</strong><small>4択学習モード（むずかしさをえらべるよ）</small></GameButton>
         <GameButton tone="gold" icon="⚔️" disabled={!battleAvail} onClick={() => battleAvail && props.onBattle?.(chapter, unit)}>
-          <strong>バトルモード（デモ）</strong>
-          <small>{battleAvail ? "いつでも戦える！5体の仲間と戦おう" : "この小単元のバトルは準備中"}</small>
+          <strong>{m.battleOpen ? "バトルモード" : "バトルモード（お試し）"}</strong>
+          <small>{!battleAvail ? "この小単元のバトルは準備中" : m.battleOpen ? "はじめてクリアで 💎クリスタル2個！" : "ごほうびなし。メダル2枚で本番バトルが開くよ"}</small>
         </GameButton>
       </div>
     </Shell>

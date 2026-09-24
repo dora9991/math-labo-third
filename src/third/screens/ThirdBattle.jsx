@@ -21,6 +21,7 @@ import { generateBattleProblem } from "../problemSource.js";
 import { PROBLEM_VERSION } from "../problemVersion.js";
 import * as bgm from "../../audio/bgm.js";
 import { normalBattleTrack } from "../story/battleBgm.js";
+import { reportBattle } from "../battleLog.js";
 import {
   SKILL_CAP_FRAC,
   DIFFICULTY_KEYS,
@@ -34,6 +35,7 @@ import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
 import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound } from "../fx/sound.js";
 import UltimateCutIn from "../../components/UltimateCutIn.jsx";
 import FxSpeedToggle from "../../components/FxSpeedToggle.jsx";
+import DrawPad from "../../components/DrawPad.jsx";
 import { fxScale, getFxSpeed, setFxSpeed } from "../../engine/fxSpeed.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
 import QuestionText from "../../components/QuestionText.jsx";
@@ -199,6 +201,8 @@ export default function Battle({ nav, params }) {
   const partyMembers = save.party.filter(Boolean).map((id) => charactersById[id]);
   const partyMaxHp = computePartyMaxHp(partyMembers, (c) => levelFromExp(save.owned[c.id]?.exp || 0, c.rarity));
   const [partyHp, setPartyHp] = useState(partyMaxHp);
+  const [quitAsk, setQuitAsk] = useState(false);
+  const [paused, setPaused] = useState(false); // 一時停止（ゲージも止まり、問題は隠れる）
   const [phase, setPhase] = useState("intro"); // intro | question | resolving | result | defeat（30秒ゲージ方式：選択フェーズは無く、問題が連続で出る）
   // スキルはSKILL_GAUGE_MAX問正解でゲージが満タンになったら発動できる。
   // 【2026-09-18】次の通常攻撃に「予約」する方式をやめ、タップした瞬間に
@@ -268,6 +272,18 @@ export default function Battle({ nav, params }) {
   // 演出だけの状態。ダメージ計算・ターン進行とは分離しているため、スキップ／オフでも結果は変わらない。
   const [fxSpeed, setBattleFxSpeed] = useState(() => getFxSpeed());
   const [cutIn, setCutIn] = useState(null);
+  // PC画面（幅900px以上）：計算用紙をバトルの横に常設し、⇄で左右を入れ替える
+  //  （HaichiStudio.jsx / StepUpSimple.jsxと同じ isDesktop の仕組み）。結果には一切影響しない見た目だけの状態。
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches);
+  const [padOnRight, setPadOnRight] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 900px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener ? mq.addEventListener("change", onChange) : mq.addListener(onChange);
+    return () => (mq.removeEventListener ? mq.removeEventListener("change", onChange) : mq.removeListener(onChange));
+  }, []);
   // ドラッグ中の見た目（指に付いてくる丸アイコン）とホバー中の敵。
   const [dragGhost, setDragGhost] = useState(null); // {charId, x, y} | null
   const [hoverTargetId, setHoverTargetId] = useState(null);
@@ -333,6 +349,14 @@ export default function Battle({ nav, params }) {
     else if (isBossWave) bgm.play("boss");
     else bgm.play(normalBattleTrack(grade, chapterId, params.subUnitId)); // 章・小単元ごとに曲を巡回（story/battleBgm.js）
   }, [isBossWave, phase, kind]);
+  // 学習ログ：この画面を出る時に、解いた問題の記録(seed＋答え＋時間)をサーバーへ送る。勝ち／負け／途中でやめた、のどれでも残す。
+  //  （勝った小単元バトルは報酬の申請で記録済み。サーバーは同じ問題を二重に数えない）
+  const resultRef = useRef("abandon");
+  useEffect(() => { if (phase === "defeat") resultRef.current = "lose"; else if (phase === "claiming") resultRef.current = "win"; }, [phase]);
+  const winRef = useRef(false);
+  useEffect(() => () => {
+    reportBattle({ grade, chapterId, subUnitId: params.subUnitId, kind, result: winRef.current ? "win" : resultRef.current, attempts: attemptsRef.current });
+  }, []); // eslint-disable-line
   const aliveEnemies = enemies.filter((e) => e.hp > 0);
 
   // 章のステージなら章の系統に固定。大ボス戦(章なし)は、キャラ自身の得意系統で殴る。
@@ -822,7 +846,7 @@ export default function Battle({ nav, params }) {
   // 敵の行動ゲージ：問題に向き合っている間(question)だけ0.1秒刻みで減る。0で敵が行動。
   latestRef.current = { onGaugeZero: doEnemyCycle };
   useEffect(() => {
-    if (phase !== "question") return undefined;
+    if (phase !== "question" || paused) return undefined;
     const id = setInterval(() => {
       gaugeRef.current -= 0.1;
       if (gaugeRef.current <= 0) {
@@ -834,10 +858,11 @@ export default function Battle({ nav, params }) {
       setGaugeSec(gaugeRef.current);
     }, 100);
     return () => clearInterval(id);
-  }, [phase]);
+  }, [phase, paused]);
 
   // バトルに勝った：解答の記録をサーバーへ送り、**サーバーが認めた報酬**を受け取る（自己申告は使わない）。
   async function finishBattle() {
+    winRef.current = true; // 勝ち（章ボス・お試しは報酬の申請が無いので、出る時の報告で解答を記録する）
     if (kind !== "subUnit" || params.demo) { // 章ボス・デモ戦はサーバー申請なし（報酬なし）
       nav.go("reward", { ...params, res: null }, { replace: true });
       return;
@@ -857,14 +882,17 @@ export default function Battle({ nav, params }) {
 
   if (!enemies.length) return null;
 
-  return (
-    <div className="mw-screen">
+  // バトル一式（トップバー・ゲージ・敵とパーティの舞台・問題/結果待ち/敗北パネル）。
+  //  PC画面ではこれを丸ごと1つの列として扱い、もう一方の列に計算用紙を常設する。
+  const battleMain = (
+    <>
       <div className="mw-topbar mw-battle-topbar">
         <span>
           {waveIndex + 1} / {encounters.length}戦目
         </span>
         <span>{topSubjectLabel}のバトル</span>
         <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
+        <button className="mw-btn" data-sfx="none" onClick={() => setPaused(true)} style={{ padding: "4px 10px", fontSize: 12 }}>⏸ 一時停止</button>
       </div>
 
       {/* 敵の行動ゲージ：0秒で敵が動く。不正解で小単元ごとの満タン時間の半分だけ進む。 */}
@@ -984,6 +1012,93 @@ export default function Battle({ nav, params }) {
         </div>
       </div>
 
+      {(phase === "question" || phase === "enemyAttack" || phase === "skill") && problem && (
+        <div className={`mw-panel mw-question-panel ${phase === "enemyAttack" || phase === "skill" ? "mw-choices-locked" : ""} ${phase === "skill" ? "mw-skill-locked" : ""}`}>
+          <div className="mw-question"><QuestionText text={problem.question} /></div>
+          <div className="mw-choices">
+            {problem.choices.map((choice, i) => (
+              <button key={i} className="mw-choice" disabled={phase !== "question"} onClick={() => pickChoice(i)}>
+                <MathText>{choice}</MathText>
+              </button>
+            ))}
+          </div>
+          {/* つぎの問題の難しさ：いつでも切替OK（いまの問題はそのまま）。むずかしいほどダメージ大。 */}
+          <div className="mw-diff-row" style={{ marginTop: 10 }}>
+            {DIFFICULTY_KEYS.map((d) => (
+              <button
+                key={d}
+                className={`mw-diff-btn ${difficulty === d ? "selected" : ""}`}
+                disabled={phase !== "question"}
+                onClick={() => pickDifficulty(d)}
+              >
+                {DIFFICULTY_LABEL[d]}
+                <span className="mw-diff-mult">×{DIFFICULTY_DAMAGE_MULTIPLIER[d]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mw-sub" style={{ textAlign: "center", marginTop: 4 }}>
+            ↑ つぎの問題のむずかしさ（今の問題は「{DIFFICULTY_LABEL[problem.level] || ""}」）
+          </div>
+        </div>
+      )}
+
+      {phase === "claiming" && (
+        <div className="mw-panel mw-center" style={{ minHeight: 70 }}>
+          <div className="mw-sub">けっかを確認しているよ…</div>
+        </div>
+      )}
+
+      {phase === "defeat" && (
+        <div className="mw-panel mw-center">
+          <div>ぜんめつしてしまった…</div>
+          <button className="mw-btn primary" onClick={() => nav.exit()}>
+            メニューにもどる
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  // PC画面（幅900px以上）：バトル一式(battleMain)の横に計算用紙を常設し、⇄で左右を入れ替える。
+  //  狭い画面はこれまでどおり battleMain だけを表示する（ダメージ計算・進行には影響しない見た目の分岐）。
+  return (
+    <div className="mw-screen">
+      {isDesktop ? (
+        <div className="calc-split">
+          <div style={{ order: padOnRight ? 1 : 2 }}>{battleMain}</div>
+          <div className="calc-split-pad" style={{ order: padOnRight ? 2 : 1 }}>
+            <div className="calc-split-pad-head">
+              <span>✏️ 計算用紙</span>
+              <button data-sfx="none" onClick={() => setPadOnRight((v) => !v)}>⇄ 入れ替え</button>
+            </div>
+            <DrawPad key="battle-pad" height="min(64vh, 620px)" />
+          </div>
+        </div>
+      ) : battleMain}
+
+      {paused && (
+        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 400, display: "grid", placeItems: "center", background: "rgba(3,8,17,.92)" }}>
+          <div className="mw-panel mw-center" style={{ maxWidth: 340 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 6 }}>⏸ 一時停止中</div>
+            {!quitAsk ? (
+              <>
+                <div style={{ fontSize: 12, opacity: .75, marginBottom: 14 }}>ゲージも止まっています</div>
+                <button className="mw-btn primary" data-sfx="none" onClick={() => setPaused(false)}>▶ つづける</button>
+                <div style={{ height: 10 }} />
+                <button className="mw-btn" data-sfx="none" onClick={() => setQuitAsk(true)}>バトルをやめる</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 800, margin: "8px 0 14px" }}>バトルをやめて戻りますか？<br /><small style={{ opacity: .75 }}>ここまでの結果は残りません</small></div>
+                <button className="mw-btn primary" data-sfx="none" onClick={() => nav.exit()}>はい</button>
+                <div style={{ height: 10 }} />
+                <button className="mw-btn" data-sfx="none" onClick={() => setQuitAsk(false)}>いいえ</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {dragGhost && (
         <div
           className="mw-drag-ghost"
@@ -1036,51 +1151,6 @@ export default function Battle({ nav, params }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {(phase === "question" || phase === "enemyAttack" || phase === "skill") && problem && (
-        <div className={`mw-panel mw-question-panel ${phase === "enemyAttack" || phase === "skill" ? "mw-choices-locked" : ""} ${phase === "skill" ? "mw-skill-locked" : ""}`}>
-          <div className="mw-question"><QuestionText text={problem.question} /></div>
-          <div className="mw-choices">
-            {problem.choices.map((choice, i) => (
-              <button key={i} className="mw-choice" disabled={phase !== "question"} onClick={() => pickChoice(i)}>
-                <MathText>{choice}</MathText>
-              </button>
-            ))}
-          </div>
-          {/* つぎの問題の難しさ：いつでも切替OK（いまの問題はそのまま）。むずかしいほどダメージ大。 */}
-          <div className="mw-diff-row" style={{ marginTop: 10 }}>
-            {DIFFICULTY_KEYS.map((d) => (
-              <button
-                key={d}
-                className={`mw-diff-btn ${difficulty === d ? "selected" : ""}`}
-                disabled={phase !== "question"}
-                onClick={() => pickDifficulty(d)}
-              >
-                {DIFFICULTY_LABEL[d]}
-                <span className="mw-diff-mult">×{DIFFICULTY_DAMAGE_MULTIPLIER[d]}</span>
-              </button>
-            ))}
-          </div>
-          <div className="mw-sub" style={{ textAlign: "center", marginTop: 4 }}>
-            ↑ つぎの問題のむずかしさ（今の問題は「{DIFFICULTY_LABEL[problem.level] || ""}」）
-          </div>
-        </div>
-      )}
-
-      {phase === "claiming" && (
-        <div className="mw-panel mw-center" style={{ minHeight: 70 }}>
-          <div className="mw-sub">けっかを確認しているよ…</div>
-        </div>
-      )}
-
-      {phase === "defeat" && (
-        <div className="mw-panel mw-center">
-          <div>ぜんめつしてしまった…</div>
-          <button className="mw-btn primary" onClick={() => nav.exit()}>
-            メニューにもどる
-          </button>
         </div>
       )}
     </div>

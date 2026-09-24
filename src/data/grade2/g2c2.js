@@ -3,7 +3,7 @@
 //  整数解 (x0,y0) を先に決め、そこから2つの方程式を逆算して構成（必ず割り切れる）。
 //  答えは "x=◯, y=◯"。ありがちな誤答（x,y入れ替え・符号ミス）を4択に。
 // ============================================================
-import { polyStr, neg, exprChoices } from "../_algebra.js";
+import { polyStr, neg, exprChoices, numChoices } from "../_algebra.js";
 
 const p = (id, build, skill = null) => ({ id, build, skill });
 
@@ -52,6 +52,59 @@ function genDainyu(r) {
   return { q: `連立方程式 ${eq1}、${eqStr(a, b, c)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: H.dainyu.h1, h2: H.dainyu.h2 };
 }
 
+// u4 連立方程式の利用（文章題）：代金／速さの2パターンをランダムに出す。
+//  どちらも「x+y=合計」「a x+b y=合計」の同じ形に帰着させ、構成法で必ず整数解にする。
+const ITEM_PAIRS = [
+  { a: "りんご", b: "なし", unit: "個" },
+  { a: "ノート", b: "消しゴム", unit: "個" },
+  { a: "おとな", b: "こども", unit: "人" },
+  { a: "赤ペン", b: "青ペン", unit: "本" },
+];
+function itemsSystem(r, xR, yR, pR) {
+  const x0 = r(xR[0], xR[1]), y0 = r(yR[0], yR[1]);
+  let pa, pb;
+  do { pa = r(pR[0], pR[1]); pb = r(pR[0], pR[1]); } while (pa === pb);
+  return { x0, y0, pa, pb, n: x0 + y0, total: pa * x0 + pb * y0 };
+}
+function genBuy(r, level) {
+  const range = level === "easy" ? [2, 8, 2, 8, 40, 150]
+    : level === "standard" ? [3, 12, 3, 12, 60, 300]
+    : [3, 15, 3, 15, 80, 500]; // advanced
+  const [xLo, xHi, yLo, yHi, pLo, pHi] = range;
+  const s = itemsSystem(r, [xLo, xHi], [yLo, yHi], [pLo, pHi]);
+  const it = rpickG2(r, ITEM_PAIRS);
+  const askA = r(0, 1) === 0;
+  const ans = askA ? s.x0 : s.y0;
+  const askName = askA ? it.a : it.b;
+  return {
+    q: `1${it.unit}${s.pa}円の${it.a}と1${it.unit}${s.pb}円の${it.b}を合わせて${s.n}${it.unit}買うと、代金の合計は${s.total}円だった。${askName}は何${it.unit}買ったか求めなさい。`,
+    ans,
+    choices: numChoices(ans, r, [askA ? s.y0 : s.x0, s.n - ans]),
+    h1: "個数をx,yとして「x+y=個数の合計」「代金の式」の2つを作る",
+    h2: `x+y=${s.n}、${s.pa}x+${s.pb}y=${s.total} を解く`,
+  };
+}
+function genWalkRun(r, level) {
+  const [tLo, tHi] = level === "advanced" ? [3, 12] : [5, 20];
+  const x0 = r(tLo, tHi), y0 = r(tLo, tHi);
+  const v1 = rpickG2(r, [60, 70, 80]), v2 = rpickG2(r, [150, 160, 180, 200]);
+  const T = x0 + y0, D = v1 * x0 + v2 * y0;
+  const askWalk = r(0, 1) === 0;
+  const ans = askWalk ? x0 : y0;
+  return {
+    q: `家から学校まで、はじめ分速${v1}mで歩き、途中から分速${v2}mで走った。歩いた時間をx分、走った時間をy分とすると、あわせて${T}分で${D}m進んだ。${askWalk ? "歩いた" : "走った"}時間は何分か求めなさい。`,
+    ans,
+    choices: numChoices(ans, r, [askWalk ? y0 : x0, T - ans]),
+    h1: "時間をx,yとして「x+y=合計時間」「道のりの式」の2つを作る",
+    h2: `x+y=${T}、${v1}x+${v2}y=${D} を解く`,
+  };
+}
+const rpickG2 = (r, arr) => arr[r(0, arr.length - 1)];
+function genWord(r, level) {
+  if (level === "easy" || level === "standard") return genBuy(r, level);
+  return r(0, 1) ? genBuy(r, "advanced") : genWalkRun(r, "advanced"); // advanced
+}
+
 // 🔥鬼：係数も解も大きめの連立（消去がやや手間。発展の上）
 function genOni(r) {
   const x0 = rnz(r, -8, 8), y0 = rnz(r, -8, 8);
@@ -82,5 +135,6 @@ export const chapter = {
     { id: "g2c2u1", name: "連立方程式の解き方（加減法・代入法）", emoji: "🧩", desc: "1文字を消して解く", problems: lv({ e: genBasic, s: genBasic, a: genKagen }, "g2c2u1", "S-SIM-SOLVE") },
     { id: "g2c2u2", name: "連立方程式（加減法の練習）", emoji: "➕", desc: "係数をそろえて消去", problems: lv({ e: genBasic, s: genKagen, a: genKagen }, "g2c2u2", "S-SIM-KAGEN") },
     { id: "g2c2u3", name: "連立方程式（代入法・かっこ・分数・小数）", emoji: "↪️", desc: "y=… を代入", problems: lv({ e: genDainyu, s: genDainyu, a: genDainyu }, "g2c2u3", "S-SIM-DAINYU") },
+    { id: "g2c2u4", name: "連立方程式の利用（文章題）", emoji: "📝", desc: "代金・速さの文章題", problems: lv({ e: (r) => genWord(r, "easy"), s: (r) => genWord(r, "standard"), a: (r) => genWord(r, "advanced") }, "g2c2u4", "S-SIM-USE") },
   ],
 };

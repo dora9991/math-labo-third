@@ -11,8 +11,11 @@ import { worldBattleFor } from "./third/link.js";
 import ThirdMenu from "./third/menu/ThirdMenu.jsx";
 import AlarmOverlay from "./third/menu/AlarmOverlay.jsx";
 import MedalToast from "./third/menu/MedalToast.jsx";
+import { unitMedals } from "./third/medals.js";
 import { isBattleOpen } from "./third/medals.js";
 import { thirdApi } from "./third/thirdApi.js";
+import { startSessionPing } from "./third/sessionPing.js";
+import { flushBattleLogs } from "./third/battleLog.js";
 import * as store from "./store/localStore.js"; // ★将来ここを supabase.js に差し替える
 import { submitAttempt, serverActive, loadServerState } from "./sync/serverSync.js"; // サーバー権威(Lv2)。AUTH無効時はno-op
 import { AUTH_ENABLED } from "./auth/supabase.js";
@@ -101,6 +104,15 @@ export default function App() {
   const [data, setData] = useState(() => store.load());
   const [screen, setScreen] = useState("start");
   const [menuPos, setMenuPos] = useState({ view: "main" }); // メニューの現在位置（はいち/練習/バトルから戻った時に同じ画面へ戻す）
+  const [menuConfirm, setMenuConfirm] = useState(false); // 左上のロゴを押した→「トップメニューに戻りますか？」
+  useEffect(() => {
+    const onReq = () => {
+      if (screen === "home" && (menuPos?.view || "main") === "main") return; // もうトップメニュー
+      setMenuConfirm(true);
+    };
+    window.addEventListener("ml3:requestMenu", onReq);
+    return () => window.removeEventListener("ml3:requestMenu", onReq);
+  }, [screen, menuPos]);
   // ---- メダル（サーバーが付与）：れんしゅう・確認問題の解答をサーバーへ送り、認められたメダルだけを表示する ----
   const [thirdState, setThirdState] = useState(null); // サーバーの状態（メダル・仲間・チケット…）。未取得の間は null
   const [medalToast, setMedalToast] = useState(null);
@@ -1435,6 +1447,10 @@ export default function App() {
 
   // 画面に合わせてBGMを切り替える（勝利/敗北/タイムアタック終了は各画面で再生）
   useEffect(() => {
+    // 【2026-09-22】はいちモード（一覧・動画スタジオ・確認問題）にいる間は、BGMを控えめにする。
+    //  動画の再生中だけさらに0（実質オフ）にする調整は HaichiStudio.jsx がYouTubeの再生状態を見て行う。
+    //  はいちモードを出れば（screenが変わればこの effect が再度走るので）ここで1に戻る。
+    bgm.setDuckLevel(["haichi", "haichiStudio", "haichiStudioPractice"].includes(screen) ? 0.35 : 1);
     if (screen === "third") return; // 仲間・ガチャ・バトル画面のBGMは ThirdApp / ThirdBattle が切り替える
     if (screen === "start") { bgm.stop(); return; }
     if (screen === "opening") { bgm.stop(); return; } // オープニング映像は映像側の音を使う（OP曲は止める）
@@ -1475,7 +1491,8 @@ export default function App() {
   function applyMedalResponse(r) {
     if (r.status === 200) {
       setThirdState(r.body.state);
-      if (r.body.newMedals?.length) setMedalToast(r.body.newMedals);
+      const items = [...(r.body.newMedals || []), ...(r.body.crystalEvents || []).map((e) => ({ kind: "crystal", ...e }))];
+      if (items.length) setMedalToast(items);
     }
   }
   async function sendWithRetry(fn) {
@@ -1508,6 +1525,8 @@ export default function App() {
     if (at.length) sendWithRetry(() => thirdApi.confirm(key, at));
   }
   useEffect(() => { loadThird(); }, []); // eslint-disable-line
+  // 学習ログ：ログイン(滞在)時間の計測を始め、前回送れなかったバトルの解答記録があれば送り直す
+  useEffect(() => { flushBattleLogs(); return startSessionPing(); }, []);
   useEffect(() => { flushPractice(); if (screen === "home") loadThird(); }, [screen]); // eslint-disable-line
   useEffect(() => {
     const f = () => flushPractice();
@@ -2304,6 +2323,8 @@ export default function App() {
       pos={menuPos}
       setPos={setMenuPos}
       quizWeakUnits={quizWeakUnits}
+      mistakes={data.mistakes}
+      onTodayPick={(chapter, unit) => { setSel({ chapter, unit, level: "standard", nav: true }); setScreen("anshin"); }}
       onQuizWeakUnitClick={(unitId) => {
         const unit = findUnitById(unitId);
         const chapter = findChapterByUnitId(unitId);
@@ -2311,7 +2332,7 @@ export default function App() {
       }}
       onHaichi={(unit) => openHaichiStudio(unit, "home")}
       onPractice={(chapter, unit, level) => { setSel({ chapter, unit, level: level || "standard", nav: false, fixed: true }); setScreen("anshin"); }} // 練習：えらんだ難度で出題（簡単/普通/難しい/鬼）
-      onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: true } }); setScreen("third"); } }}
+      onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: !unitMedals(thirdState, unit.id).battleOpen } }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
       onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: true } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
@@ -2326,6 +2347,19 @@ export default function App() {
         {renderScreen()}
       </div>
       {screen !== "start" && <AudioToggle />}
+      {menuConfirm && (
+        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 500, display: "grid", placeItems: "center", background: "rgba(0,0,0,.6)" }}>
+          <div className="glass" style={{ padding: "22px 24px", borderRadius: 14, maxWidth: 340, textAlign: "center", color: "#fff" }}>
+            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>トップメニューに戻りますか？</div>
+            <div style={{ fontSize: 12, opacity: .75, marginBottom: 16 }}>いまの問題はとちゅうで終わります</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button className="hint-yellow-btn" data-sfx="none" style={{ minWidth: 100 }}
+                onClick={() => { setMenuConfirm(false); setMenuPos({ view: "main" }); setScreen("home"); }}>はい</button>
+              <button className="legacy-help-btn legacy-help-btn--quiet" data-sfx="none" style={{ minWidth: 100 }} onClick={() => setMenuConfirm(false)}>いいえ</button>
+            </div>
+          </div>
+        </div>
+      )}
       {levelUpTo && (
         <LevelUpOverlay
           level={levelUpTo}

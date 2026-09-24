@@ -1602,13 +1602,11 @@
   .mw-enemy-slot { max-width: 190px; }
 }
 
-/* 横長の広い画面(iPad横・PC): 左=敵と仲間、右=問題 の2列。縦スクロールなしで選択肢まで押せるようにする（敵の大きさは変えない）。 */
-@media (min-width: 1000px) and (orientation: landscape) {
-  .mw-screen:has(.mw-battle-stage) { max-width: 1280px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(380px, 1fr); column-gap: 18px; row-gap: 10px; align-items: start; }
-  .mw-screen:has(.mw-battle-stage) > .mw-battle-topbar,
-  .mw-screen:has(.mw-battle-stage) > .mw-gauge { grid-column: 1 / -1; }
-  .mw-screen:has(.mw-battle-stage) > .mw-gauge { justify-self: center; width: 100%; max-width: 620px; margin-bottom: 0; }
-  .mw-screen:has(.mw-battle-stage) > .mw-battle-stage { grid-column: 1; margin: 0; }
-  .mw-screen:has(.mw-battle-stage) > .mw-panel:not(.mw-battle-stage) { grid-column: 2; margin: 0; }
+/* 2026-09-23：PC幅(900px以上)は「バトル一式（敵・パーティ・問題）｜計算用紙」の2列（ThirdBattle.jsxの
+   .calc-split）に統一。旧来の「敵|問題」2列グリッドは、計算用紙の場所が無かったため廃止した。
+   ⇄ボタンで左右を入れ替えられる（.calc-split 自体は theme.css の共通ルールで幅を確保する）。 */
+@media (min-width: 900px) {
+  .mw-screen:has(.calc-split) { max-width: 1180px; }
+  .mw-screen:has(.calc-split) .mw-battle-stage { margin: 0 0 13px; }
   .mw-enemy-slot { max-width: 200px; }
 }

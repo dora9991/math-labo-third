@@ -26,6 +26,12 @@ export default function Reward({ nav, params }) {
       <div className="mw-fantasy-panel mw-center" style={{ minHeight: "50vh" }}>
         <div className="mw-reward-pop" style={{ fontSize: "2.8rem", animationDelay: "0s" }}>🎉</div>
         <div className="mw-fantasy-title mw-reward-pop" style={{ fontSize: "1.4rem", animationDelay: "0.08s" }}>クリア！</div>
+        {!res && (
+          <div className="mw-reward-pop" style={{ color: "#c9b98f", animationDelay: "0.2s", textAlign: "center", lineHeight: 1.7 }}>
+            お試しバトルだから、ごほうびはないよ。<br />
+            「学ぶ」と「練習」でメダルを2枚そろえると、<br />はじめてのクリアで💎クリスタルがもらえる本番バトルが開くよ！
+          </div>
+        )}
         {res && !res.ok && (
           <div className="mw-reward-pop" style={{ color: "#ffb4b4", animationDelay: "0.2s", textAlign: "center" }}>
             ごほうびを受け取れなかったよ<br />（{ERROR[res.error] || "つながらなかったよ"}）
@@ -35,8 +41,8 @@ export default function Reward({ nav, params }) {
           <>
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.2s" }}>経験値 +{r.exp}（仲間ひとりずつ +{r.perMember ?? 0}）</div>
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.3s" }}>🪙 +{r.coins}</div>
-            {r.tickets > 0 && (
-              <div className="mw-reward-pop" style={{ color: "#7cff8a", fontWeight: 900, fontSize: "1.2rem", animationDelay: "0.42s" }}>🎫 ガチャチケット +{r.tickets}！</div>
+            {r.crystals > 0 && (
+              <div className="mw-reward-pop" style={{ color: "#7cff8a", fontWeight: 900, fontSize: "1.2rem", animationDelay: "0.42s" }}>💎 クリスタル +{r.crystals}！</div>
             )}
             {isFirstClear && <div className="mw-reward-pop" style={{ color: "#ffe066", fontWeight: 700, animationDelay: "0.5s" }}>はじめてのクリア！</div>}
             {!r.granted && <div className="mw-reward-pop" style={{ color: "#c9b98f", animationDelay: "0.3s" }}>{REASON[r.reason] || ""}</div>}
@@ -44,7 +50,7 @@ export default function Reward({ nav, params }) {
           </>
         )}
       </div>
-      {r?.tickets > 0 && (
+      {r?.crystals >= 5 && (
         <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => nav.go("gacha", {}, { replace: true })}>
           <span className="mw-fantasy-icon">🎰</span>ガチャを引く
         </button>

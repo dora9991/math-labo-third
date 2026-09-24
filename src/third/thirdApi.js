@@ -9,6 +9,7 @@
 import { supabase, AUTH_ENABLED } from "../auth/supabase.js";
 import { isGuest, guestMem } from "../auth/session.js";
 import { handle } from "../../supabase/functions/third-api/handler.js";
+import { applyAdminOp } from "./adminOps.js";
 
 export const THIRD_SERVER = AUTH_ENABLED && import.meta.env.VITE_THIRD_SERVER === "1";
 export const THIRD_MODE = THIRD_SERVER ? "server" : "local";
@@ -56,17 +57,30 @@ export const thirdApi = {
   claim: (claim) => call("claim", { claim }),
   practice: (attempts) => call("practice", { attempts }),
   confirm: (key, attempts) => call("confirm", { key, attempts }),
+  report: (r) => call("report", r), // バトル終了の報告（負け・途中でやめた・お試し・章ボスの解答も学習ログに残す）
+  ping: (sid) => call("ping", { sid }), // 滞在時間の計測（1分おき）
 };
 
-// 開発用（ローカルモードのみ）：コンソールから ticket を付与して動作確認できる。サーバーモードでは存在しない。
+/** ローカルモード用：この端末のテスト用データを管理操作で調整する（サーバーモードでは使わない） */
+export async function localAdminGrant(op, args = {}) {
+  const cur = await localStore.load();
+  const base = cur?.state || (await thirdApi.getState()).body.state;
+  const r = applyAdminOp(base, op, args);
+  if (!r.ok) return { ok: false, error: r.error };
+  const again = await localStore.load();
+  await localStore.save("local", r.state, again ? again.version : null);
+  return { ok: true, message: r.message, crystals: r.state.crystals, owned: Object.keys(r.state.owned).length };
+}
+
+// 開発用（ローカルモードのみ）：コンソールから crystal を付与して動作確認できる。サーバーモードでは存在しない。
 if (!THIRD_SERVER && typeof window !== "undefined") {
   window.__thirdDev = {
-    async giveTickets(n = 10) {
+    async giveCrystals(n = 50) {
       const cur = await localStore.load();
       const base = (await thirdApi.getState()).body.state;
-      const next = { ...(cur?.state || base), tickets: ((cur?.state || base).tickets || 0) + n };
+      const next = { ...(cur?.state || base), crystals: ((cur?.state || base).crystals || 0) + n };
       await localStore.save("local", next, cur ? cur.version : null);
-      return next.tickets;
+      return next.crystals;
     },
     reset() { localStorage.removeItem(LOCAL_KEY); },
   };

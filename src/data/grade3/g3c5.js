@@ -3,6 +3,7 @@
 //  比例式・面積比/体積比・影の測定。整数になるよう構成。
 // ============================================================
 import { exprChoices, numChoices } from "../_algebra.js";
+import { genSimProof } from "../_proof.js";
 
 const p = (id, build, skill = null) => ({ id, build, skill });
 const rpick = (r, arr) => arr[r(0, arr.length - 1)];
@@ -92,6 +93,10 @@ const lv = (fn, oni, idp, skill) => ({
   oni: tens(idp, "o", (r) => oni(r), skill),
 });
 
+const proofSet = (fn, idp, skill) => Object.fromEntries(["easy", "standard", "advanced", "oni"].map((lvName) => [
+  lvName, Array.from({ length: 10 }, (_, i) => p(`${idp}${lvName[0]}${i + 1}`, (r) => fn(r, lvName), skill)),
+]));
+
 export const chapter = {
   id: "g3c5",
   name: "相似な図形",
@@ -102,5 +107,7 @@ export const chapter = {
     { id: "g3c5u1", name: "比例式とxの値", emoji: "➗", desc: "a:b=c:x", problems: lv(genProp, genOniProp, "g3c5u1", "S-SIM-PROP") },
     { id: "g3c5u2", name: "相似な図形の面積比・体積比", emoji: "📐", desc: "m²:n²・m³:n³", problems: lv(genRatio, genOniRatio, "g3c5u2", "S-SIM-RATIO") },
     { id: "g3c5u3", name: "相似の利用（影と測定）", emoji: "🌳", desc: "影で高さを測る", problems: lv(genShadow, genOniShadow, "g3c5u3", "S-SIM-USE") },
+    // 証明（穴うめ・選択式）：根拠／相似条件／等しい比 を4択で選ぶ。難易度ごとに問う内容が変わる（oni＝根拠と条件の組みあわせ）
+    { id: "g3c5u4", name: "相似の証明", emoji: "📝", desc: "根拠・相似条件を選ぶ", problems: proofSet(genSimProof, "g3c5u4", "S-SIM-PROOF") },
   ],
 };

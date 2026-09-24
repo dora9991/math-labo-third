@@ -166,7 +166,7 @@ export default function PartyFormation({ nav }) {
           パーティ編成
         </span>
         <button className="mw-fantasy-back" onClick={() => nav.go("gacha")} aria-label="ガチャ">
-          🎰 🎫{save.tickets}
+          🎰 💎{save.crystals}
         </button>
       </div>
 

@@ -1,5 +1,5 @@
 // ============================================================
-// ThirdGacha.jsx — ガチャ画面（数学ラボ3）。チケット(🎫)で引く。抽選は**サーバー**が行う（ローカルモードは開発用）。
+// ThirdGacha.jsx — ガチャ画面（数学ラボ3）。クリスタル(💎)で引く。抽選は**サーバー**が行う（ローカルモードは開発用）。
 //  演出は math-world の派手なガチャ（カプセル→光の爆発→シルエット→レア度演出）を流用。
 //  10連は「一番レアな1体」を派手に演出したあと、全結果の一覧を出す。
 // ============================================================
@@ -52,7 +52,7 @@ export default function ThirdGacha({ nav }) {
     if (busy) return;
     setError(null);
     const r = await actions.pullGacha(count);
-    if (!r.ok) { setError(r.error === "not-enough-tickets" ? "チケットが足りないよ" : "うまくいかなかったよ。もういちど"); return; }
+    if (!r.ok) { setError(r.error === "not-enough-crystals" ? "クリスタルが足りないよ" : "うまくいかなかったよ。もういちど"); return; }
     const best = [...r.results].sort((a, b) => RANK[b.rarity] - RANK[a.rarity])[0];
     setResults(r.results);
     setTop(best);
@@ -74,7 +74,7 @@ export default function ThirdGacha({ nav }) {
       <div className="mw-fantasy-topbar">
         <button className="mw-fantasy-back" onClick={() => nav.back()} disabled={busy}>← もどる</button>
         <span className="mw-fantasy-title" style={{ fontSize: "1.1rem" }}>ガチャ</span>
-        <span className="mw-fantasy-coin">🎫 {save.tickets}</span>
+        <span className="mw-fantasy-coin">💎 {save.crystals}</span>
       </div>
 
       {mode === "guest" && (
@@ -89,7 +89,7 @@ export default function ThirdGacha({ nav }) {
           {phase === "idle" && (
             <div className="mw-gacha-idle">
               <div className="mw-gacha-machine">🎰</div>
-              <div className="mw-gacha-tap-hint">チケットで仲間をよぼう！</div>
+              <div className="mw-gacha-tap-hint">クリスタルで仲間をよぼう！</div>
               <div style={{ fontSize: 12, color: "#ffe9b3", marginTop: 6, lineHeight: 1.7 }}>
                 ダブると「限界突破」で強くなるよ（最大{GACHA.maxBreaks}回・+{Math.round(GACHA.breakBonus * GACHA.maxBreaks * 100)}%）<br />
                 {GACHA.srGuaranteeEvery}回に1回はSR以上・あと{Math.max(0, GACHA.urPity - (save.pity?.sinceUR || 0))}回でUR確定
@@ -142,13 +142,13 @@ export default function ThirdGacha({ nav }) {
 
       {phase === "idle" && (
         <>
-          <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => pull(1)} disabled={save.tickets < GACHA.costPerPull}>
-            <span className="mw-fantasy-icon">🎫</span>1回引く（🎫×{GACHA.costPerPull}）
+          <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => pull(1)} disabled={save.crystals < GACHA.costPerPull}>
+            <span className="mw-fantasy-icon">💎</span>1回引く（💎×{GACHA.costPerPull}）
           </button>
-          <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => pull(GACHA.packSize)} disabled={save.tickets < GACHA.costPerPull * GACHA.packSize}>
-            <span className="mw-fantasy-icon">🎫</span>{GACHA.packSize}連（🎫×{GACHA.costPerPull * GACHA.packSize}）
+          <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => pull(GACHA.packSize)} disabled={save.crystals < GACHA.costPerPull * GACHA.packSize}>
+            <span className="mw-fantasy-icon">💎</span>{GACHA.packSize}連（💎×{GACHA.costPerPull * GACHA.packSize}）・SR以上が1体かくてい！
           </button>
-          <div style={{ fontSize: 11.5, color: "#c9b98f", textAlign: "center", lineHeight: 1.7 }}>チケットは、バトルを はじめてクリアすると もらえるよ。</div>
+          <div style={{ fontSize: 11.5, color: "#c9b98f", textAlign: "center", lineHeight: 1.7 }}>クリスタルは、確認問題・れんしゅう（むずかしさごと）・バトルを「はじめてクリア」すると もらえるよ。</div>
         </>
       )}
       {isRevealed && results.length > 1 && (

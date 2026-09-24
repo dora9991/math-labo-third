@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import App from "../App.jsx";
 import Login from "../screens/Login.jsx";
 import { AUTH_ENABLED, supabase } from "./supabase.js";
-import { setActiveUid, getActiveUid, setGuest } from "./session.js";
+import { setActiveUid, getActiveUid, setGuest, setLogoutHandler } from "./session.js";
 import { getAutoLogin, setAutoLogin, setRememberedId } from "./loginPrefs.js";
 import { touchLastLogin } from "./kidAuth.js";
 
@@ -46,36 +46,26 @@ export default function AuthGate() {
     return () => { alive = false; sub?.subscription?.unsubscribe(); };
   }, []);
 
-  if (guest) {
-    return (
-      <>
-        <App key="guest" />
-        <button data-sfx="none" onClick={endGuest} title="ゲストをおわる（データは消えます）"
-          style={{ position: "fixed", top: 8, right: 8, zIndex: 300, padding: "6px 11px", borderRadius: 999, fontSize: 11.5, fontWeight: 800,
-            border: "1px solid rgba(255,255,255,.25)", background: "rgba(0,0,0,.55)", color: "#fff", cursor: "pointer" }}>
-          👤 ゲスト中（データは残りません）・おわる
-        </button>
-      </>
-    );
-  }
+  // ログアウト／ゲスト終了は、設定画面のボタンから呼ぶ（画面右上に常時ボタンは置かない）
+  useEffect(() => {
+    if (guest) { setLogoutHandler(endGuest); return () => setLogoutHandler(null); }
+    if (user) {
+      setLogoutHandler(() => {
+        setActiveUid(null);
+        setAutoLogin(false); setRememberedId(""); // 明示的なログアウト＝この端末の記憶も消す（共有端末対策）
+        supabase.auth.signOut();
+      });
+      return () => setLogoutHandler(null);
+    }
+    setLogoutHandler(null);
+    return undefined;
+  }, [guest, user]);
+
+  if (guest) return <App key="guest" />;
   if (user === undefined) {
     return <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh", color: "rgba(255,255,255,.6)" }}>よみこみ中…</div>;
   }
   if (!user) return <Login onDone={() => { /* onAuthStateChange が拾う */ }} onGuest={startGuest} />;
 
-  return (
-    <>
-      <App key={user.id} />
-      <button data-sfx="none" onClick={() => {
-        setActiveUid(null);
-        setAutoLogin(false); setRememberedId(""); // 明示的なログアウト＝この端末の記憶も消す（共有端末対策）
-        supabase.auth.signOut();
-      }}
-        title="ログアウト"
-        style={{ position: "fixed", top: 8, right: 8, zIndex: 300, width: 34, height: 34, borderRadius: 999,
-          border: "1px solid rgba(255,255,255,.2)", background: "rgba(0,0,0,.45)", color: "#fff", cursor: "pointer", fontSize: 15 }}>
-        🚪
-      </button>
-    </>
-  );
+  return <App key={user.id} />;
 }

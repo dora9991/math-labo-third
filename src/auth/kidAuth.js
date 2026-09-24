@@ -85,6 +85,12 @@ export async function touchLastLogin(uid) {
   if (!supabase || !uid) return;
   try {
     await supabase.from("students").update({ last_login: new Date().toISOString() }).eq("id", uid);
+    // ログイン履歴（日付がわかるように1回ぶん追加。同じ開き直しで何度も増えないよう、このタブでは1回だけ）
+    const k = "ml3_login_logged_" + uid;
+    if (!sessionStorage.getItem(k)) {
+      sessionStorage.setItem(k, "1");
+      await supabase.from("third_login_log").insert({ student_id: uid }); // 表がまだ無い場合はエラーになるだけ（無視）
+    }
   } catch { /* noop */ }
 }
 

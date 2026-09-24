@@ -42,8 +42,8 @@ export default function ToketaHint({ problem, compact = false }) {
 
   if (!reveal) {
     return (
-      <button className="legacy-help-btn" style={{ fontSize: 12, marginBottom: 11 }} onClick={() => setReveal(true)}>
-        ヒントを見る
+      <button className="hint-yellow-btn" data-sfx="none" onClick={() => setReveal(true)}>
+        ヒント
       </button>
     );
   }

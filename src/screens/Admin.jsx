@@ -6,7 +6,7 @@
 import { useState } from "react";
 import Header from "../components/Header.jsx";
 import BackupBox from "../components/BackupBox.jsx";
-import ClassStats from "../components/ClassStats.jsx";
+import AdminThirdPanel from "../components/AdminThirdPanel.jsx";
 import FeedbackBox from "../components/FeedbackBox.jsx";
 import { MONSTERS } from "../data/monsters.js";
 import { levelTitle, playerLevel } from "../engine/scoring.js";
@@ -44,12 +44,14 @@ export default function Admin({ player, records, admin, onExport, onImport, onBa
         <div className="pg-ttl">🛠️ 管理用モード</div>
         <div className="pg-sub">先生用：値を自由に設定できます（生徒には見えない隠しモード）</div>
 
-        {/* クラス全員の成績（サーバー記録・先生の合言葉が必要） */}
-        <ClassStats />
+        {/* ラボ3の分析（1週間のまとめ・生徒ごとの詳細・正答率の低い問題）と管理ツール（サーバー記録・先生の合言葉が必要） */}
+        <AdminThirdPanel />
 
         {/* 生徒からのご意見箱（サーバー記録・先生の合言葉が必要） */}
         <FeedbackBox />
 
+        <details className="glass" style={{ padding: "12px 16px" }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 800 }}>旧ラボ2由来の設定（レベル・コイン・SPなど。ラボ3ではほぼ使いません）</summary>
         {/* 現状サマリ */}
         <div className="glass" style={{ padding: "12px 14px", display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12, color: "rgba(255,255,255,.7)" }}>
           <span>Lv.{lv}（{levelTitle(lv)}）</span>・
@@ -81,9 +83,13 @@ export default function Admin({ player, records, admin, onExport, onImport, onBa
           </Row>
         </div>
 
+        </details>
+
         {/* データのバックアップ（保存・復元） */}
         {onExport && onImport && <BackupBox onExport={onExport} onImport={onImport} />}
 
+        <details className="glass" style={{ padding: "12px 16px" }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 800 }}>旧ラボ2由来の操作（星MAX・モンスター・スキル・初期化）</summary>
         {/* ワンタッチ操作 */}
         <div className="glass" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 9 }}>
           <div className="slbl">⚡ クリア状況・解放</div>
@@ -110,6 +116,7 @@ export default function Admin({ player, records, admin, onExport, onImport, onBa
             </div>
           )}
         </div>
+        </details>
       </div>
     </div>
   );

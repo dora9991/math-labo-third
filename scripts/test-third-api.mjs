@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -40,29 +40,29 @@ function makeClaim({ n = 12, correctRate = 1, ms = 3000, nonce = "n" + Math.rand
 }
 
 // ===== 1. 初期状態
-{ const s = makeStore(); const r = await call(s, "get_state", {}); t("初回: 初期5体が配布される", r.status === 200 && Object.keys(r.body.state.owned).length === 5 && r.body.state.tickets === 0);
+{ const s = makeStore(); const r = await call(s, "get_state", {}); t("初回: 初期5体が配布される", r.status === 200 && Object.keys(r.body.state.owned).length === 5 && r.body.state.crystals === 0);
   t("初回: パーティは初期5体", JSON.stringify(r.body.state.party) === JSON.stringify(T.STARTER_PARTY));
   const r0 = await T.handle({ action: "get_state", userId: null, store: s }); t("未ログインは401", r0.status === 401); }
 
 // ===== 2. ガチャ
 { const s = makeStore(); await call(s, "get_state", {});
-  let r = await call(s, "gacha", { count: 1 }); t("チケット0では引けない", r.status === 400 && r.body.error === "not-enough-tickets");
+  let r = await call(s, "gacha", { count: 1 }); t("クリスタル0では引けない", r.status === 400 && r.body.error === "not-enough-crystals");
   // チケットを直接与える(=サーバー内の状態を用意)
-  const cur = await s.load("stu1"); cur.state.tickets = 200; await s.save("stu1", cur.state, cur.version);
-  r = await call(s, "gacha", { count: 10 }); t("10連: チケット10枚を消費して10体", r.status === 200 && r.body.results.length === 10 && r.body.state.tickets === 190);
+  const cur = await s.load("stu1"); cur.state.crystals = 200; await s.save("stu1", cur.state, cur.version);
+  r = await call(s, "gacha", { count: 10 }); t("10連: クリスタル50個を消費して10体", r.status === 200 && r.body.results.length === 10 && r.body.state.crystals === 150);
   t("10連: SR以上が最低1体(保証)", r.body.results.some((x) => x.rarity === "SR" || x.rarity === "UR"));
   r = await call(s, "gacha", { count: 3 }); t("1/10以外の回数は拒否", r.status === 400);
   // 統計：確率が設定どおり(大量に引く)
-  let counts = { N: 0, R: 0, SR: 0, UR: 0 }, st = (await s.load("stu1")).state; st.tickets = 100000; let cur2 = await s.load("stu1"); await s.save("stu1", st, cur2.version);
+  let counts = { N: 0, R: 0, SR: 0, UR: 0 }, st = (await s.load("stu1")).state; st.crystals = 100000; let cur2 = await s.load("stu1"); await s.save("stu1", st, cur2.version);
   for (let i = 0; i < 300; i++) { const rr = await call(s, "gacha", { count: 10 }); rr.body.results.forEach((x) => counts[x.rarity]++); }
   const tot = 3000, rate = (k) => counts[k] / tot;
   t(`排出率が設定どおり(N≈55%: ${(rate("N") * 100).toFixed(1)})`, Math.abs(rate("N") - 0.55) < 0.06 && rate("UR") > 0.02 && rate("UR") < 0.07, JSON.stringify(counts));
   // 凸の上限：全キャラ所持後は被りがコインに変換
   const fin = (await s.load("stu1")).state; t("被りは凸(最大4)に達し、超えるとコインになる", Object.values(fin.owned).every((o) => o.breaks <= 4) && fin.coins > 0);
   // 天井：100回目までにURが必ず出る
-  const s2 = makeStore(); await call(s2, "get_state", {}); const c2 = await s2.load("stu1"); c2.state.tickets = 100; await s2.save("stu1", c2.state, c2.version);
+  const s2 = makeStore(); await call(s2, "get_state", {}); const c2 = await s2.load("stu1"); c2.state.crystals = 600; await s2.save("stu1", c2.state, c2.version);
   let gotUR = false; const noUR = () => 0.5; // 常にN(=0.5<0.55)の乱数＝運が最悪でも
-  for (let i = 0; i < 10; i++) { const rr = await call(s2, "gacha", { count: 10 }, "stu1", Date.now(), () => 0.9); if (rr.body.results.some((x) => x.rarity === "UR")) gotUR = true; }
+  for (let i = 0; i < 12; i++) { const rr = await call(s2, "gacha", { count: 10 }, "stu1", Date.now(), () => 0.9); if (rr.body.results.some((x) => x.rarity === "UR")) gotUR = true; }
   t("天井: 最悪運でも100回以内にURが出る", gotUR);
 }
 
@@ -142,16 +142,16 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   await earnMedals(s, "stu1", T0);
   // 5-1 正しい申請 → 初回クリアでチケット1枚（実時間が十分経過）
   let claim = makeClaim({ now }); r = await call(s, "claim", { claim }, "stu1", now);
-  t("正しい申請: 初回クリアでチケット+1", r.status === 200 && r.body.rewards.granted && r.body.rewards.tickets === 1 && r.body.rewards.isFirstClear, JSON.stringify(r.body).slice(0, 200));
+  t("正しい申請: 初回クリアでクリスタル+2", r.status === 200 && r.body.rewards.granted && r.body.rewards.crystals === 2 && r.body.rewards.isFirstClear, JSON.stringify(r.body).slice(0, 200));
   t("経験値がパーティに配られる", r.body.state.owned[T.STARTER_PARTY[0]].exp > 0);
   r = await call(s, "claim", { claim }, "stu1", now + 5 * MIN); t("同じnonceの再送は拒否", r.status === 400 && r.body.error === "duplicate-claim");
   const replay = { ...claim, nonce: "another-nonce-1" }; r = await call(s, "claim", { claim: replay }, "stu1", now + 10 * MIN);
   t("同じ解答(seed)の使い回しは報酬にならない", r.status === 200 && r.body.rewards.granted === false && r.body.verified.correct === 0, JSON.stringify(r.body.verified));
   const c2 = makeClaim({ now: now + 20 * MIN }); r = await call(s, "claim", { claim: c2 }, "stu1", now + 20 * MIN);
-  t("2回目以降のクリアはチケット0(経験値・コインは少なめ)", r.status === 200 && r.body.rewards.granted && r.body.rewards.tickets === 0 && r.body.rewards.exp < 200 && !r.body.rewards.isFirstClear, JSON.stringify(r.body.rewards));
+  t("2回目以降のクリアはクリスタル0(経験値・コインは少なめ)", r.status === 200 && r.body.rewards.granted && r.body.rewards.crystals === 0 && r.body.rewards.exp < 200 && !r.body.rewards.isFirstClear, JSON.stringify(r.body.rewards));
   // 5-5 全部まちがい
   const s3 = makeStore(); await earnMedals(s3, "u3", T0); r = await call(s3, "claim", { claim: makeClaim({ correctRate: 0, now }) }, "u3", now);
-  t("正解ゼロの申請は報酬なし", r.status === 200 && r.body.rewards.granted === false && r.body.state.tickets === 0);
+  t("正解ゼロの申請は報酬なし", r.status === 200 && r.body.rewards.granted === false && r.body.rewards.crystals === 0);
   const liar = makeClaim({ correctRate: 0, now: now + 400000 }); liar.attempts.forEach((a) => (a.correct = true)); liar.won = true; r = await call(s3, "claim", { claim: liar }, "u3", now + 15 * MIN);
   t("『正解した/勝った』と書き足しても無効", r.body.rewards.granted === false);
   // 5-7 速すぎる解答
@@ -171,11 +171,68 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
 }
 
 // ===== 6. 二重送信（同時リクエスト）で2回取れない
-{ const s = makeStore(); await call(s, "get_state", {}); const cur = await s.load("stu1"); cur.state.tickets = 1; await s.save("stu1", cur.state, cur.version);
+{ const s = makeStore(); await call(s, "get_state", {}); const cur = await s.load("stu1"); cur.state.crystals = 5; await s.save("stu1", cur.state, cur.version);
   // 2つのリクエストが同じ版を読んでから書く状況を再現
   const a = call(s, "gacha", { count: 1 }), b = call(s, "gacha", { count: 1 }); const [ra, rb] = await Promise.all([a, b]);
   const okCount = [ra, rb].filter((x) => x.status === 200).length; const end = (await s.load("stu1")).state;
-  t("同時に2回ガチャを送っても、チケット1枚で1回しか成立しない", okCount === 1 && end.tickets === 0, `ok=${okCount} tickets=${end.tickets}`); }
+  t("同時に2回ガチャを送っても、クリスタル5個で1回しか成立しない", okCount === 1 && end.crystals === 0, `ok=${okCount} crystals=${end.crystals}`); }
+
+// ===== 7. 管理者の操作（チケット・全クリア・仲間の調整）＋解答ログにtemplateId
+{
+  const s = makeStore();
+  let r = await T.handleAdmin({ op: "addCrystals", args: { n: 7 }, targetId: "adm1", store: s });
+  t("管理者：クリスタルを付与できる", r.status === 200 && r.body.crystals === 7, JSON.stringify(r.body));
+  r = await T.handleAdmin({ op: "clearAllMedals", targetId: "adm1", store: s });
+  const st = (await s.load("adm1")).state;
+  const units = T.chaptersForGrade(1).flatMap((c) => c.units);
+  t("管理者：全クリアで全小単元のバトルが解放される", r.status === 200 && units.every((u) => T.unitMedalsOf(st, u.id).battleOpen));
+  r = await T.handleAdmin({ op: "grantCompanions", args: { mode: "all" }, targetId: "adm1", store: s });
+  t("管理者：仲間を全員追加できる", r.status === 200 && r.body.owned > 100, JSON.stringify(r.body));
+  r = await T.handleAdmin({ op: "setCompanionGrowth", args: { exp: 5000, breaks: 2 }, targetId: "adm1", store: s });
+  const st2 = (await s.load("adm1")).state;
+  t("管理者：仲間の経験値・限界突破をそろえられる", Object.values(st2.owned).every((o) => o.exp === 5000 && o.breaks === 2));
+  r = await T.handleAdmin({ op: "resetCompanions", targetId: "adm1", store: s });
+  t("管理者：仲間を最初の5体に戻せる", r.status === 200 && r.body.owned === 5);
+  r = await T.handleAdmin({ op: "nope", targetId: "adm1", store: s });
+  t("管理者：知らない操作は拒否", r.status === 400);
+  // れんしゅうの解答に templateId が付く（問題ごとの正答率の元）
+  const sp = makeStore();
+  await call(sp, "get_state", {}, "stuP", Date.now() - 10 * 60000); // 実時間の持ち分を貯めてから
+  await call(sp, "practice", { attempts: makePracticeAttempts({ n: 3, ms: 4000, seedBase: 4242 }) }, "stuP", Date.now());
+  t("解答ログに templateId が入る", sp.log.attempts.length > 0 && sp.log.attempts.every((x) => typeof x.templateId === "string" && x.templateId.length > 0), JSON.stringify(sp.log.attempts[0]));
+}
+
+// ===== 8. クリスタル（初クリア報酬）と10連の保証
+{
+  const s = makeStore();
+  const T0 = Date.now() - 20 * 60000;
+  await call(s, "get_state", {}, "cry1", T0);
+  // れんしゅう：簡単で5問正解 → クリスタル1（普通で5問 → もう1）。同じ難易度の周回では増えない
+  const mk = (lv, base) => Array.from({ length: 5 }, (_, i) => { const seed = base + i; const p = T.generatePractice("u1", lv, seed); return { unitId: "u1", level: lv, seed, answer: p.ans, ms: 2500 }; });
+  let r = await call(s, "practice", { attempts: mk("easy", 900100) }, "cry1", T0 + 60000);
+  t("れんしゅう(簡単)を初クリア：クリスタル+1", r.status === 200 && r.body.state.crystals === 1 && r.body.crystalEvents.length === 1, JSON.stringify(r.body.crystalEvents));
+  r = await call(s, "practice", { attempts: mk("easy", 900200) }, "cry1", T0 + 120000);
+  t("同じ難易度をもう一度クリアしても増えない", r.status === 200 && r.body.state.crystals === 1);
+  r = await call(s, "practice", { attempts: mk("standard", 900300) }, "cry1", T0 + 180000);
+  t("れんしゅう(普通)は別にクリスタル+1", r.status === 200 && r.body.state.crystals === 2);
+  // 確認問題：初合格でクリスタル+1
+  const lesson = T.haichiKeyForUnit("u1");
+  const cf = Array.from({ length: 5 }, (_, i) => { const seed = 900400 + i; const p = T.generatePractice("u1", "standard", seed); return { unitId: "u1", level: "standard", seed, answer: p.ans, ms: 2500 }; });
+  r = await call(s, "confirm", { key: lesson, attempts: cf }, "cry1", T0 + 300000);
+  t("確認問題に初めて合格：クリスタル+1", r.status === 200 && r.body.verified.passed && r.body.state.crystals === 3, JSON.stringify(r.body.verified));
+  const cf2 = Array.from({ length: 5 }, (_, i) => { const seed = 900500 + i; const p = T.generatePractice("u1", "standard", seed); return { unitId: "u1", level: "standard", seed, answer: p.ans, ms: 2500 }; });
+  r = await call(s, "confirm", { key: lesson, attempts: cf2 }, "cry1", T0 + 420000);
+  t("確認問題の2回目の合格では増えない", r.status === 200 && r.body.state.crystals === 3);
+  // 10連は必ずSR以上が1体（最悪の乱数でも）
+  const g = await s.load("cry1"); g.state.crystals = 500; await s.save("cry1", g.state, g.version);
+  let allOk = true;
+  for (let i = 0; i < 8; i++) { const rr = await call(s, "gacha", { count: 10 }, "cry1", Date.now(), () => 0.5); if (!rr.body.results.some((x) => x.rarity === "SR" || x.rarity === "UR")) allOk = false; }
+  t("10連：最悪の乱数でもSR以上が必ず1体", allOk);
+  // 旧ガチャチケットは 1枚=クリスタル5個 に換算して引き継ぐ
+  const s3 = makeStore(); const legacy = { v: 1, tickets: 3 }; await s3.save("old1", legacy, null);
+  const lg = await call(s3, "get_state", {}, "old1");
+  t("旧チケット3枚 → クリスタル15個に引き継ぎ", lg.body.state.crystals === 15 && lg.body.state.tickets === undefined, JSON.stringify(lg.body.state.crystals));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

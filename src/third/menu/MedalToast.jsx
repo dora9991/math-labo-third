@@ -5,6 +5,7 @@ import { HAICHI_COURSE } from "../../data/haichiCourse.js";
 import * as sfx from "../../audio/sfx.js";
 
 function labelOf(m) {
+  if (m.kind === "crystal") return { icon: "💎", title: `クリスタル +${m.n}`, sub: m.label || "", crystal: true };
   if (m.kind === "practice") return { icon: "✏️", title: "れんしゅうメダル", sub: findUnitById(m.unitId)?.name || "" };
   const key = m.key || "";
   if (key.startsWith("nv:")) return { icon: "📺", title: "はいちメダル", sub: findUnitById(key.slice(3))?.name || "" };
@@ -28,7 +29,7 @@ export default function MedalToast({ medals, onDone }) {
           <div key={i} className="glass" style={{ maxWidth: 360, width: "100%", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, border: "2px solid #fde047", background: "rgba(23,21,54,.96)", animation: "rankUpPop .5s cubic-bezier(.2,1.4,.4,1) both" }}>
             <span style={{ fontSize: 34, display: "grid", placeItems: "center", width: 52, height: 52, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%,#fff7c2,#fbbf24 55%,#b45309)", boxShadow: "0 0 14px rgba(251,191,36,.6)" }}>{l.icon}</span>
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: "#fde047" }}>🏅 {l.title}ゲット！</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: l.crystal ? "#7dd3fc" : "#fde047" }}>{l.crystal ? `💎 ${l.title}！` : `🏅 ${l.title}ゲット！`}</div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", marginTop: 2 }}>{l.sub}</div>
             </div>
           </div>

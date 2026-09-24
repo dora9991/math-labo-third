@@ -95,3 +95,21 @@ create index if not exists third_answer_log_student_created on public.third_answ
 drop policy if exists "third_answer_log self insert" on public.third_answer_log;
 create policy "third_answer_log self insert" on public.third_answer_log
   for insert with check (auth.uid() = student_id);
+
+-- ============================================================
+-- ⑥ 管理者の分析用（2026-09-24）— これも SQL Editor に貼って実行（何度実行しても安全）
+--  ・third_attempts に「解答にかけた時間(ms)」の列を追加（プレイ時間の集計用）。template_id は元からある列を使う。
+--  ・third_login_log：ログインした日時の履歴（生徒が自分の行だけ追加できる。読めるのは管理者の Edge Function だけ）。
+-- ============================================================
+alter table public.third_attempts add column if not exists ms int;
+
+create table if not exists public.third_login_log (
+  id          bigint generated always as identity primary key,
+  student_id  uuid not null references public.students(id) on delete cascade,
+  at          timestamptz not null default now()
+);
+alter table public.third_login_log enable row level security;
+create index if not exists third_login_log_student_at on public.third_login_log (student_id, at desc);
+drop policy if exists "third_login_log self insert" on public.third_login_log;
+create policy "third_login_log self insert" on public.third_login_log
+  for insert with check (auth.uid() = student_id);

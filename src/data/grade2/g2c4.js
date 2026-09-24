@@ -3,6 +3,7 @@
 //  多角形の内角の和 180(n−2)、正n角形の1内角 180(n−2)/n、1外角 360/n。
 // ============================================================
 import { numChoices } from "../_algebra.js";
+import { genCongProof } from "../_proof.js";
 
 const p = (id, build, skill = null) => ({ id, build, skill });
 const rpick = (r, arr) => arr[r(0, arr.length - 1)];
@@ -236,6 +237,10 @@ const lv = (fn, idp, skill) => ({
   advanced: [p(idp + "a", (r) => fn(r, "advanced"), skill)],
 });
 
+const proofSet = (fn, idp, skill) => Object.fromEntries(["easy", "standard", "advanced", "oni"].map((lvName) => [
+  lvName, Array.from({ length: 10 }, (_, i) => p(`${idp}${lvName[0]}${i + 1}`, (r) => fn(r, lvName), skill)),
+]));
+
 export const chapter = {
   id: "g2c4",
   name: "平行と合同",
@@ -245,5 +250,7 @@ export const chapter = {
   units: [
     { id: "g2c4u1", name: "多角形の内角の和", emoji: "🔺", desc: "180×(n−2)", problems: { easy: U1_EASY, standard: U1_STANDARD, advanced: U1_ADVANCED, oni: U1_ONI } },
     { id: "g2c4u2", name: "正多角形の内角・外角", emoji: "⬡", desc: "1つの内角・外角", problems: { easy: U2_EASY, standard: U2_STANDARD, advanced: U2_ADVANCED, oni: U2_ONI } },
+    // 証明（穴うめ・選択式）：根拠／合同条件／等しい辺・角 を4択で選ぶ。難易度ごとに問う内容が変わる（oni＝根拠と条件の組みあわせ）
+    { id: "g2c4u3", name: "合同の証明", emoji: "📝", desc: "根拠・合同条件を選ぶ", problems: proofSet(genCongProof, "g2c4u3", "S-CONG-PROOF") },
   ],
 };

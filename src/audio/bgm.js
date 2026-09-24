@@ -70,11 +70,22 @@ const VOLUME = { op: 0.6,
 };
 const DEFAULT_VOLUME = 0.28;
 
+// 【2026-09-22】ダッキング：ユーザーの「ミュート」設定(muted)とは別に、今鳴っている曲の
+//  音量に一時的な係数(0〜1)をかける仕組み。はいちモード滞在中は控えめに、YouTube動画の
+//  再生中はさらに0（実質オフ）にする、といった「画面の状況に応じた一時的な調整」に使う。
+//  曲を切り替えても(play())係数は保たれる（画面のBGM切替と独立して効かせるため）。
+let duckLevel = 1;
+let currentBaseVolume = DEFAULT_VOLUME; // 今の曲の「素の」音量（係数をかける前）
+
+function applyVolume() {
+  if (el) el.volume = currentBaseVolume * duckLevel;
+}
+
 function ensure() {
   if (!el) {
     el = new Audio();
     el.loop = true;
-    el.volume = DEFAULT_VOLUME;
+    el.volume = currentBaseVolume * duckLevel;
     el.muted = muted;
   }
   return el;
@@ -96,7 +107,8 @@ export function play(name, { loop = true } = {}) {
   el.src = src;
   el.loop = loop;
   el.muted = muted;
-  el.volume = VOLUME[name] != null ? VOLUME[name] : DEFAULT_VOLUME;
+  currentBaseVolume = VOLUME[name] != null ? VOLUME[name] : DEFAULT_VOLUME;
+  applyVolume();
   const p = el.play();
   if (p && p.catch) p.catch(() => {}); // 自動再生ブロック時は無視
 }
@@ -105,6 +117,19 @@ export function play(name, { loop = true } = {}) {
 export function stop() {
   if (el) { el.pause(); current = null; }
 }
+
+/**
+ * BGMの音量に一時的な係数(0〜1)をかける。1=通常、0=実質無音。
+ *  例：はいちモード滞在中は0.35（控えめ）、YouTube動画の再生中だけ0（オフ）、
+ *      動画が止まったら0.35に戻す、はいちモードを出たら1に戻す。
+ * ミュート設定(muted/toggleMute)には触れない＝ユーザーが手動でミュートしていれば無音のまま。
+ */
+export function setDuckLevel(level) {
+  duckLevel = Math.max(0, Math.min(1, level));
+  applyVolume();
+}
+
+export function getDuckLevel() { return duckLevel; }
 
 /** ミュート切替（true=ミュート中を返す） */
 export function toggleMute() {

@@ -5,10 +5,9 @@ export const STARTER_PARTY = ["sp_calc_a_n", "sp_eq_a_n", "sp_func_a_n", "sp_geo
 export const PARTY_SIZE = 5;
 
 export const GACHA = {
-  costPerPull: 1, // チケット1枚で1回
-  packSize: 10, // 「10連」＝10回（チケット10枚）
+  costPerPull: 5, // クリスタル5個で1回（2026-09-24 kazu指定。旧：ガチャチケット1枚）
+  packSize: 10, // 「10連」＝10回（クリスタル50個）。10連には SR以上が必ず1体入る
   rates: { N: 0.55, R: 0.3, SR: 0.12, UR: 0.03 }, // 通常の排出率
-  srGuaranteeEvery: 10, // 10回に1回はSR以上を保証（10連の最後）
   urPity: 100, // 100回引いてもURが出なければ、100回目はUR確定（天井）
   maxBreaks: 4, // 被り＝限界突破(凸)の上限
   breakBonus: 0.05, // 凸1回ごとの hp/atk 上乗せ（最大 +20%）
@@ -17,7 +16,7 @@ export const GACHA = {
 
 // バトルのご褒美（初回クリア/2回目以降）
 export const REWARD = {
-  firstTickets: 1, // 小単元バトルの初回クリア
+  firstCrystals: 2, // 小単元バトルの初回クリア：クリスタル2個
   firstCoins: 60,
   repeatCoins: 15,
   repeatExpRate: 0.3, // 2回目以降の経験値は初回の30%
@@ -34,6 +33,12 @@ export const VERIFY = {
   seenSeedsKeep: 600, // 使用済みseedの記憶数（同じ解答の使い回し防止）
   claimIdsKeep: 60,
 };
+
+// クリスタル（ガチャの通貨。2026-09-24 kazu指定）：はじめてクリアしたときだけ付く（周回では増えない）
+//  ・確認問題（はいち）に初めて合格：1個（動画レッスンごとに1回）
+//  ・れんしゅう：難易度（簡単・普通・難しい・鬼）ごとに、その難易度の正解が5問に達した最初の1回：各1個
+//  ・バトル：小単元の初クリア：2個（REWARD.firstCrystals）
+export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5 };
 
 // メダル（サーバーが付与）
 export const MEDAL = {

@@ -90,6 +90,48 @@ function genProbAdv(r, level) {
   return { q: `2つのさいころを同時に投げるとき、出た目の積が ${m} の倍数になる確率を求めなさい。`, ans: frac(fav, 36), choices: fchoices(fav, 36, r), h1: H.prob.h1, h2: `36通りのうち積が${m}の倍数は ${fav} 通り。${fav}/36 を約分` };
 }
 
+// ── u4 四分位範囲・箱ひげ図 ──
+const median = (arr) => { const n = arr.length, mid = Math.floor(n / 2); return n % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2; };
+function quartiles(arr) {
+  const n = arr.length, mid = Math.floor(n / 2);
+  const lower = arr.slice(0, mid);
+  const upper = n % 2 ? arr.slice(mid + 1) : arr.slice(mid);
+  return { q1: median(lower), med: median(arr), q3: median(upper) };
+}
+function genData(r, n, lo, hi) {
+  const set = new Set();
+  while (set.size < n) set.add(r(lo, hi));
+  return [...set].sort((a, b) => a - b);
+}
+function genQuartile(r, level) {
+  if (level === "easy") {
+    const arr = genData(r, 7, 1, 30);
+    const med = median(arr);
+    return { q: `あるデータを小さい順に並べると次のようになった。中央値を求めなさい。\n${arr.join(", ")}`, ans: med, choices: numChoices(med, r, [arr[2], arr[4]]), h1: "データを小さい順に並べたときの真ん中の値", h2: `中央値=${med}` };
+  }
+  if (level === "standard") {
+    const arr = genData(r, 7, 1, 30);
+    const { q1, q3 } = quartiles(arr);
+    const askQ1 = r(0, 1) === 0;
+    const ans = askQ1 ? q1 : q3;
+    return { q: `あるデータを小さい順に並べると次のようになった。第${askQ1 ? "1" : "3"}四分位数を求めなさい。\n${arr.join(", ")}`, ans, choices: numChoices(ans, r, [askQ1 ? q3 : q1, median(arr)]), h1: "中央値で前半・後半に分け、それぞれの中央値が第1・第3四分位数", h2: `第1四分位数=${q1}、第3四分位数=${q3}` };
+  }
+  if (level === "advanced") {
+    const arr = genData(r, 9, 1, 40);
+    const { q1, q3 } = quartiles(arr);
+    const iqr = q3 - q1;
+    return { q: `あるデータを小さい順に並べると次のようになった。四分位範囲（第3四分位数−第1四分位数）を求めなさい。\n${arr.join(", ")}`, ans: iqr, choices: numChoices(iqr, r, [q3, q1, arr[arr.length - 1] - arr[0]]), h1: "四分位範囲=第3四分位数−第1四分位数", h2: `${q3}−${q1}=${iqr}` };
+  }
+  // oni：五数要約（最小・Q1・中央値・Q3・最大）から範囲 or 四分位範囲を読み取る
+  const arr = genData(r, 9, 1, 50);
+  const { q1, q3, med } = quartiles(arr);
+  const min = arr[0], max = arr[arr.length - 1];
+  const askRange = r(0, 1) === 0;
+  const range = max - min, iqr = q3 - q1;
+  const ans = askRange ? range : iqr;
+  return { q: `あるデータの箱ひげ図から、最小値${min}、第1四分位数${q1}、中央値${med}、第3四分位数${q3}、最大値${max}であることがわかった。${askRange ? "範囲（最大値−最小値）" : "四分位範囲（第3四分位数−第1四分位数）"}を求めなさい。`, ans, choices: numChoices(ans, r, [askRange ? iqr : range, max - q1]), h1: askRange ? "範囲=最大値−最小値" : "四分位範囲=第3四分位数−第1四分位数", h2: askRange ? `${max}−${min}=${range}` : `${q3}−${q1}=${iqr}` };
+}
+
 // 各レベル10問ずつ（同じ作問関数を10通りの乱数で出す。id は連番で重複なし）＋ oni を新設
 const N = 10;
 const seq = (fn, idp, level, tag, skill) =>
@@ -111,5 +153,6 @@ export const chapter = {
     { id: "g2c6u1", name: "場合の数（順列・組み合わせ）", emoji: "🔢", desc: "並べる・選ぶ", problems: lv(genCount, "g2c6u1", "S-PRB-COUNT") },
     { id: "g2c6u2", name: "確率の基本（さいころ・硬貨）", emoji: "🎲", desc: "場合÷全部", problems: lv(genProbBasic, "g2c6u2", "S-PRB-BASIC") },
     { id: "g2c6u3", name: "確率の応用（玉・2つのさいころ）", emoji: "🔴", desc: "玉・2個のさいころ", problems: lv(genProbAdv, "g2c6u3", "S-PRB-ADV") },
+    { id: "g2c6u4", name: "四分位範囲・箱ひげ図", emoji: "📦", desc: "中央値・四分位数・範囲", problems: lv(genQuartile, "g2c6u4", "S-STAT-QUARTILE") },
   ],
 };
