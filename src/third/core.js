@@ -64,7 +64,8 @@ export function normalizeThirdState(s) {
   for (const [id, v] of Object.entries(s.owned || {})) {
     if (ROSTER_BY_ID[id]) out.owned[id] = { exp: Math.max(0, Number(v?.exp) || 0), exp2: Math.max(0, Number(v?.exp2) || 0), exp3: Math.max(0, Number(v?.exp3) || 0), breaks: Math.min(GACHA.maxBreaks, Math.max(0, Number(v?.breaks) || 0)), n: Number(v?.n) || 0 };
   }
-  for (const id of STARTER_PARTY) if (!out.owned[id]) out.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: 0 };
+  // 初期の5体は「まったく仲間がいない（新規・壊れたデータ）」時だけ配る。（合成で手放した初期の子が、読み込むたびに復活しないように）
+  if (!Object.keys(out.owned).length) for (const id of STARTER_PARTY) out.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: 0 };
   let seq = Math.max(Number(s.acqSeq) || 0, ...Object.values(out.owned).map((o) => o.n));
   for (const o of Object.values(out.owned)) if (!o.n) o.n = ++seq;
   out.acqSeq = seq;
@@ -75,7 +76,11 @@ export function normalizeThirdState(s) {
   let party = Array.isArray(s.party) ? s.party.slice(0, PARTY_SIZE) : [...STARTER_PARTY];
   party = party.map((id) => (id && out.owned[id] ? id : null));
   while (party.length < PARTY_SIZE) party.push(null);
-  out.party = [...new Set(party.filter(Boolean))].length === party.filter(Boolean).length ? party : [...STARTER_PARTY];
+  if ([...new Set(party.filter(Boolean))].length !== party.filter(Boolean).length) { // 重複など壊れた編成：初期の子（手放していなければ）で組み直す
+    party = [...STARTER_PARTY].map((id) => (out.owned[id] ? id : null));
+    while (party.length < PARTY_SIZE) party.push(null);
+  }
+  out.party = party;
   // 旧ガチャチケット(1枚=1回)は、クリスタル(5個=1回)に換算して引き継ぐ
   out.crystals = Math.max(0, Math.round(Number(s.crystals ?? (Number(s.tickets) || 0) * GACHA.costPerPull) || 0));
   delete out.tickets;
@@ -178,32 +183,43 @@ export function applyRaidWin(state, index, now) {
 
 // ---------------- 合成・限界突破 ----------------
 /**
- * 合成：いらない仲間を、ほかの仲間の経験値にする（1体＝200＋その子の経験値÷2）。
+ * 合成：合成するキャラを、ほかの仲間の経験値にする（1体＝200＋その子の経験値÷2）。
  *  source "spare"：ガチャで被った予備（経験値0なので1体＝200。count個まとめて）
  *  source "owned"：持っている仲間（パーティ外・予備が無い子）。合成するとその子は仲間からいなくなる（図鑑には残る）
  */
 export function synthesize(state, req) {
-  const targetId = req?.targetId, materialId = req?.materialId, source = req?.source;
+  const targetId = req?.targetId;
   const grade = [1, 2, 3].includes(Number(req?.grade)) ? Number(req.grade) : 1; // 合成は「その学年の経験値」どうしで行う
   if (typeof targetId !== "string" || !state.owned[targetId]) return { ok: false, error: "bad-target" };
+  // 素材は複数まとめて渡せる：materials = [{ id, source:"spare"|"owned", count? }]。（1体だけの旧形式 materialId/source/count も受ける）
+  let list = req?.materials;
+  if (!Array.isArray(list)) list = [{ id: req?.materialId, source: req?.source, count: req?.count }];
+  if (!list.length || list.length > 60) return { ok: false, error: "bad-material" };
   const s = structuredClone(state);
+  const seen = new Set();
   let gain = 0, used = 0;
-  if (source === "spare") {
-    const have = s.spares[materialId] || 0;
-    const count = Number.isInteger(req?.count) ? req.count : 1;
-    if (!have || count < 1 || count > have) return { ok: false, error: "no-spare" };
-    s.spares[materialId] = have - count;
-    if (!s.spares[materialId]) delete s.spares[materialId];
-    gain = count * SYNTH.baseExp; used = count;
-  } else if (source === "owned") {
-    const m = s.owned[materialId];
-    if (!m) return { ok: false, error: "bad-material" };
-    if (materialId === targetId) return { ok: false, error: "same-character" };
-    if (s.party.includes(materialId)) return { ok: false, error: "in-party" };
-    if ((s.spares[materialId] || 0) > 0) return { ok: false, error: "use-spare-first" };
-    gain = SYNTH.baseExp + Math.floor(expOf(m, grade) * SYNTH.expRate);
-    delete s.owned[materialId]; used = 1;
-  } else return { ok: false, error: "bad-source" };
+  for (const it of list) {
+    const materialId = it?.id, source = it?.source;
+    if (typeof materialId !== "string") return { ok: false, error: "bad-material" };
+    if (seen.has(`${source}:${materialId}`)) return { ok: false, error: "bad-material" }; // 同じ素材の二重指定は不可
+    seen.add(`${source}:${materialId}`);
+    if (source === "spare") {
+      const have = s.spares[materialId] || 0;
+      const count = Number.isInteger(it.count) ? it.count : 1;
+      if (!have || count < 1 || count > have) return { ok: false, error: "no-spare" };
+      s.spares[materialId] = have - count;
+      if (!s.spares[materialId]) delete s.spares[materialId];
+      gain += count * SYNTH.baseExp; used += count;
+    } else if (source === "owned") {
+      const m = s.owned[materialId];
+      if (!m) return { ok: false, error: "bad-material" };
+      if (materialId === targetId) return { ok: false, error: "same-character" };
+      if (s.party.includes(materialId)) return { ok: false, error: "in-party" };
+      if ((s.spares[materialId] || 0) > 0) return { ok: false, error: "use-spare-first" };
+      gain += SYNTH.baseExp + Math.floor(expOf(m, grade) * SYNTH.expRate);
+      delete s.owned[materialId]; used += 1;
+    } else return { ok: false, error: "bad-source" };
+  }
   addExp(s.owned[targetId], grade, gain);
   return { ok: true, state: s, gain, used };
 }

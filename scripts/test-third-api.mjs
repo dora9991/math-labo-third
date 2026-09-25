@@ -452,5 +452,25 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t("学年ごとの経験値: 合成は指定した学年の経験値だけ増える（中3を指定→中1・中2は増えない）", m.status === 200 && o2.exp3 === 400 && o2.exp === 0 && o2.exp2 === 0, JSON.stringify(o2));
 }
 
+// ---------------- 合成：まとめて合成・二重指定・消費の確認 ----------------
+{
+  const s = makeStore(); await call(s, "get_state", {}, "mx1", T0);
+  const g = await s.load("mx1"); const ids = Object.keys(g.state.owned);
+  const [a, b, c, d, e] = ids; // 初期5体（全員パーティ）。パーティから外して素材にする
+  g.state.party = [a, null, null, null, null].map((x) => x || null);
+  g.state.spares = { [b]: 3 };
+  await s.save("mx1", g.state, g.version);
+  let m = await call(s, "synthesize", { targetId: a, grade: 1, materials: [{ id: b, source: "spare", count: 2 }, { id: c, source: "owned" }, { id: d, source: "owned" }] }, "mx1", T0);
+  t("まとめて合成: 予備2＋持っている子2を一度に。経験値の合計が入る", m.status === 200 && m.body.gain === 2 * T.SYNTH.baseExp + 2 * T.SYNTH.baseExp && m.body.used === 4, JSON.stringify(m.body.gain));
+  const st = m.body.state;
+  t("まとめて合成: 使った子は仲間から消える／予備は減る／図鑑には残る", !st.owned[c] && !st.owned[d] && st.owned[e] && st.spares[b] === 1 && st.dex[c] === 1);
+  m = await call(s, "synthesize", { targetId: a, grade: 1, materials: [{ id: c, source: "owned" }] }, "mx1", T0);
+  t("合成した子は もう素材に使えない（永遠に合成できない）", m.status === 400 && m.body.error === "bad-material");
+  m = await call(s, "synthesize", { targetId: a, grade: 1, materials: [{ id: e, source: "owned" }, { id: e, source: "owned" }] }, "mx1", T0);
+  t("同じ子の二重指定は拒否（一度に2回ぶん消費できない）", m.status === 400);
+  const before = await s.load("mx1");
+  t("拒否された合成では何も減らない", !!before.state.owned[e] && before.state.spares[b] === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
