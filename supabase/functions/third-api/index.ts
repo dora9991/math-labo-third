@@ -245,6 +245,26 @@ Deno.serve(async (req: Request) => {
       await db.from("third_sessions").update({ last_seen_at: iso, active_ms: (Number(row?.active_ms) || 0) + delta }).eq("student_id", uid).eq("sid", sid);
       if (delta > 0) await this.bumpDaily(uid, dailyArgs({ activeMs: delta, now }));
     },
+    // ---- マルチプレイの部屋（third_rooms。書き込みはここ＝service_roleだけ）
+    async roomLoad(code: string) {
+      const { data } = await db.from("third_rooms").select("room, updated_at").eq("code", code).maybeSingle();
+      return data ? { room: data.room, version: data.updated_at } : null;
+    },
+    async roomSave(room: { code: string; hostId: string; status: string; members: { id: string }[]; updatedAt: number }, prevVersion: string | null) {
+      const row = { code: room.code, host_id: room.hostId, status: room.status, member_ids: room.members.map((m) => m.id), room, updated_at: new Date().toISOString() };
+      if (prevVersion === null) { const { error } = await db.from("third_rooms").insert(row); return !error; }
+      const { data, error } = await db.from("third_rooms").update(row).eq("code", room.code).eq("updated_at", prevVersion).select("code");
+      return !error && (data?.length ?? 0) === 1;
+    },
+    async roomOfUser(uid: string) {
+      const since = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+      const { data } = await db.from("third_rooms").select("code").contains("member_ids", [uid]).neq("status", "closed").gt("updated_at", since).order("updated_at", { ascending: false }).limit(1);
+      return data?.[0]?.code || null;
+    },
+    async profileName(uid: string) {
+      const { data } = await db.from("students").select("name").eq("id", uid).maybeSingle();
+      return data?.name || "";
+    },
     async logGacha(uid: string, rows: { id: string; rarity: string; isNew: boolean }[]) {
       if (!rows.length) return;
       await db.from("third_gacha_log").insert(rows.map((r) => ({ student_id: uid, pool: "standard", result_id: r.id, rarity: r.rarity, is_new: r.isNew, tickets_used: 5 })));

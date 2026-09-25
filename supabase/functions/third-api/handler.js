@@ -6,6 +6,7 @@
 // ============================================================
 import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
+import { ROOM, newRoomCode, normalizeCode, createRoom, joinRoom, leaveRoom, startRoom, roomView, isActive, memberIds } from "../../../src/third/room.js";
 import { initialThirdState, normalizeThirdState, pullGacha, setParty, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
 
 export async function handle({ action, body = {}, userId, store, now = Date.now(), rand = Math.random }) {
@@ -23,6 +24,7 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
     await recordLogs({ store, userId, mode: "battle", attempts: r.attempts, rows: [], ctx: r.ctx, now });
     return { status: 200, body: { ok: true } };
   }
+  if (String(action).startsWith("room_")) return handleRoom({ action, body, userId, store, now, rand });
   const loaded = await store.load(userId);
   const prevVersion = loaded ? loaded.version : null;
   const state = normalizeThirdState(loaded ? loaded.state : initialThirdState());
@@ -102,4 +104,75 @@ export async function handleAdmin({ op, args = {}, targetId, store }) {
   const ok = await store.save(targetId, r.state, loaded ? loaded.version : null);
   if (!ok) return { status: 409, body: { error: "conflict-retry" } };
   return { status: 200, body: { message: r.message, crystals: r.state.crystals, owned: Object.keys(r.state.owned).length } };
+}
+
+
+// ---------------- マルチプレイの部屋（第1段階：作成・参加・退出・開始）----------------
+//  store の部屋用: roomLoad(code)→{room,version}|null / roomSave(room,prevVersion)→boolean(prev=nullは新規) / roomOfUser(userId)→code|null / profileName(userId)
+async function handleRoom({ action, body, userId, store, now, rand }) {
+  if (!store.roomLoad) return { status: 400, body: { error: "server-required" } }; // ローカル(開発)モードでは使えない
+  const conflict = { status: 409, body: { error: "conflict-retry" } };
+  const view = (room) => ({ status: 200, body: { room: roomView(room), now } });
+  const loadActive = async (code) => {
+    const rec = await store.roomLoad(code);
+    return rec && isActive(rec.room, now) ? rec : null;
+  };
+  const myCode = async () => { const c = await store.roomOfUser(userId); return c ? normalizeCode(c) : null; };
+
+  if (action === "room_mine") { // いま入っている部屋（なければ null）
+    const c = await myCode(); const rec = c ? await loadActive(c) : null;
+    return rec && memberIds(rec.room).includes(userId) ? view(rec.room) : { status: 200, body: { room: null, now } };
+  }
+  if (action === "room_get") {
+    const rec = await loadActive(normalizeCode(body.code));
+    if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+    return view(rec.room);
+  }
+  if (action === "room_create") {
+    const old = await myCode(); // 別の部屋に入ったままなら、先に抜ける
+    if (old) { const rec = await loadActive(old); if (rec) { const r = leaveRoom(rec.room, { userId, now }); if (r.ok) await store.roomSave(r.room, rec.version); } }
+    const name = await store.profileName(userId);
+    for (let i = 0; i < 8; i++) {
+      const code = newRoomCode(rand);
+      const ex = await store.roomLoad(code);
+      if (ex && isActive(ex.room, now)) continue; // 使用中のコードは避ける
+      const room = createRoom({ code, userId, name, now });
+      const ok = ex ? await store.roomSave({ ...room, rev: (ex.room.rev || 0) + 1 }, ex.version) : await store.roomSave(room, null);
+      if (ok) return view(room);
+    }
+    return { status: 503, body: { error: "code-busy" } };
+  }
+  if (action === "room_join") {
+    const code = normalizeCode(body.code);
+    if (code.length !== ROOM.codeLen) return { status: 400, body: { error: "bad-code" } };
+    const rec = await loadActive(code);
+    if (!rec) return { status: 404, body: { error: "room-not-found" } };
+    const old = await myCode(); // 別の部屋に入ったままなら、先に抜ける
+    if (old && old !== code) { const o = await loadActive(old); if (o) { const r = leaveRoom(o.room, { userId, now }); if (r.ok) await store.roomSave(r.room, o.version); } }
+    const name = await store.profileName(userId);
+    const r = joinRoom(rec.room, { userId, name, now });
+    if (!r.ok) return { status: r.error === "room-not-found" ? 404 : 400, body: { error: r.error } };
+    if (r.room !== rec.room && !(await store.roomSave(r.room, rec.version))) return conflict;
+    return view(r.room);
+  }
+  if (action === "room_leave") {
+    const code = normalizeCode(body.code) || (await myCode());
+    const rec = code ? await loadActive(code) : null;
+    if (!rec) return { status: 200, body: { room: null, now } };
+    const r = leaveRoom(rec.room, { userId, now });
+    if (!r.ok) return { status: 200, body: { room: null, now } };
+    if (!(await store.roomSave(r.room, rec.version))) return conflict;
+    return { status: 200, body: { room: null, closed: !!r.closed, now } };
+  }
+  if (action === "room_start") {
+    const rec = await loadActive(normalizeCode(body.code));
+    if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+    const states = {};
+    for (const id of memberIds(rec.room)) { const l = await store.load(id); states[id] = l ? normalizeThirdState(l.state) : normalizeThirdState(initialThirdState()); }
+    const r = startRoom(rec.room, { userId, states, now });
+    if (!r.ok) return { status: 400, body: { error: r.error } };
+    if (!(await store.roomSave(r.room, rec.version))) return conflict;
+    return view(r.room);
+  }
+  return { status: 400, body: { error: "unknown-room-action" } };
 }

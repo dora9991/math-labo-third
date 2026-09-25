@@ -16,7 +16,7 @@ if (!/^VITE_THIRD_SERVER=1/m.test(env)) { console.error("❌ .env.local に VITE
 const ref = /project_id = "([^"]+)"/.exec(readFileSync("scripts/build-third-api.mjs", "utf8"))?.[1];
 if (!ref) { console.error("❌ project_id が見つかりません（scripts/build-third-api.mjs）"); process.exit(1); }
 
-step(1, "サーバー側ロジックの自動テスト"); run("npm run test:third-api");
+step(1, "サーバー側ロジックの自動テスト"); run("npm run test:third-api"); run("npm run test:third-room");
 step(2, "関数(third-api)を1ファイルにビルド"); run("npm run build:third-api");
 if (!dry && !args.has("--skip-fn")) {
   step(3, `Supabase(${ref}) へ関数を登録`);

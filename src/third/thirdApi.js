@@ -60,6 +60,13 @@ export const thirdApi = {
   practice: (attempts) => call("practice", { attempts }),
   confirm: (key, attempts) => call("confirm", { key, attempts }),
   report: (r) => call("report", r), // バトル終了の報告（負け・途中でやめた・お試し・章ボスの解答も学習ログに残す）
+  // マルチプレイの部屋（サーバーモードのみ）
+  roomMine: () => call("room_mine"),
+  roomGet: (code) => call("room_get", { code }),
+  roomCreate: () => call("room_create"),
+  roomJoin: (code) => call("room_join", { code }),
+  roomLeave: (code) => call("room_leave", { code }),
+  roomStart: (code) => call("room_start", { code }),
   ping: (sid) => call("ping", { sid }), // 滞在時間の計測（1分おき）
 };
 

@@ -16,12 +16,13 @@ import ThirdBattle from "./screens/ThirdBattle.jsx";
 import Reward from "./screens/Reward.jsx";
 import ThirdGacha from "./screens/ThirdGacha.jsx";
 import ThirdSynth from "./screens/ThirdSynth.jsx";
+import RoomLobby from "./screens/RoomLobby.jsx";
 import { getFxSpeed } from "../engine/fxSpeed.js";
 import StoryPlayer from "./story/StoryPlayer.jsx";
 import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
 import "./third.css";
 
-const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha, synth: ThirdSynth };
+const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha, synth: ThirdSynth, room: RoomLobby };
 const FLASH_IN_MS = 280;
 const FLASH_SETTLE_MS = 60;
 
