@@ -55,7 +55,7 @@ function makeClaim({ n = 12, correctRate = 1, ms = 3000, nonce = "n" + Math.rand
   // 統計：確率が設定どおり(大量に引く)
   let counts = { N: 0, R: 0, SR: 0, UR: 0 }, st = (await s.load("stu1")).state; st.crystals = 100000; let cur2 = await s.load("stu1"); await s.save("stu1", st, cur2.version);
   for (let i = 0; i < 300; i++) { const rr = await call(s, "gacha", { count: 10 }); rr.body.results.forEach((x) => counts[x.rarity]++); }
-  const tot = 3000, rate = (k) => counts[k] / tot;
+  const tot = counts.N + counts.R + counts.SR + counts.UR, rate = (k) => counts[k] / tot;
   t(`排出率が設定どおり(N≈55%: ${(rate("N") * 100).toFixed(1)})`, Math.abs(rate("N") - 0.55) < 0.06 && rate("UR") > 0.02 && rate("UR") < 0.07, JSON.stringify(counts));
   // 被った子は自動で凸にならず「予備」として残る（合成か限界突破に使う）。数は取りこぼさない
   const fin = (await s.load("stu1")).state; const totalSpares = Object.values(fin.spares).reduce((a, n) => a + n, 0);
