@@ -2335,6 +2335,7 @@ export default function App() {
       onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: !unitMedals(thirdState, unit.id).battleOpen } }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
       onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battleOpen) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
+      onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
       onFeedback={() => setScreen("feedback")}
     />

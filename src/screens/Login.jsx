@@ -10,8 +10,14 @@
 //  認証ON（Supabase設定済み）のときだけ AuthGate から表示される。
 // ============================================================
 import { useState } from "react";
-import { loginKid, registerKid } from "../auth/kidAuth.js";
+import { loginKid, registerKid, schoolId } from "../auth/kidAuth.js";
 import { getRememberedId, setRememberedId, getAutoLogin, setAutoLogin } from "../auth/loginPrefs.js";
+
+// 学校コードから作るIDの選択肢（例：E-101236 ＝ 学校コードE・コード番号10・1年・2組・36号）
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const NUM99 = Array.from({ length: 99 }, (_, i) => String(i + 1));
+const YEARS = ["1", "2", "3"];
+const CLASSES = Array.from({ length: 9 }, (_, i) => String(i + 1));
 
 export default function Login({ onDone, onGuest }) {
   const remembered = getRememberedId();
@@ -23,7 +29,13 @@ export default function Login({ onDone, onGuest }) {
   const [err, setErr] = useState("");
 
   const isRegister = mode === "register";
-  const ready = id.trim() && /^\d{4}$/.test(pin);
+  // 新規登録の方法：「学校コードを通して登録」（プルダウンでIDを作る。例：E-101236）／「個別にIDを作って登録」（自由に決める）
+  const [regType, setRegType] = useState("school"); // "school" | "custom"
+  const [sel, setSel] = useState({ code: "", num: "", year: "", cls: "", no: "" });
+  const bySchool = isRegister && regType === "school";
+  const schoolReady = Object.values(sel).every((v) => v !== "");
+  const effId = bySchool ? (schoolReady ? schoolId(sel.code, Number(sel.num), sel.year, sel.cls, Number(sel.no)) : "") : id.trim();
+  const ready = !!effId && /^\d{4}$/.test(pin);
 
   async function submit(e) {
     e?.preventDefault();
@@ -31,9 +43,9 @@ export default function Login({ onDone, onGuest }) {
     setBusy(true); setErr("");
     try {
       const { uid } = isRegister
-        ? await registerKid(id, pin, id) // ニックネームの初期値はID（あとで設定変更可）
-        : await loginKid(id, pin);
-      setRememberedId(id);
+        ? await registerKid(effId, pin, effId) // ニックネームの初期値はID（あとで設定変更可）
+        : await loginKid(effId, pin);
+      setRememberedId(effId);
       setAutoLogin(autoLogin);
       onDone?.(uid);
     } catch (e2) {
@@ -46,7 +58,7 @@ export default function Login({ onDone, onGuest }) {
     setMode(next);
     setPin("");
     setErr("");
-    if (next === "register") setId(""); // 登録は新しいIDを決めるので空にする
+    if (next === "register") { setId(""); setRegType("school"); setSel({ code: "", num: "", year: "", cls: "", no: "" }); } // 登録は新しいIDを決めるので空にする
     else setId(remembered);
   }
 
@@ -63,15 +75,57 @@ export default function Login({ onDone, onGuest }) {
         <div style={{ fontSize: 30 }}>📐</div>
         <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", margin: "2px 0 2px" }}>数学ラボ3</div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)", marginBottom: 18 }}>
-          {isRegister ? "新規登録：IDと合言葉を決めよう" : remembered ? "おかえりなさい！" : "ログインして はじめよう"}
+          {isRegister ? "新規登録：新規IDと合言葉を決めよう" : remembered ? "おかえりなさい！" : "ログインして はじめよう"}
         </div>
 
-        <div style={{ textAlign: "left", marginBottom: 12 }}>
-          <div style={lbl}>ID</div>
-          <input style={inp} value={id} onChange={(e) => setId(e.target.value)}
-            placeholder={isRegister ? "例：E-101236（小テストと同じIDだと連携できるよ）" : "IDを入れてください。（例：1204）"}
-            autoCapitalize="off" autoCorrect="off" />
-        </div>
+        {isRegister && (
+          <div style={{ textAlign: "left", marginBottom: 12 }}>
+            <div style={lbl}>とうろくの方法</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[["school", "🏫 学校コードを通して登録"], ["custom", "✏️ 個別にIDを作って登録"]].map(([k, label]) => (
+                <button key={k} type="button" data-sfx="none" onClick={() => setRegType(k)} style={{
+                  flex: 1, padding: "10px 6px", borderRadius: 12, fontSize: 12.5, fontWeight: 800, cursor: "pointer", lineHeight: 1.4, fontFamily: "inherit",
+                  color: "#fff", border: regType === k ? "2px solid #a5b4fc" : "1px solid rgba(255,255,255,.2)",
+                  background: regType === k ? "rgba(99,102,241,.35)" : "rgba(255,255,255,.05)",
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {bySchool ? (
+          <div style={{ textAlign: "left", marginBottom: 12 }}>
+            <div style={lbl}>新規ID（学校コードから作ります）</div>
+            {[
+              [[["code", "学校コード", LETTERS, ""], ["num", "コード番号", NUM99, ""]]],
+              [[["year", "年", YEARS, "年"], ["cls", "組", CLASSES, "組"], ["no", "号", NUM99, "号"]]],
+            ].map(([row], ri) => (
+              <div key={ri} style={{ display: "grid", gridTemplateColumns: `repeat(${row.length}, 1fr)`, gap: 8, marginBottom: 8 }}>
+                {row.map(([k, label, opts, unit]) => (
+                  <label key={k} style={{ display: "block" }}>
+                    <span style={{ display: "block", fontSize: 10.5, fontWeight: 800, color: "rgba(255,255,255,.6)", margin: "0 0 3px 2px" }}>{label}</span>
+                    <select value={sel[k]} onChange={(e) => setSel((o) => ({ ...o, [k]: e.target.value }))} style={{ ...inp, padding: "11px 8px", fontSize: 15 }}>
+                      <option value="">えらぶ</option>
+                      {opts.map((o) => <option key={o} value={o}>{o}{unit}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            ))}
+            <div style={{ textAlign: "center", padding: "10px 8px", borderRadius: 12, background: "rgba(255,255,255,.06)", border: "1px dashed rgba(255,255,255,.25)" }}>
+              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.55)" }}>あなたのID</div>
+              <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: 2, color: effId ? "#fde68a" : "rgba(255,255,255,.3)" }}>{effId || "E-101236 のように できます"}</div>
+              {effId && <div style={{ fontSize: 10.5, color: "#fcd34d", marginTop: 2 }}>ログインの時も このIDを入れるよ。メモしておいてね</div>}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: "left", marginBottom: 12 }}>
+            <div style={lbl}>{isRegister ? "新規ID" : "ID"}</div>
+            <input style={inp} value={id} onChange={(e) => setId(e.target.value)}
+              placeholder={isRegister ? "すきなIDを決めてね（例：taro2025）" : "IDを入れてください。（例：1204、E-101236）"}
+              autoCapitalize="off" autoCorrect="off" />
+          </div>
+        )}
 
         <div style={{ textAlign: "left", marginBottom: 10 }}>
           <div style={lbl}>合言葉（パスワード・すうじ4つ）</div>
@@ -116,7 +170,7 @@ export default function Login({ onDone, onGuest }) {
 
         <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.4)", marginTop: 14, lineHeight: 1.6 }}>
           {isRegister
-            ? <>IDと合言葉は自分で決めよう。わすれないようにメモしておいてね！<br />ニックネーム（呼び名）は はじめはIDと同じ。あとから「🎨キャラクター」でいつでも変えられるよ。<br />小テストアプリを使っているクラスは、そちらと同じIDにすると先生が名寄せしやすいよ。</>
+            ? <>{regType === "school" ? <>学校のクラスの人は「学校コードを通して登録」を選んでね。小テストと同じ形のIDになるよ。<br /></> : null}IDと合言葉は わすれないようにメモしておいてね！<br />ニックネーム（呼び名）は はじめはIDと同じ。あとから「🎨キャラクター」でいつでも変えられるよ。</>
             : <>ID・合言葉を わすれた人は先生に相談してね。</>}
         </div>
       </form>

@@ -18,8 +18,22 @@ function hash36(str) {
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
   return h.toString(36);
 }
+/**
+ * 学校コード形式のID（例：E-101236）は、全角・小文字で入れられても「E-101236」にそろえる（ログインで迷わないように）。
+ * それ以外の自由なIDは、これまでどおり前後の空白を除くだけ（既存のアカウントのIDは変わらない）。
+ */
+export function normalizeId(id) {
+  const raw = String(id || "").trim();
+  const t = raw.normalize("NFKC").replace(/[‐‑‒–—―−ー]/g, "-");
+  return /^[A-Za-z]-\d{6}$/.test(t) ? t.toUpperCase() : raw;
+}
+/** 学校コード形式のIDを作る。例：("E", 10, 1, 2, 36) → "E-101236"（学校コード-コード番号2桁＋年1桁＋組1桁＋号2桁）。小テストの学籍番号との連携用。 */
+export function schoolId(code, num, year, cls, no) {
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${code}-${p2(num)}${year}${cls}${p2(no)}`;
+}
 export function emailFor(id) {
-  const h = hash36(String(id || "").trim());
+  const h = hash36(normalizeId(id));
   return `id-${h}@mathlabo.local`;
 }
 function passwordFor(pin) { return "mlpw-" + String(pin || "").trim(); }
@@ -58,7 +72,7 @@ export async function registerKid(id, pin, nickname = "") {
   }
   const uid = su.data?.user?.id;
   if (!uid) throw new Error("アカウント作成に失敗しました。しばらくして もう一度ためしてね。");
-  await upsertStudent(uid, nickname, id);
+  await upsertStudent(uid, nickname, normalizeId(id));
   return { uid };
 }
 

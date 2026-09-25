@@ -148,7 +148,7 @@ export default function ThirdGacha({ nav }) {
           <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => pull(GACHA.packSize)} disabled={save.crystals < GACHA.costPerPull * GACHA.packSize}>
             <span className="mw-fantasy-icon">💎</span>{GACHA.packSize}連（💎×{GACHA.costPerPull * GACHA.packSize}）・SR以上が1体かくてい！
           </button>
-          <div style={{ fontSize: 11.5, color: "#c9b98f", textAlign: "center", lineHeight: 1.7 }}>クリスタルは、確認問題・れんしゅう（むずかしさごと）・バトルを「はじめてクリア」すると もらえるよ。</div>
+          <div style={{ fontSize: 11.5, color: "#c9b98f", textAlign: "center", lineHeight: 1.7 }}>クリスタルは、確認問題・れんしゅう（むずかしさごと）・バトル・章のボスを「はじめてクリア」したり、章や学年をクリアしたり、「今日の目標」（5問せいかい）やクリア済みバトルの周回（1日5回まで）でもらえるよ。</div>
         </>
       )}
       {isRevealed && results.length > 1 && (
