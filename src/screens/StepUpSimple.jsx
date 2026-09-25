@@ -162,7 +162,6 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
               <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>正答率</div>
               <div style={{ fontSize: 44, fontWeight: 900, color: rateColor, lineHeight: 1.1 }}>{rate}%</div>
               <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700, marginTop: 2 }}>{result.correct} / {result.seen} 問せいかい</div>
-              <span className="xp-pill" style={{ marginTop: 10 }}>✨ +{result.points} 獲得ポイント</span>
             </div>
 
             {/* 合格判定（はいちモード：正答率が基準以上で「合格」） */}

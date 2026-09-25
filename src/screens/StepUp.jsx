@@ -218,8 +218,8 @@ export default function StepUp({ player, chapter, onAttempt, onHome, targetSkill
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <div style={{ flex: 1, background: "rgba(255,255,255,.05)", borderRadius: 10, padding: "10px 4px" }}>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24" }}>+{result.points}</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)" }}>獲得ポイント</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24" }}>{result.correct}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)" }}>せいかい</div>
               </div>
               <div style={{ flex: 1, background: "rgba(255,255,255,.05)", borderRadius: 10, padding: "10px 4px" }}>
                 <div style={{ fontSize: 20, fontWeight: 900, color: "#4ade80" }}>{result.improved.length}</div>

@@ -6,7 +6,8 @@ export const PARTY_SIZE = 5;
 
 export const GACHA = {
   costPerPull: 5, // クリスタル5個で1回（2026-09-24 kazu指定。旧：ガチャチケット1枚）
-  packSize: 10, // 「10連」＝10回（クリスタル50個）。10連には SR以上が必ず1体入る
+  packSize: 10, // 「11連」＝10回ぶんのクリスタル(50個)で、packBonus 回ぶん多く引ける。SR以上が必ず1体入る
+  packBonus: 1, // 10連のおまけ（＝1回多く引ける）
   rates: { N: 0.55, R: 0.3, SR: 0.12, UR: 0.03 }, // 通常の排出率
   urPity: 100, // 100回引いてもURが出なければ、100回目はUR確定（天井）
   maxBreaks: 4, // 被り＝限界突破(凸)の上限

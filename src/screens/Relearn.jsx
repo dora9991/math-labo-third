@@ -44,7 +44,7 @@ export default function Relearn({ player, mistakes = [], onRelearn, onHaichi, on
       <Header player={player} back="ホーム" onBack={onBack} />
       <div className="content">
         <div className="pg-ttl">{focusUnitId ? `📖 学び直し・${focusUnit ? focusUnit.name : "この単元"}` : "🩹 弱点克服モード"}</div>
-        <div className="pg-sub">まちがいは<b style={{ color: "#fde047" }}>たからもの</b>。<b style={{ color: "#7dd3fc" }}>2回れんぞく正解</b>でなおせて、<b style={{ color: "#86efac" }}>つぎの日にもう1問</b>とけたらカンペキ（ノートから消える）。1問 +15XP。</div>
+        <div className="pg-sub">まちがいは<b style={{ color: "#fde047" }}>たからもの</b>。<b style={{ color: "#7dd3fc" }}>5問れんぞくで正解</b>すると、その単元のまちがいがノートから<b style={{ color: "#86efac" }}>消える</b>よ。まちがえたら、また1問目から。</div>
         {/* よくあるまちがいパターン（誤答タグの累計＝価値づけの分析結果）。全体一覧のときだけ表示 */}
         {!focusUnitId && (() => {
           const stats = player?.mistakeTagStats || {};
@@ -84,12 +84,8 @@ export default function Relearn({ player, mistakes = [], onRelearn, onHaichi, on
             const vurl = unit ? videoUrlFor(key) : null;
             const color = chap?.color || "#94a3b8";
             const list = groups[key];
-            const phase = phaseOf(list, today);
-            // 段階ごとのボタン見た目・文言（fresh=なおす / confirm=あと1問 / pendingToday=あした確認）
-            const btn = {
-              fresh:   { bg: "linear-gradient(135deg,#0ea5e9,#6366f1)", main: "✏️ この単元を学び直す", sub: "2回れんぞく正解でなおせる" },
-              confirm: { bg: "linear-gradient(135deg,#22c55e,#10b981)", main: "🔄 あと1問でカンペキ！", sub: "きのうなおした所を確認しよう" },
-            }[phase];
+            const phase = "fresh"; // 2026-09-26：段階（あした確認）は廃止。5問れんぞく正解で消える
+            const btn = { bg: "linear-gradient(135deg,#0ea5e9,#6366f1)", main: "✏️ この単元を学び直す", sub: "5問れんぞく正解でなおせる" };
             return (
               <div key={key} className="glass" style={{ padding: "12px 13px", marginBottom: 12, borderLeft: `4px solid ${color}` }}>
                 {/* 単元ヘッダー */}

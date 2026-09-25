@@ -284,21 +284,10 @@ export default function TimeAttack({ player, chapter, unit, level, onComplete, o
               {!weak && <div style={{ marginTop: 7 }}><Stars count={stars} size={24} /></div>}
               {summary && (
                 <div style={{ marginTop: 9 }}>
-                  <span className="xp-pill">✨ +{summary.xp} XP</span>
-                  {summary.coins > 0 && (
-                    <span className="xp-pill" style={{ marginLeft: 6, background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#3a2a00" }}>
-                      💰 +{summary.coins} コイン
-                    </span>
-                  )}
                   {summary.crystal > 0 && (
                     <span className="xp-pill" style={{ marginLeft: 6, background: "linear-gradient(135deg,#22d3ee,#67e8f9)", color: "#063b44" }}>
                       💎 +{summary.crystal} クリスタル
                     </span>
-                  )}
-                  {summary.dailyBonus > 0 && (
-                    <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 800, marginTop: 5 }}>
-                      🎁 今日の初クリアボーナス +{summary.dailyBonus}XP！
-                    </div>
                   )}
                   {!weak && summary.crystal === 0 && (
                     <div style={{ fontSize: 11, color: "#0e7490", fontWeight: 700, marginTop: 5 }}>

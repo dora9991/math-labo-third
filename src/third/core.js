@@ -126,13 +126,14 @@ export function pullGacha(state, count, rand = Math.random) {
   s.crystals -= cost;
   const results = [];
   const rollUpgrade = () => (rand() < GACHA.rates.UR / (GACHA.rates.SR + GACHA.rates.UR) ? "UR" : "SR");
-  for (let i = 0; i < count; i++) {
+  const rolls = count === GACHA.packSize ? count + (GACHA.packBonus || 0) : count; // 10連は1回多く引ける（11連）
+  for (let i = 0; i < rolls; i++) {
     s.pity.pulls += 1;
     s.pity.sinceSR += 1;
     s.pity.sinceUR += 1;
     let rarity = rollRarity(rand, s.pity);
-    // 10連：最後の1回までにSR以上が出ていなければ、その1回をSR以上にする（10連は必ずSR以上が1体）
-    if (count === GACHA.packSize && i === count - 1 && !results.some((x) => x.rarity === "SR" || x.rarity === "UR") && rarity !== "SR" && rarity !== "UR") rarity = rollUpgrade();
+    // 10連（11連）：最後の1回までにSR以上が出ていなければ、その1回をSR以上にする（必ずSR以上が1体）
+    if (count === GACHA.packSize && i === rolls - 1 && !results.some((x) => x.rarity === "SR" || x.rarity === "UR") && rarity !== "SR" && rarity !== "UR") rarity = rollUpgrade();
     if (rarity === "UR") { s.pity.sinceUR = 0; s.pity.sinceSR = 0; }
     else if (rarity === "SR") s.pity.sinceSR = 0;
     const ids = POOL[rarity];

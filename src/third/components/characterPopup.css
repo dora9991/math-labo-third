@@ -1,0 +1,37 @@
+/* キャラの強さポップアップ（かっこいい版） */
+.cp-card { width: 100%; max-width: 400px; max-height: 92vh; overflow-y: auto; position: relative; padding: 0 0 14px; color: #f4eee0;
+  background: radial-gradient(120% 60% at 50% 0%, var(--cp-glow, rgba(90,140,220,.45)), transparent 70%), linear-gradient(170deg,#0a1226 0%,#101f3d 55%,#0a1226 100%);
+  border: 1px solid var(--cp-edge, #dfbd73); box-shadow: 0 0 28px var(--cp-glow, rgba(90,140,220,.45)), 0 16px 40px rgba(0,0,0,.6); }
+.cp-N { --cp-edge:#9aa7b4; --cp-glow:rgba(150,170,190,.35); }
+.cp-R { --cp-edge:#6fb4ff; --cp-glow:rgba(70,150,255,.45); }
+.cp-SR { --cp-edge:#c58bff; --cp-glow:rgba(180,100,255,.5); }
+.cp-UR { --cp-edge:#ffd166; --cp-glow:rgba(255,190,60,.6); }
+.cp-hero { position: relative; display: flex; flex-direction: column; align-items: center; padding: 18px 16px 4px; }
+.cp-art { width: 62%; max-width: 220px; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 8px 18px rgba(0,0,0,.7)) drop-shadow(0 0 16px var(--cp-glow)); animation: cp-float 3.2s ease-in-out infinite; }
+@keyframes cp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.cp-rar { position: absolute; top: 14px; left: 16px; font-family: 'Cinzel',serif; font-weight: 900; font-size: 1.5rem; letter-spacing: .08em; color: var(--cp-edge); text-shadow: 0 0 12px var(--cp-glow); }
+.cp-name { font-size: 1.25rem; font-weight: 900; letter-spacing: .08em; margin-top: 6px; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+.cp-theme { font-size: .8rem; opacity: .75; margin-bottom: 4px; }
+.cp-sec { margin: 10px 16px 0; }
+.cp-lvbox { display: flex; align-items: baseline; gap: 10px; }
+.cp-lvbox .cp-lv { font-family: 'Cinzel',serif; font-size: 2.2rem; font-weight: 900; color: #ffe9b3; line-height: 1; text-shadow: 0 0 14px rgba(255,200,90,.6); }
+.cp-lvbox .cp-lvl { font-size: .75rem; letter-spacing: .2em; color: var(--cp-edge); }
+.cp-lvbox .cp-cap { margin-left: auto; font-size: .75rem; opacity: .75; }
+.cp-expline { display: flex; justify-content: space-between; font-size: .78rem; margin-top: 4px; color: #dfe8ea; }
+.cp-expline b { color: #9be7ef; font-size: .95rem; }
+.cp-total { margin-top: 2px; font-size: .75rem; color: #c9b98f; }
+.cp-grades { display: flex; gap: 6px; margin-top: 8px; }
+.cp-grades span { flex: 1; text-align: center; padding: 4px 0; font-size: .72rem; border: 1px solid rgba(155,231,239,.25); background: rgba(6,14,30,.7); color: #b9c8cc; }
+.cp-grades span.on { border-color: var(--cp-edge); color: #fff; background: rgba(50,70,110,.55); }
+.cp-stats { display: grid; gap: 8px; margin-top: 12px; }
+.cp-stat { display: grid; grid-template-columns: 34px 1fr 56px; align-items: center; gap: 8px; font-size: .8rem; }
+.cp-stat .lbl { font-family: 'Cinzel',serif; font-weight: 800; letter-spacing: .1em; color: var(--cp-edge); }
+.cp-stat .num { text-align: right; font-weight: 900; font-size: 1rem; }
+.cp-stat .track { height: 9px; background: rgba(3,8,18,.9); border: 1px solid rgba(223,189,115,.35); }
+.cp-stat .track i { display: block; height: 100%; }
+.cp-stat.hp .track i { background: linear-gradient(90deg,#1fb56a,#7cff8a); }
+.cp-stat.atk .track i { background: linear-gradient(90deg,#d63a3a,#ff9a5a); }
+.cp-h { margin: 14px 16px 4px; font-size: .72rem; letter-spacing: .3em; color: var(--cp-edge); border-bottom: 1px solid rgba(223,189,115,.3); padding-bottom: 3px; }
+.cp-close { display: block; margin: 14px auto 0; padding: 10px 40px; font-weight: 800; letter-spacing: .2em; color: #141018; background: linear-gradient(135deg,#ffe2a0,#bd762d); border: 1px solid #fff0bd; cursor: pointer; }
+/* スマホの編成：パーティの5枠は控えと同じ大きさの絵にする */
+.mw-party-row.mw-party-row-small.mw-party-edit .mw-portrait-frame { width: 100%; margin: 0; }

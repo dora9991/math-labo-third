@@ -26,7 +26,6 @@ export default function Header({ player, back, onBack }) {
           <button className="back-btn" onClick={onBack}>← {back}</button>
         ) : (
           <>
-            <div className="chip cc"><span aria-hidden>◇</span>{player.coins ?? 0}</div>
             <div className="chip cs"><span aria-hidden>✦</span>{player.streaks}日</div>
             <div className="chip cl">
               <span style={{ fontSize: 11, fontWeight: 700, color: col }}>Lv.{lv}</span>

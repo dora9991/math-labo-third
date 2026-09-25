@@ -123,7 +123,7 @@ export default function ThirdGacha({ nav }) {
           <div className="gx-lead">クリスタルで 仲間をよぼう！</div>
           <div className="gx-sub">
             ダブった子は「予備」として のこるよ（合成で経験値に／限界突破に）<br />
-            {GACHA.packSize}連は SR以上が1体かくてい・あと{Math.max(0, GACHA.urPity - (save.pity?.sinceUR || 0))}回でUR確定
+            {GACHA.packSize + GACHA.packBonus}連（💎{GACHA.costPerPull * GACHA.packSize}）は 1回おまけ＆SR以上が1体かくてい・あと{Math.max(0, GACHA.urPity - (save.pity?.sinceUR || 0))}回でUR確定
           </div>
         </div>
       )}
@@ -181,7 +181,7 @@ export default function ThirdGacha({ nav }) {
               {!canOne && <span className="gx-pull-lack">あと💎{GACHA.costPerPull - save.crystals}個</span>}
             </button>
             <button className="gx-pull gx-pull-ten" onClick={() => pull(GACHA.packSize)} disabled={!canTen} data-sfx="none">
-              <span className="gx-pull-main">{GACHA.packSize}連 引く！</span><span className="gx-pull-cost">💎 × {GACHA.costPerPull * GACHA.packSize}　SR以上かくてい</span>
+              <span className="gx-pull-main">{GACHA.packSize + GACHA.packBonus}連 引く！</span><span className="gx-pull-cost">💎 × {GACHA.costPerPull * GACHA.packSize}　1回おまけ・SR以上かくてい</span>
               {!canTen && <span className="gx-pull-lack">あと💎{GACHA.costPerPull * GACHA.packSize - save.crystals}個</span>}
             </button>
             <div className="gx-help">クリスタルは、確認問題・れんしゅう・バトル・章のボスを「はじめてクリア」したり、章や学年のクリア、「今日の目標」（5問せいかい）、クリア済みバトルの周回（1日5回まで）でもらえるよ。</div>

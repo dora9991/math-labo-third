@@ -633,19 +633,13 @@ export default function App() {
     if (!unitId) return;
     const unit = practiceUnit && practiceUnit.id === unitId ? practiceUnit : findUnitById(unitId);
     if (!unit) return;
-    const phase = relearnPhase(unitId);
-    if (phase === "confirm") {
-      // 翌日以降の確認：1問でも正解できたら完全クリア
-      if (ok) { relearnStreakRef.current[unitId] = 0; confirmRelearnUnit(unit); }
-      return;
-    }
-    if (phase !== "fresh") return; // none/pendingToday はこれ以上進めない
-    // その場（fresh）：単元ごとに連続正解を数え、2連続で〈仮なおし〉。
+    if (relearnPhase(unitId) === "none") return; // この単元にまちがいが無ければ何もしない
+    // 【2026-09-26】単元ごとに連続正解を数え、RELEARN_STREAK_TARGET(5)問れんぞくで正解したら、その単元のまちがいをノートから消す。不正解で0に戻る。
     const next = ok ? (relearnStreakRef.current[unitId] || 0) + 1 : 0;
     relearnStreakRef.current[unitId] = next;
     if (ok && next >= RELEARN_STREAK_TARGET) {
       relearnStreakRef.current[unitId] = 0;
-      pendUnitRelearn(unit);
+      confirmRelearnUnit(unit);
     }
   }
 
@@ -2034,8 +2028,8 @@ export default function App() {
   // 学び直しの練習（時間制限なし・1問15XP＝1.5倍・クリスタルは出ない・StepUpSimpleを流用）
   if (screen === "relearnPractice" && practiceUnit) {
     const rlPhase = relearnPhase(practiceUnit.id);
-    // 翌日確認（confirm）は「あと1問」なので短く、その場（fresh）は2連続正解を狙うので少し長め。
-    const rlRound = rlPhase === "confirm" ? 3 : 6;
+    // 5問れんぞく正解で消えるので、1セット＝5問。
+    const rlRound = RELEARN_STREAK_TARGET;
     return (
       <StepUpSimple
         key={"relearn-" + practiceUnit.id}
@@ -2534,7 +2528,7 @@ function RelearnMasteredOverlay({ info, onDone }) {
         <div style={{ fontSize: 50, margin: "10px 0" }}>📖✨</div>
         <div style={{ fontSize: 18, fontWeight: 900, color: "#86efac" }}>{info.unitName}</div>
         <div style={{ fontSize: 13, color: "rgba(255,255,255,.72)", margin: "8px 0 4px", lineHeight: 1.5 }}>
-          日をまたいでも解けた！ほんとうに身についたね。まちがい{info.count}問をノートから消したよ。💰+{info.reward}
+          5問れんぞくで正解できた！ほんとうに身についたね。まちがい{info.count}問をノートから消したよ。
         </div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginTop: 12 }}>タップで閉じる</div>
       </div>

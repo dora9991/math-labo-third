@@ -77,7 +77,7 @@ function loadSfxBuffer(filename) {
  *  rate: 再生速度(=ピッチ)。1未満で少し低く＝重く聞こえる（クリティカル用）。 */
 // 攻撃音(球が飛ぶ音・ダメージ音)専用のバス：5体が同時に攻撃して重なっても、合計が約60%を超えないよう
 //  リミッター(コンプレッサー)で頭を押さえる。他の音(正解音など)には影響しない。
-const ATTACK_BUS_CEILING = 0.6;
+const ATTACK_BUS_CEILING = 0.3; // 2026-09-26：BGMと同じくらいの大きさに（0.6→0.3）
 function attackBus(c) {
   if (!c.__attackBus) {
     const comp = c.createDynamicsCompressor();
@@ -118,6 +118,7 @@ export function unlockAudio() {
   loadSfxBuffer("enemy-attack-start.m4a");
   loadSfxBuffer("hit-enemy.m4a");
   loadSfxBuffer("hit-player.m4a");
+  loadSfxBuffer("skill-activate.m4a");
 }
 
 function envGain(audioCtx, { attack = 0.005, peak = 0.5, decay = 0.15, delay = 0 } = {}) {
@@ -184,6 +185,14 @@ export function playCorrectSound() {
   tone(c, { freq: 880, type: "triangle", duration: 0.14, gain: 0.95, delay: 0.08 });
 }
 
+/** レベルアップ：明るい上昇アルペジオ（ドミソド↑）。 */
+export function playLevelUpSound() {
+  const c = getCtx();
+  if (!c) return;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(c, { freq: f, type: "triangle", duration: 0.16, gain: 0.7, delay: i * 0.075 }));
+  tone(c, { freq: 1568, type: "sine", duration: 0.5, gain: 0.35, delay: 0.3 });
+}
+
 /** 不正解：低いブザー音。 */
 export function playIncorrectSound() {
   const c = getCtx();
@@ -195,6 +204,11 @@ export function playIncorrectSound() {
 export function playPlayerAttackStartSound() {
   // 【数学ラボ3】球が飛んでいく音：12%（5体が重なっても約60%）。0.9→0.45→0.12
   playSfx("player-attack-start.m4a", { gain: 0.12, limited: true });
+}
+
+/** スキル発動音（カットインが出る瞬間）。仮素材(決定音)。もっとかっこいい「キュピーン！」系の音に差し替える予定。 */
+export function playSkillActivateSound() {
+  playSfx("skill-activate.m4a", { gain: 0.5 });
 }
 
 /** 敵の攻撃開始音（反撃の予備動作＝敵が下がり始める瞬間）。kazu制作の実素材(発動効果音)。 */
@@ -219,7 +233,7 @@ export function playLaunchSound({ crit = false } = {}) {
  *  再生速度を少し落として重く聞こえるようにしている（素材は1種類のみのため）。 */
 export function playImpactSound({ crit = false } = {}) {
   // 【数学ラボ3】ダメージ(着弾)音：12%（クリティカルも同じ音量。重なっても約60%まで）
-  playSfx("hit-enemy.m4a", { gain: 0.12, rate: crit ? 0.85 : 1, limited: true });
+  playSfx("hit-enemy.m4a", { gain: 0.1, rate: crit ? 0.85 : 1, limited: true });
 }
 
 /** V3着弾の補助音。攻撃専用バスへ送り、実素材の音量は変えずに低音ときらめきだけ足す。 */
@@ -246,7 +260,8 @@ export function playMissSound() {
 
 /** 敵の攻撃がこちらに当たった(＝こちらがダメージを受けた)音。kazu制作の実素材(ダメージ２)。 */
 export function playEnemyHitSound() {
-  playSfx("hit-player.m4a", { gain: 0.9 });
+  // 【2026-09-26】こちらが受けるダメージ音も、攻撃音と同じ「重なっても頭を押さえる」バスへ。0.9だと大きすぎた。
+  playSfx("hit-player.m4a", { gain: 0.14, limited: true });
 }
 
 /** 撃破音（華やかに）。 */

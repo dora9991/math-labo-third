@@ -1,6 +1,9 @@
 // Reward.jsx — バトル勝利画面。表示する報酬は**サーバーが検証して認めた値**（params.res）。
 import { useEffect } from "react";
 import { playCorrectSound } from "../fx/sound.js";
+import { useGame } from "../ThirdContext.jsx";
+import { expOf } from "../expCurve.js";
+import ExpMeter from "../components/ExpMeter.jsx";
 
 const REASON = {
   "not-enough-correct": "正解がたりなかったので、ごほうびはなかったよ",
@@ -16,8 +19,13 @@ const ERROR = {
 };
 
 export default function Reward({ nav, params }) {
+  const { save, charactersById } = useGame();
   const res = params.res || null;
   const r = res?.rewards;
+  // 経験値メーター：いまのセーブ(受け取り後)から、もらう前の値をさかのぼる
+  const grade = Number(params.grade) || 1;
+  const per = r?.granted ? r.perMember || 0 : 0;
+  const meters = per > 0 ? save.party.filter(Boolean).map((id) => (charactersById[id] && save.owned[id] ? { c: { ...charactersById[id], breaks: save.owned[id].breaks }, to: expOf(save.owned[id], grade) } : null)).filter(Boolean) : [];
   useEffect(() => {
     playCorrectSound();
   }, []);
@@ -42,6 +50,16 @@ export default function Reward({ nav, params }) {
         {r && (
           <>
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.2s" }}>経験値 +{r.exp}（仲間ひとりずつ +{r.perMember ?? 0}）</div>
+            {meters.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 440, margin: "4px auto" }}>
+                {meters.map((m, i) => <ExpMeter key={m.c.id} character={m.c} from={Math.max(0, m.to - per)} to={m.to} delay={500 + i * 120} />)}
+              </div>
+            )}
+            {meters.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 440, margin: "4px auto" }}>
+                {meters.map((m, i) => <ExpMeter key={m.c.id} character={m.c} from={Math.max(0, m.to - per)} to={m.to} delay={500 + i * 120} />)}
+              </div>
+            )}
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.3s" }}>🪙 +{r.coins}</div>
             {r.kind === "chapterBoss" && r.isFirstClear && <div className="mw-reward-pop" style={{ color: "#ffe066", fontWeight: 900, animationDelay: "0.36s" }}>👑 章ボスを はじめて たおした！</div>}
             {(r.newMedals || []).some((m) => m.kind === "battle") && <div className="mw-reward-pop" style={{ color: "#fde047", fontWeight: 900, animationDelay: "0.38s" }}>⚔️ バトルメダル ゲット！</div>}

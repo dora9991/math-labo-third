@@ -33,7 +33,7 @@ import {
 import { levelFromExp, getSubUnitClearExpReward, expOf } from "../expCurve.js";
 import { setViewGrade } from "../gradeView.js";
 import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
-import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound } from "../fx/sound.js";
+import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound, playSkillActivateSound } from "../fx/sound.js";
 import UltimateCutIn from "../../components/UltimateCutIn.jsx";
 import FxSpeedToggle from "../../components/FxSpeedToggle.jsx";
 import DrawPad from "../../components/DrawPad.jsx";
@@ -612,6 +612,7 @@ export default function Battle({ nav, params }) {
     setTimeout(() => setPoppedOut((p) => ({ ...p, [characterId]: false })), fxDelay(POPUP_LEAD_MS + 260));
     // カットインの決めフラッシュだけを先に見せる。HP反映とFXは onComplete 後。
     setPhase("skill");
+    playSkillActivateSound();
     setCutIn({ id: `${characterId}-${Date.now()}`, character: c, skill });
   }
 

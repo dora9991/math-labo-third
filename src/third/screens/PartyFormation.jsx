@@ -173,7 +173,7 @@ export default function PartyFormation({ nav }) {
       </div>
 
       <div className="mw-fantasy-panel">
-        <div className="mw-party-row mw-party-row-small">
+        <div className="mw-party-row mw-party-row-small mw-party-edit">
           {PARTY_SLOTS.map((slot) => {
             const c = save.party[slot] ? charactersById[save.party[slot]] : null;
             return (
@@ -223,7 +223,7 @@ export default function PartyFormation({ nav }) {
         document.body
       )}
 
-      {popupChar && <CharacterPopup character={popupChar} save={save} onClose={() => setPopupCharId(null)} />}
+      {popupChar && createPortal(<CharacterPopup character={popupChar} save={save} onClose={() => setPopupCharId(null)} />, document.body)}
     </div>
   );
 }

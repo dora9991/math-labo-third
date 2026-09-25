@@ -200,14 +200,6 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
               <div style={{ fontSize: 18, fontWeight: 900, color: "#1e1b4b" }}>
                 {anshin ? `${correct}問クリア！ ポイントゲット！` : `クリア！${streak}問連続正解！`}
               </div>
-              <div style={{ marginTop: 9 }}>
-                <span className="xp-pill">✨ +{clearInfo ? clearInfo.xp : 0} XP</span>
-                {clearInfo && clearInfo.mult < 1 && (
-                  <div style={{ fontSize: 11, color: "#92400e", fontWeight: 700, marginTop: 5 }}>
-                    {clearInfo.mult === 0.5 ? "今日2回目以降のためXP½" : "クリア済みの再挑戦のためXP⅕"}（通常なら{clearInfo.baseXp}XP）
-                  </div>
-                )}
-              </div>
               {/* れんしゅうメダル：サーバーが認めた正解5問で獲得。5問ずつ区切っても貯まる（発展まで上がったのも引き継ぐ）。 */}
               {anshin && (() => {
                 const done = Math.min(MEDAL_PRACTICE_TARGET, cyclePracticeN + correct);
