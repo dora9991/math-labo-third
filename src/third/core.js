@@ -10,11 +10,13 @@ import { SPECIALIST_ROSTER } from "./specialistRoster.js";
 import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./gachaConfig.js";
 import { DIFFICULTY_KEYS } from "./balance.js";
 import { labUnitIdForBattle } from "./link.js";
+import { chaptersForGrade } from "../data/index.js";
 import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfChapter } from "./problemSource.js";
 import { getChapter, getGrade } from "./data/storyMap.js";
 import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js";
 import { getSubUnitClearExpReward } from "./expCurve.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
+import { RAID, RAID_LADDER, raidBoss } from "./raid.js";
 
 export { PROBLEM_VERSION };
 
@@ -47,6 +49,7 @@ export function initialThirdState() {
     lastClaimAt: 0,
     daily: { date: null, repeat: 0, ok: 0, mission: false }, // 1日の集計：周回の回数／検証済みの正解数／毎日の目標を達成したか
     gradeDone: {}, // 学年クリアボーナスを受け取った学年 { "1": ms }
+    raid: { cleared: {}, gradeDone: {}, allDone: 0, daily: { date: null, n: 0 } }, // 協力プレイ「裏ボス連戦」：倒した裏ボス { "grade:chapter": ms }・学年/全制覇ボーナス受取・周回の1日カウント
     medals: { practiceN: {}, haichi: {}, pracLv: {}, battle: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
   };
@@ -82,6 +85,8 @@ export function normalizeThirdState(s) {
   out.chapterDone = s.chapterDone && typeof s.chapterDone === "object" ? s.chapterDone : {};
   out.bossDone = s.bossDone && typeof s.bossDone === "object" ? s.bossDone : {};
   out.gradeDone = s.gradeDone && typeof s.gradeDone === "object" ? s.gradeDone : {};
+  const rd = s.raid && typeof s.raid === "object" ? s.raid : {};
+  out.raid = { cleared: { ...(rd.cleared || {}) }, gradeDone: { ...(rd.gradeDone || {}) }, allDone: Number(rd.allDone) || 0, daily: { date: rd.daily?.date || null, n: Number(rd.daily?.n) || 0 } };
   out.seenSeeds = Array.isArray(s.seenSeeds) ? s.seenSeeds.slice(-VERIFY.seenSeedsKeep) : [];
   out.claimIds = Array.isArray(s.claimIds) ? s.claimIds.slice(-VERIFY.claimIdsKeep) : [];
   out.daily = { ...base.daily, ...(s.daily || {}) };
@@ -140,6 +145,34 @@ export function pullGacha(state, count, rand = Math.random) {
     results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted: false, spare, spares: s.spares[id] || 0, refund });
   }
   return { ok: true, state: s, results };
+}
+
+// ---------------- 協力プレイ：裏ボスを倒した時のごほうび ----------------
+/**
+ * 協力プレイで、連戦の index 番目の裏ボスを（部屋の全員で）倒した時のごほうびを、1人ぶんの状態に付ける。
+ * ★サーバーの部屋の戦闘が「倒した」と確定した時だけ呼ぶこと（クライアントから直接呼べる操作にはしない）。
+ *  初回：💎firstCrystals＋称号。2回目以降：💎repeatCrystals（1日 repeatDailyMax 体まで）。
+ *  学年の裏ボスを全部倒した時 gradeBonus、21体すべてで allBonus（それぞれ1回）。
+ */
+export function applyRaidWin(state, index, now) {
+  const b = raidBoss(index);
+  if (!b) return { ok: false, error: "bad-index" };
+  const s = structuredClone(state);
+  const key = `${b.grade}:${b.chapterId}`;
+  const first = !s.raid.cleared[key];
+  const today = dayKey(now);
+  if (s.raid.daily.date !== today) s.raid.daily = { date: today, n: 0 };
+  let crystals = 0;
+  if (first) { crystals = RAID.firstCrystals; s.raid.cleared[key] = now; }
+  else if (s.raid.daily.n < RAID.repeatDailyMax) { crystals = RAID.repeatCrystals; s.raid.daily.n += 1; }
+  let gradeBonus = 0, allBonus = 0;
+  if (first) {
+    const gradeAll = RAID_LADDER.filter((x) => x.grade === b.grade).every((x) => s.raid.cleared[`${x.grade}:${x.chapterId}`]);
+    if (gradeAll && !s.raid.gradeDone[b.grade]) { s.raid.gradeDone[b.grade] = now; gradeBonus = RAID.gradeBonus; }
+    if (RAID_LADDER.every((x) => s.raid.cleared[`${x.grade}:${x.chapterId}`]) && !s.raid.allDone) { s.raid.allDone = now; allBonus = RAID.allBonus; }
+  }
+  s.crystals += crystals + gradeBonus + allBonus;
+  return { ok: true, state: s, rewards: { crystals, gradeBonus, allBonus, first, title: first ? b.title : null, boss: b.name } };
 }
 
 // ---------------- 合成・限界突破 ----------------
@@ -210,6 +243,7 @@ export function verifyClaim(claim, state, now) {
   if (claim.kind === "subUnit") {
     unitId = labUnitIdForBattle({ grade: claim.grade, chapterId: claim.chapterId, subUnitId: claim.subUnitId });
     if (!unitId) return fail("unknown-unit");
+    if (!battleOpen(state, claim.grade, unitId)) return fail("locked"); // 前のバトルをクリアしていない小単元は、申請を受け付けない（ストーリーどおりに進む）
     allowed = [unitId];
   } else { // 章ボス：その章の小単元のバトルメダルがすべてそろっている（＝全部のバトルをクリアした）時だけ。出題はその章のどの単元でもよい
     allowed = labUnitIdsOfChapter(claim.grade, claim.chapterId);
@@ -338,6 +372,27 @@ function spend(s, ms) {
   if (ms > s.credit.ms + CREDIT.slackMs) return false;
   s.credit.ms = Math.max(0, s.credit.ms - ms);
   return true;
+}
+
+// ---------------- バトルの順番（ストーリーどおりに進む） ----------------
+/** その学年の小単元を、章の順→小単元の順に並べたID配列（＝バトルを進める順番）。 */
+export function battleOrder(grade) {
+  return chaptersForGrade(Number(grade)).flatMap((c) => (c.units || []).map((u) => u.id));
+}
+/**
+ * その小単元のバトルに挑戦できるか。ストーリーどおり、**前のバトルをクリアすると次が開く**（章をまたいでも同じ）。
+ *  ・学年の最初の小単元は、いつでも。
+ *  ・いちばん先までクリアした小単元の「次」まで開く（以前に先へ進んでいた人が行き止まりにならない）。
+ *  state が未取得(null)の間は開けておく（サーバーが最終的に判定する）。
+ */
+export function battleOpen(state, grade, unitId) {
+  if (!state) return true;
+  const order = battleOrder(grade);
+  const idx = order.indexOf(unitId);
+  if (idx <= 0) return true;
+  let furthest = -1;
+  for (let i = 0; i < order.length; i++) if (state.medals?.battle?.[order[i]]) furthest = i;
+  return idx <= furthest + 1;
 }
 
 // ---------------- メダル ----------------

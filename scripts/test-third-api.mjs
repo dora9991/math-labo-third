@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -378,6 +378,57 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t("限界突破: 最大4まで", lb.body.breaks === 4 && lb.body.state.spares[id2] === 5);
   lb = await call(s2, "limit_break", { id: id2 }, "sy2", T0); t("限界突破: 5回目は拒否(max-breaks)", lb.status === 400 && lb.body.error === "max-breaks");
   lb = await call(s2, "limit_break", { id: T.STARTER_PARTY[3] }, "sy2", T0); t("限界突破: 予備が無い子は拒否", lb.status === 400 && lb.body.error === "no-spare");
+}
+
+// ===== 12. 協力プレイの裏ボス連戦：相手の一覧・強さ・ごほうび・称号（2026-09-25）
+{
+  t("裏ボス連戦: 全21体（中1が7・中2が6・中3が8）で、章の順", T.RAID_LADDER.length === 21 && [1, 2, 3].map((g) => T.RAID_LADDER.filter((b) => b.grade === g).length).join() === "7,6,8" && T.RAID_LADDER.every((b, i) => b.index === i));
+  const s0 = T.initialThirdState(); const b0 = T.raidStats(0), bl = T.raidStats(20);
+  t("裏ボスの強さ: HPは章ボスの5倍・後半ほど強い", b0.hp > 0 && bl.hp > b0.hp && b0.dmg > 0);
+  let r = T.applyRaidWin(s0, 0, T0); const st1 = r.state;
+  t("裏ボス初撃破: 💎10＋称号", r.ok && r.rewards.crystals === T.RAID.firstCrystals && !!r.rewards.title && st1.crystals === T.RAID.firstCrystals && T.titlesOf(st1).find((x) => x.id === "raid_c1").got);
+  const ds = [];
+  let st = st1; for (let i = 0; i < 5; i++) { r = T.applyRaidWin(st, 0, T0 + (i + 1) * MIN); st = r.state; ds.push(r.rewards.crystals); }
+  t("裏ボス周回: 💎1が1日3回まで（4回目から0）", JSON.stringify(ds) === JSON.stringify([1, 1, 1, 0, 0]), JSON.stringify(ds));
+  r = T.applyRaidWin(st, 0, T0 + 30 * 60 * MIN); t("裏ボス周回: 翌日はまた💎1", r.rewards.crystals === 1);
+  // 学年制覇（中1の7体）と全制覇（21体）
+  let sc = T.initialThirdState(); const got = [];
+  for (const b of T.RAID_LADDER) { const rr = T.applyRaidWin(sc, b.index, T0 + b.index * MIN); sc = rr.state; got.push([rr.rewards.gradeBonus, rr.rewards.allBonus]); }
+  t("学年制覇ボーナス: 各学年の最後の1体で💎20（中1=7体目・中2=13体目・中3=21体目）", got[6][0] === T.RAID.gradeBonus && got[12][0] === T.RAID.gradeBonus && got[20][0] === T.RAID.gradeBonus && got.filter((g) => g[0] > 0).length === 3, JSON.stringify(got.map((g) => g[0])));
+  t("全制覇ボーナス: 21体すべてで💎50（1回）", got[20][1] === T.RAID.allBonus && got.filter((g) => g[1] > 0).length === 1 && T.titlesOf(sc).find((x) => x.id === "all").got);
+  t("称号: 全部で 21＋3＋1＝25種", T.titlesOf(sc).length === 25 && T.titlesOf(sc).every((x) => x.got) && T.titlesOf(T.initialThirdState()).every((x) => !x.got));
+  t("裏ボスの範囲外は拒否", T.applyRaidWin(s0, 99, T0).ok === false);
+  // クライアントから直接「倒した」と申請する操作は存在しない（不正にごほうびを取れない）
+  const s = makeStore(); await call(s, "get_state", {}, "rd1", T0);
+  const bad = await call(s, "raid_win", { index: 0 }, "rd1", T0); t("裏ボスのごほうびは、クライアントから直接は申請できない", bad.status === 400 && bad.body.error === "unknown-action");
+}
+
+// ===== 13. ストーリーどおり：前のバトルをクリアすると次が開く（2026-09-25）
+{
+  const ch1 = T.chaptersForGrade(1)[0], ch2 = T.chaptersForGrade(1)[1]; const u1 = ch1.units.map((u) => u.id), lastC1 = u1[u1.length - 1], firstC2 = ch2.units[0].id;
+  const st = T.initialThirdState();
+  t("バトルの順番: 学年の最初の小単元はいつでも開いている", T.battleOpen(st, 1, u1[0]) && !T.battleOpen(st, 1, u1[1]) && !T.battleOpen(st, 1, u1[2]));
+  t("バトルの順番: 状態が未取得(null)の間は開けておく（サーバーが最終判定）", T.battleOpen(null, 1, u1[3]));
+  const cl = (ids) => { const x = T.initialThirdState(); for (const id of ids) x.medals.battle[id] = 1; return x; };
+  t("バトルの順番: 前をクリアすると次だけが開く", T.battleOpen(cl([u1[0]]), 1, u1[1]) && !T.battleOpen(cl([u1[0]]), 1, u1[2]));
+  t("バトルの順番: 章をまたいでも同じ（前の章の最後をクリアすると、次の章の最初が開く）", !T.battleOpen(cl(u1.slice(0, -1)), 1, firstC2) && T.battleOpen(cl(u1), 1, firstC2) && !T.battleOpen(cl(u1), 1, ch2.units[1].id));
+  t("バトルの順番: 以前に先へ進んでいた人は行き止まりにならない（いちばん先の次まで開く）", T.battleOpen(cl([u1[4]]), 1, u1[2]) && T.battleOpen(cl([u1[4]]), 1, u1[5]) && !T.battleOpen(cl([u1[4]]), 1, u1[6] ?? firstC2));
+  t("バトルの順番: 学年ごとに別（中2の最初はいつでも）", T.battleOpen(T.initialThirdState(), 2, T.chaptersForGrade(2)[0].units[0].id));
+  // サーバーの申請：前をクリアしていないと拒否 → クリアすると通る
+  const s = makeStore(); await call(s, "get_state", {}, "lk1", T0);
+  const attemptsFor = (uid, n, seedBase) => Array.from({ length: n }, (_, i) => { const lv = ["easy", "standard", "advanced", "oni"][i % 4]; let seed = seedBase + i, p = T.generateThirdProblem(uid, lv, seed) || T.generateThirdProblem(uid, "standard", seed); for (let k = 1; !p && k < 50; k++) { seed = seedBase + i + k * 1000; p = T.generateThirdProblem(uid, lv, seed) || T.generateThirdProblem(uid, "standard", seed); } return { unitId: uid, level: p.level, seed, answer: p.choices[p.correctIndex], ms: 3000 }; });
+  const claimFor = (idx, seedBase, now) => { const w = T.worldBattleFor(1, ch1, ch1.units[idx]); return { nonce: "lk-" + idx + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: w.chapterId, kind: "subUnit", subUnitId: w.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor(u1[idx], 12, seedBase) }; };
+  let now = T0 + 5 * MIN;
+  let r = await call(s, "claim", { claim: claimFor(2, 40000000, now) }, "lk1", now); now += 3 * MIN;
+  t("バトルの順番(サーバー): 前をクリアしていない小単元の申請は拒否(locked)", r.status === 400 && r.body.error === "locked", JSON.stringify(r.body.error));
+  r = await call(s, "claim", { claim: claimFor(0, 40001000, now) }, "lk1", now); now += 3 * MIN;
+  t("バトルの順番(サーバー): 最初の小単元は通り、バトルメダルが付く", r.status === 200 && r.body.state.medals.battle[u1[0]] > 0);
+  r = await call(s, "claim", { claim: claimFor(2, 40002000, now) }, "lk1", now); now += 3 * MIN;
+  t("バトルの順番(サーバー): 1つ飛ばした3つ目はまだ拒否", r.status === 400 && r.body.error === "locked");
+  r = await call(s, "claim", { claim: claimFor(1, 40003000, now) }, "lk1", now); now += 3 * MIN;
+  t("バトルの順番(サーバー): 2つ目をクリアすると", r.status === 200);
+  r = await call(s, "claim", { claim: claimFor(2, 40004000, now) }, "lk1", now);
+  t("バトルの順番(サーバー): 3つ目が開いて通る", r.status === 200 && r.body.state.medals.battle[u1[2]] > 0, JSON.stringify(r.body.error));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

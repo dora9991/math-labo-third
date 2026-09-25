@@ -12,6 +12,7 @@ const ERROR = {
   "too-soon": "すこし間をあけてね",
   "duplicate-claim": "もう受け取ったよ",
   "time-mismatch": "時間が合わなかったよ",
+  locked: "前のバトルをクリアすると、このバトルのごほうびがもらえるよ",
 };
 
 export default function Reward({ nav, params }) {

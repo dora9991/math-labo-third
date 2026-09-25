@@ -11,6 +11,8 @@ import GameButton from "../../components/GameButton.jsx";
 import { MathBackdrop } from "../../components/Decorations.jsx";
 import { chaptersForGrade } from "../../data/index.js";
 import { unitMedals, medalSummary, MEDAL_PRACTICE_TARGET } from "../medals.js";
+import { battleOpen, battleOrder } from "../core.js";
+import { findUnitById } from "../../data/index.js";
 import { getChapter } from "../data/storyMap.js";
 import { worldBattleFor } from "../link.js";
 import RecordScreen from "./RecordScreen.jsx";
@@ -114,7 +116,7 @@ export default function ThirdMenu(props) {
   if (view === "record") {
     return (
       <Shell player={player} back="メニュー" onBack={() => go({ view: "main" })} transitionKey={view} reverse>
-        <RecordScreen player={player} records={records} onWeakness={props.onWeakness} />
+        <RecordScreen player={player} records={records} onWeakness={props.onWeakness} state={medalState} />
       </Shell>
     );
   }
@@ -166,7 +168,7 @@ export default function ThirdMenu(props) {
             return (
               <GameButton key={u.id} tone={m.count >= 3 ? "gold" : "violet"} onClick={() => go({ view: "actions", chapterId: chapter.id, unitId: u.id })}>
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%" }}>
-                  <span style={{ textAlign: "left" }}><strong>{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
+                  <span style={{ textAlign: "left" }}><strong>{!battleOpen(medalState, grade, u.id) ? "🔒 " : ""}{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
                   <MedalPair m={m} />
                 </span>
               </GameButton>
@@ -198,7 +200,10 @@ export default function ThirdMenu(props) {
 
   // ---- 学習：小単元を選んだ後の4つ
   const m = unitMedals(medalState, unit.id);
-  const battleAvail = !!worldBattleFor(grade, chapter, unit); // バトルはメダルの条件なし。はじめてクリアで💎とバトルメダル
+  const battleExists = !!worldBattleFor(grade, chapter, unit);
+  const open = battleOpen(medalState, grade, unit.id); // ストーリーどおり：前のバトルをクリアすると次が開く
+  const battleAvail = battleExists && open;
+  const prevName = (() => { const o = battleOrder(grade); const i = o.indexOf(unit.id); return i > 0 ? findUnitById(o[i - 1])?.name || "" : ""; })();
   return (
     <Shell player={player} back={chapter.name} onBack={() => go({ view: "subunits", chapterId: chapter.id })} transitionKey={`${view}:${unit.id}`} reverse>
       <Title sub={chapter.name}>{unit.emoji ? unit.emoji + " " : ""}{unit.name}</Title>
@@ -215,7 +220,7 @@ export default function ThirdMenu(props) {
         <GameButton tone="mint" icon="✏️" onClick={() => go({ view: "practicePick", chapterId: chapter.id, unitId: unit.id })}><strong>練習</strong><small>4択学習モード（むずかしさをえらべるよ）</small></GameButton>
         <GameButton tone="gold" icon="⚔️" disabled={!battleAvail} onClick={() => battleAvail && props.onBattle?.(chapter, unit)}>
           <strong>バトルモード</strong>
-          <small>{!battleAvail ? "この小単元のバトルは準備中" : m.battle ? "クリアずみ！ もう一度たたかえるよ" : "はじめてクリアで ⚔️バトルメダルと 💎クリスタル2個！"}</small>
+          <small>{!battleExists ? "この小単元のバトルは準備中" : !open ? `🔒 前のバトルをクリアすると開くよ${prevName ? `（${prevName}）` : ""}` : m.battle ? "クリアずみ！ もう一度たたかえるよ" : "はじめてクリアで ⚔️バトルメダルと 💎クリスタル2個！"}</small>
         </GameButton>
       </div>
     </Shell>

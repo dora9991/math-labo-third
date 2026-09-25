@@ -1,0 +1,170 @@
+[
+ {
+  "id": "raid_c1",
+  "name": "ゼロ・ヴォイド",
+  "desc": "正負の二極をのみこむ、白黒の虚無の竜",
+  "grade": 1,
+  "chapterId": "c1",
+  "accent": "白黒の二極＋古金"
+ },
+ {
+  "id": "raid_c2",
+  "name": "エックス・ミミック",
+  "desc": "どんな文字にも化ける、擬態の王",
+  "grade": 1,
+  "chapterId": "c2",
+  "accent": "エメラルド緑"
+ },
+ {
+  "id": "raid_c3",
+  "name": "バランス・レヴィアタン",
+  "desc": "天秤を海へ沈める、琥珀の大海獣",
+  "grade": 1,
+  "chapterId": "c3",
+  "accent": "琥珀・橙"
+ },
+ {
+  "id": "raid_c4",
+  "name": "オリジン・ハイドラ",
+  "desc": "原点から無限にのびる、星図の多頭蛇",
+  "grade": 1,
+  "chapterId": "c4",
+  "accent": "サファイア青(星)"
+ },
+ {
+  "id": "raid_c5",
+  "name": "ユークリッド・ガーディアン",
+  "desc": "青銅の庭をまもる、公理の巨像",
+  "grade": 1,
+  "chapterId": "c5",
+  "accent": "青緑銅"
+ },
+ {
+  "id": "raid_c6",
+  "name": "ポリヘドラ・ドラゴン",
+  "desc": "紫水晶の翼をもつ、多面体の竜",
+  "grade": 1,
+  "chapterId": "c6",
+  "accent": "アメジスト紫"
+ },
+ {
+  "id": "raid_c7",
+  "name": "ミーン・オーバーロード",
+  "desc": "平均をゆがめる、雲海の君主",
+  "grade": 1,
+  "chapterId": "c7",
+  "accent": "薔薇石英ピンク"
+ },
+ {
+  "id": "raid_g2c1",
+  "name": "ポリノミアル・ワーム",
+  "desc": "式のからまる糸を操る、巨大な蟲",
+  "grade": 2,
+  "chapterId": "g2c1",
+  "accent": "深紅"
+ },
+ {
+  "id": "raid_g2c2",
+  "name": "ツインエンド・キメラ",
+  "desc": "ふたつの頭で吠える、橋の谷の合成獣",
+  "grade": 2,
+  "chapterId": "g2c2",
+  "accent": "翡翠"
+ },
+ {
+  "id": "raid_g2c3",
+  "name": "スロープ・ワイバーン",
+  "desc": "どこまでも駆ける、黄金の飛竜",
+  "grade": 2,
+  "chapterId": "g2c3",
+  "accent": "黄金・レモン"
+ },
+ {
+  "id": "raid_g2c4",
+  "name": "ミラー・ツイン",
+  "desc": "鏡の館にひそむ、双子の影",
+  "grade": 2,
+  "chapterId": "g2c4",
+  "accent": "銀青"
+ },
+ {
+  "id": "raid_g2c5",
+  "name": "プルーフ・ゴーレム",
+  "desc": "証拠の石でできた、塔の巨人",
+  "grade": 2,
+  "chapterId": "g2c5",
+  "accent": "青銅・赤銅"
+ },
+ {
+  "id": "raid_g2c6",
+  "name": "ダイス・オブ・フェイト",
+  "desc": "さいころの市を支配する、運命の魔物",
+  "grade": 2,
+  "chapterId": "g2c6",
+  "accent": "マゼンタ"
+ },
+ {
+  "id": "raid_g3c1",
+  "name": "ファクター・シーカー",
+  "desc": "式を切り裂く、赤黒い刃の獣",
+  "grade": 3,
+  "chapterId": "g3c1",
+  "accent": "黒曜赤(溶岩の筋)"
+ },
+ {
+  "id": "raid_g3c2",
+  "name": "ルート・リッチ",
+  "desc": "井戸の底に眠る、根の亡霊",
+  "grade": 3,
+  "chapterId": "g3c2",
+  "accent": "海緑"
+ },
+ {
+  "id": "raid_g3c3",
+  "name": "パラボラ・フェニックス",
+  "desc": "炎の弧をえがく、不死鳥",
+  "grade": 3,
+  "chapterId": "g3c3",
+  "accent": "炎橙"
+ },
+ {
+  "id": "raid_g3c4",
+  "name": "グラビティ・ブレイカー",
+  "desc": "落下を支配する、氷の巨躯",
+  "grade": 3,
+  "chapterId": "g3c4",
+  "accent": "氷シアン"
+ },
+ {
+  "id": "raid_g3c5",
+  "name": "スケール・ジャイアント",
+  "desc": "大きさを自在に変える、巨人",
+  "grade": 3,
+  "chapterId": "g3c5",
+  "accent": "ライム(黄緑)"
+ },
+ {
+  "id": "raid_g3c6",
+  "name": "サークル・セラフ",
+  "desc": "真珠色の輪をまとう、天使",
+  "grade": 3,
+  "chapterId": "g3c6",
+  "accent": "真珠白"
+ },
+ {
+  "id": "raid_g3c7",
+  "name": "ピタゴラス・タイタン",
+  "desc": "直角の大階段をゆく、藍紫の巨神",
+  "grade": 3,
+  "chapterId": "g3c7",
+  "accent": "藍紫(インディゴ)"
+ },
+ {
+  "id": "raid_g3c8",
+  "name": "サンプル・オラクル",
+  "desc": "一部だけを見て未来を告げる、神託の眼",
+  "grade": 3,
+  "chapterId": "g3c8",
+  "accent": "黄土・茶"
+ }
+]

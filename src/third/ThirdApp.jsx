@@ -9,7 +9,7 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import * as bgm from "../audio/bgm.js";
-import { ThirdProvider } from "./ThirdContext.jsx";
+import { ThirdProvider, useGame } from "./ThirdContext.jsx";
 import { playUiTapSound } from "./fx/sound.js";
 import PartyFormation from "./screens/PartyFormation.jsx";
 import ThirdBattle from "./screens/ThirdBattle.jsx";
@@ -18,6 +18,8 @@ import ThirdGacha from "./screens/ThirdGacha.jsx";
 import ThirdSynth from "./screens/ThirdSynth.jsx";
 import RoomLobby from "./screens/RoomLobby.jsx";
 import { getFxSpeed } from "../engine/fxSpeed.js";
+import { battleOpen } from "./core.js";
+import { labUnitIdForBattle } from "./link.js";
 import StoryPlayer from "./story/StoryPlayer.jsx";
 import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
 import "./third.css";
@@ -56,6 +58,26 @@ function useNav(initial, exit) {
   return { ...current, go, back, resetTo, flashTo, exit, flashOpacity, navKey };
 }
 
+// ストーリーどおりに進む：前のバトルをクリアしていない小単元のバトルには入れない（サーバーも同じ判定で申請を断る）。
+function BattleLockGate({ nav, children }) {
+  const { save } = useGame();
+  const p = nav.params || {};
+  if (nav.screen === "battle" && p.kind === "subUnit") {
+    const unitId = labUnitIdForBattle(p);
+    if (unitId && !battleOpen(save, p.grade, unitId)) {
+      return (
+        <div className="mw-fantasy-panel mw-center" style={{ minHeight: "40vh", marginTop: 40 }}>
+          <div style={{ fontSize: "2.4rem" }}>🔒</div>
+          <div className="mw-fantasy-title">まだ このバトルは ひらいていないよ</div>
+          <div style={{ color: "#ffe9b3", margin: "8px 0" }}>前のバトルをクリアすると、次のバトルが開くよ。</div>
+          <button className="mw-btn primary" onClick={() => nav.exit()}>もどる</button>
+        </div>
+      );
+    }
+  }
+  return children;
+}
+
 export default function ThirdApp({ player, start, onExit }) {
   const nav = useNav(start || { screen: "party", params: {} }, onExit);
   const Screen = SCREENS[nav.screen] || PartyFormation;
@@ -82,7 +104,7 @@ export default function ThirdApp({ player, start, onExit }) {
         <div key={nav.navKey} className={`mw-screen-enter mw-screen-enter--${getFxSpeed()}`}>
           {pending.length
             ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} />
-            : <Screen params={nav.params} nav={nav} />}
+            : <BattleLockGate nav={nav}><Screen params={nav.params} nav={nav} /></BattleLockGate>}
         </div>
         <div className="mw-whiteout" style={{ opacity: nav.flashOpacity, pointerEvents: nav.flashOpacity > 0 ? "auto" : "none" }} />
       </div>

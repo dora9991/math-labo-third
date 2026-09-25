@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { dayKeyBefore, daySummary, weekSummary, weeklyTier } from "../../engine/studyLog.js";
 import GameButton from "../../components/GameButton.jsx";
+import { titlesOf } from "../raid.js";
 
 const DAILY_MINUTES = 15;            // 1日の目安（集中して15分）
 const DAILY_QUESTIONS = 30;          // ≒ 15分 ÷ 30秒/問
@@ -17,7 +18,9 @@ function Card({ icon, title, children }) {
   );
 }
 
-export default function RecordScreen({ player, records, onWeakness }) {
+export default function RecordScreen({ player, records, onWeakness, state }) {
+  const titles = useMemo(() => titlesOf(state), [state]);
+  const gotTitles = titles.filter((t) => t.got);
   const todayKey = useMemo(() => dayKeyBefore(0), []);
   const today = useMemo(() => daySummary(records, todayKey), [records, todayKey]);
   const week = useMemo(() => weekSummary(records, 7), [records]);
@@ -80,6 +83,17 @@ export default function RecordScreen({ player, records, onWeakness }) {
         </div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,.68)", marginTop: 8, lineHeight: 1.6 }}>
           1週間の目安：OK! 1〜10問／Good! 11〜30問／Great! 31問〜。休むことも大事。むりせず続けよう。
+        </div>
+      </Card>
+
+      <Card icon="V" title={`称号　${gotTitles.length} / ${titles.length}`}>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", marginBottom: 8, lineHeight: 1.6 }}>協力プレイで、各章の「裏ボス」をたおすと もらえるよ。</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {titles.map((t) => (
+            <span key={t.id} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800,
+              color: t.got ? "#3a2400" : "rgba(255,255,255,.35)", background: t.got ? "linear-gradient(135deg,#fde68a,#f59e0b)" : "rgba(255,255,255,.06)",
+              border: t.got ? "1px solid #fff2c4" : "1px dashed rgba(255,255,255,.2)" }}>{t.got ? t.label : "？？？"}</span>
+          ))}
         </div>
       </Card>
 
