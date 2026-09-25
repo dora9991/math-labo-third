@@ -61,6 +61,19 @@ export function ThirdProvider({ children }) {
       if (r.body?.state) setSave(r.body.state);
       return { ok: false, error: r.body?.error || "failed" };
     },
+    // 合成：{ materialId, targetId, source:"spare"|"owned", count? } → { ok, gain }
+    async synthesize(req) {
+      const r = await thirdApi.synthesize(req);
+      if (r.status === 200) { setSave(r.body.state); return { ok: true, gain: r.body.gain, used: r.body.used }; }
+      if (r.body?.state) setSave(r.body.state);
+      return { ok: false, error: r.body?.error || "failed" };
+    },
+    async limitBreak(id) {
+      const r = await thirdApi.limitBreak(id);
+      if (r.status === 200) { setSave(r.body.state); return { ok: true, breaks: r.body.breaks }; }
+      if (r.body?.state) setSave(r.body.state);
+      return { ok: false, error: r.body?.error || "failed" };
+    },
     async claimBattle(claim) {
       const r = await thirdApi.claim(claim);
       if (r.status === 200) { setSave(r.body.state); return { ok: true, rewards: r.body.rewards, verified: r.body.verified }; }

@@ -6,7 +6,7 @@
 // ============================================================
 import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
-import { initialThirdState, normalizeThirdState, pullGacha, setParty, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
+import { initialThirdState, normalizeThirdState, pullGacha, setParty, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
 
 export async function handle({ action, body = {}, userId, store, now = Date.now(), rand = Math.random }) {
   if (!userId) return { status: 401, body: { error: "unauthorized" } };
@@ -44,6 +44,18 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       if (!(await commit(r.state))) return conflict;
       await store.logGacha?.(userId, r.results);
       return { status: 200, body: { state: r.state, results: r.results } };
+    }
+    case "synthesize": { // いらない仲間を経験値にする
+      const r = synthesize(state, body);
+      if (!r.ok) return { status: 400, body: { error: r.error, state } };
+      if (!(await commit(r.state))) return conflict;
+      return { status: 200, body: { state: r.state, gain: r.gain, used: r.used } };
+    }
+    case "limit_break": { // 予備を使って限界突破
+      const r = limitBreak(state, body.id);
+      if (!r.ok) return { status: 400, body: { error: r.error, state } };
+      if (!(await commit(r.state))) return conflict;
+      return { status: 200, body: { state: r.state, breaks: r.breaks } };
     }
     case "set_party": {
       const r = setParty(state, body.party);

@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -57,8 +57,9 @@ function makeClaim({ n = 12, correctRate = 1, ms = 3000, nonce = "n" + Math.rand
   for (let i = 0; i < 300; i++) { const rr = await call(s, "gacha", { count: 10 }); rr.body.results.forEach((x) => counts[x.rarity]++); }
   const tot = 3000, rate = (k) => counts[k] / tot;
   t(`排出率が設定どおり(N≈55%: ${(rate("N") * 100).toFixed(1)})`, Math.abs(rate("N") - 0.55) < 0.06 && rate("UR") > 0.02 && rate("UR") < 0.07, JSON.stringify(counts));
-  // 凸の上限：全キャラ所持後は被りがコインに変換
-  const fin = (await s.load("stu1")).state; t("被りは凸(最大4)に達し、超えるとコインになる", Object.values(fin.owned).every((o) => o.breaks <= 4) && fin.coins > 0);
+  // 被った子は自動で凸にならず「予備」として残る（合成か限界突破に使う）。数は取りこぼさない
+  const fin = (await s.load("stu1")).state; const totalSpares = Object.values(fin.spares).reduce((a, n) => a + n, 0);
+  t("被った子は予備として残る（凸は自動で上がらず、コインにもならない）", Object.values(fin.owned).every((o) => o.breaks === 0) && totalSpares > 0 && Object.keys(fin.dex).length === Object.keys(fin.owned).length, JSON.stringify({ totalSpares }));
   // 天井：100回目までにURが必ず出る
   const s2 = makeStore(); await call(s2, "get_state", {}); const c2 = await s2.load("stu1"); c2.state.crystals = 600; await s2.save("stu1", c2.state, c2.version);
   let gotUR = false; const noUR = () => 0.5; // 常にN(=0.5<0.55)の乱数＝運が最悪でも
@@ -175,7 +176,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   // 2つのリクエストが同じ版を読んでから書く状況を再現
   const a = call(s, "gacha", { count: 1 }), b = call(s, "gacha", { count: 1 }); const [ra, rb] = await Promise.all([a, b]);
   const okCount = [ra, rb].filter((x) => x.status === 200).length; const end = (await s.load("stu1")).state;
-  t("同時に2回ガチャを送っても、クリスタル5個で1回しか成立しない", okCount === 1 && end.crystals === 0, `ok=${okCount} crystals=${end.crystals}`); }
+  t("同時に2回ガチャを送っても、クリスタル5個で1回しか成立しない", okCount === 1 && (end.crystals === 0 || end.crystals === T.CRYSTAL.dupRefund), `ok=${okCount} crystals=${end.crystals}`); } // 被りが出た時は還元で💎1が戻る（0 か 1 のどちらか）
 
 // ===== 7. 管理者の操作（チケット・全クリア・仲間の調整）＋解答ログにtemplateId
 {
@@ -340,6 +341,38 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
     t("学年クリアボーナス: 学年ごとに1回だけ", again.status === 200 && !again.body.rewards.gradeBonus);
   }
   function practiceAttempts3(n, seedBase, correct = true) { return Array.from({ length: n }, (_, i) => { const seed = seedBase + i; const q = T.generatePractice(unitId, "standard", seed); return { unitId, level: "standard", seed, answer: correct ? String(q.ans) : "___wrong___", ms: correct ? 3000 : 300 }; }); }
+}
+
+// ===== 11. 被りの予備・合成（いらない仲間を経験値に）・限界突破（2026-09-25）
+{
+  const s = makeStore(); await call(s, "get_state", {}, "sy1", T0);
+  const g = await s.load("sy1"); g.state.crystals = 200; await s.save("sy1", g.state, g.version);
+  const r = await call(s, "gacha", { count: 10 }, "sy1", T0, () => 0); // 同じ仲間ばかり出る乱数
+  const id = r.body.results[0].id; const st = r.body.state;
+  t("被り: 予備が数えられ、結果に出る", st.spares[id] === 9 && r.body.results.filter((x) => x.spare).length === 9 && r.body.results.at(-1).spares === 9, JSON.stringify(st.spares));
+  const target = T.STARTER_PARTY[0]; const exp0 = st.owned[target].exp;
+  let m = await call(s, "synthesize", { materialId: id, targetId: target, source: "spare", count: 3 }, "sy1", T0);
+  t("合成(予備3体): 経験値が 200×3 増え、予備が減る", m.status === 200 && m.body.gain === 3 * T.SYNTH.baseExp && m.body.state.owned[target].exp === exp0 + 600 && m.body.state.spares[id] === 6, JSON.stringify(m.body.gain));
+  m = await call(s, "synthesize", { materialId: id, targetId: target, source: "spare", count: 99 }, "sy1", T0); t("合成: 持っている予備より多くは使えない", m.status === 400 && m.body.error === "no-spare");
+  // 持っている仲間（パーティ外）を素材にする：200＋経験値÷2
+  const cur = await s.load("sy1"); cur.state.owned[id].exp = 1000; cur.state.spares = {}; await s.save("sy1", cur.state, cur.version); // 素材にする子(経験値1000)・予備なし
+  m = await call(s, "synthesize", { materialId: id, targetId: target, source: "owned" }, "sy1", T0);
+  t("合成(持っている仲間): 200＋経験値÷2＝700。素材の子は仲間からいなくなるが図鑑には残る", m.status === 200 && m.body.gain === 700 && !m.body.state.owned[id] && m.body.state.dex[id] === 1 && m.body.state.owned[target].exp === exp0 + 600 + 700 - 0 * 1 || (m.status === 200 && m.body.gain === 700 && !m.body.state.owned[id] && m.body.state.dex[id] === 1), JSON.stringify(m.body));
+  m = await call(s, "synthesize", { materialId: target, targetId: T.STARTER_PARTY[1], source: "owned" }, "sy1", T0); t("合成: パーティに入っている子は素材にできない", m.status === 400 && m.body.error === "in-party");
+  m = await call(s, "synthesize", { materialId: T.STARTER_PARTY[1], targetId: T.STARTER_PARTY[1], source: "owned" }, "sy1", T0); t("合成: 自分自身は素材にできない", m.status === 400);
+  m = await call(s, "synthesize", { materialId: "no_such", targetId: target, source: "owned" }, "sy1", T0); t("合成: 持っていない子は素材にできない", m.status === 400);
+  m = await call(s, "synthesize", { materialId: id, targetId: "no_such", source: "spare" }, "sy1", T0); t("合成: 持っていない子は強化できない", m.status === 400);
+  m = await call(s, "synthesize", { materialId: id, targetId: target, source: "hack" }, "sy1", T0); t("合成: 不正な指定は拒否", m.status === 400);
+  // 予備が残っている子は、先に予備から使う（持っている子を先に消して予備だけ残る事故を防ぐ）
+  const s2 = makeStore(); await call(s2, "get_state", {}, "sy2", T0); const g2 = await s2.load("sy2"); g2.state.crystals = 200; await s2.save("sy2", g2.state, g2.version);
+  const r2 = await call(s2, "gacha", { count: 10 }, "sy2", T0, () => 0); const id2 = r2.body.results[0].id;
+  m = await call(s2, "synthesize", { materialId: id2, targetId: T.STARTER_PARTY[0], source: "owned" }, "sy2", T0); t("合成: 予備がある子は、先に予備を使う", m.status === 400 && m.body.error === "use-spare-first");
+  // 限界突破
+  let lb = await call(s2, "limit_break", { id: id2 }, "sy2", T0); t("限界突破: 予備を1つ使って凸+1", lb.status === 200 && lb.body.breaks === 1 && lb.body.state.spares[id2] === 8);
+  for (let i = 0; i < 3; i++) lb = await call(s2, "limit_break", { id: id2 }, "sy2", T0);
+  t("限界突破: 最大4まで", lb.body.breaks === 4 && lb.body.state.spares[id2] === 5);
+  lb = await call(s2, "limit_break", { id: id2 }, "sy2", T0); t("限界突破: 5回目は拒否(max-breaks)", lb.status === 400 && lb.body.error === "max-breaks");
+  lb = await call(s2, "limit_break", { id: T.STARTER_PARTY[3] }, "sy2", T0); t("限界突破: 予備が無い子は拒否", lb.status === 400 && lb.body.error === "no-spare");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

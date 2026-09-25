@@ -165,9 +165,10 @@ export default function PartyFormation({ nav }) {
         <span className="mw-fantasy-title" style={{ fontSize: "1.1rem" }}>
           パーティ編成
         </span>
-        <button className="mw-fantasy-back" onClick={() => nav.go("gacha")} aria-label="ガチャ">
-          🎰 💎{save.crystals}
-        </button>
+        <span style={{ display: "flex", gap: 6 }}>
+          <button className="mw-fantasy-back" onClick={() => nav.go("synth")} aria-label="合成">🔄 合成</button>
+          <button className="mw-fantasy-back" onClick={() => nav.go("gacha")} aria-label="ガチャ">🎰 💎{save.crystals}</button>
+        </span>
       </div>
 
       <div className="mw-fantasy-panel">
@@ -206,8 +207,9 @@ export default function PartyFormation({ nav }) {
         </div>
         <div className="mw-bench-grid">
           {ownedList.map((c) => (
-            <button key={c.id} className="mw-portrait-btn mw-bench-item" onPointerDown={(e) => startDrag(e, "bench", c.id, null)}>
+            <button key={c.id} className="mw-portrait-btn mw-bench-item" style={{ position: "relative" }} onPointerDown={(e) => startDrag(e, "bench", c.id, null)}>
               <MonsterPortrait character={c} size="small" />
+              {save.spares?.[c.id] > 0 && <span className="mw-spare-badge">×{save.spares[c.id] + 1}</span>}
             </button>
           ))}
         </div>

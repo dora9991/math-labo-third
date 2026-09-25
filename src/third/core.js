@@ -7,7 +7,7 @@
 //  設計: Obsidian 設計メモ_math-labo-third_ゲームシステム論点整理（2026-09-21）
 // ============================================================
 import { SPECIALIST_ROSTER } from "./specialistRoster.js";
-import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD, DAILY } from "./gachaConfig.js";
+import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./gachaConfig.js";
 import { DIFFICULTY_KEYS } from "./balance.js";
 import { labUnitIdForBattle } from "./link.js";
 import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfChapter } from "./problemSource.js";
@@ -35,6 +35,8 @@ export function initialThirdState() {
     coins: 0,
     owned: Object.fromEntries(STARTER_PARTY.map((id, i) => [id, { exp: 0, breaks: 0, n: i + 1 }])), // n＝入手した順
     acqSeq: STARTER_PARTY.length,
+    spares: {}, // ガチャで被った子の予備の数 { id: 個数 }。合成（経験値にする）か限界突破に使う
+    dex: Object.fromEntries(STARTER_PARTY.map((id) => [id, 1])), // 図鑑：一度でも仲間にした子（合成でいなくなっても残る）
     party: [...STARTER_PARTY],
     cleared: {}, // { "grade:chapter:subUnit": { first: ms, count } }
     chapterDone: {}, // 章クリアボーナス（その章の小単元を全部はじめてクリア）を受け取った章 { "grade:chapter": ms }
@@ -63,6 +65,10 @@ export function normalizeThirdState(s) {
   let seq = Math.max(Number(s.acqSeq) || 0, ...Object.values(out.owned).map((o) => o.n));
   for (const o of Object.values(out.owned)) if (!o.n) o.n = ++seq;
   out.acqSeq = seq;
+  out.spares = {};
+  for (const [id, n] of Object.entries(s.spares || {})) if (ROSTER_BY_ID[id] && Number(n) > 0) out.spares[id] = Math.floor(Number(n));
+  out.dex = { ...(s.dex && typeof s.dex === "object" ? s.dex : {}) };
+  for (const id of Object.keys(out.owned)) out.dex[id] = out.dex[id] || 1;
   let party = Array.isArray(s.party) ? s.party.slice(0, PARTY_SIZE) : [...STARTER_PARTY];
   party = party.map((id) => (id && out.owned[id] ? id : null));
   while (party.length < PARTY_SIZE) party.push(null);
@@ -121,14 +127,55 @@ export function pullGacha(state, count, rand = Math.random) {
     const ids = POOL[rarity];
     const id = ids[Math.min(ids.length - 1, Math.floor(rand() * ids.length))];
     const cur = s.owned[id];
-    let isNew = false, converted = false, refund = 0;
-    if (!cur) { s.owned[id] = { exp: 0, breaks: 0, n: ++s.acqSeq }; isNew = true; }
-    else if (cur.breaks < GACHA.maxBreaks) { cur.breaks += 1; refund = CRYSTAL.dupRefund; }
-    else { s.coins += GACHA.overflowCoins; converted = true; refund = CRYSTAL.dupRefund; }
+    let isNew = false, spare = false, refund = 0;
+    if (!cur) { s.owned[id] = { exp: 0, breaks: 0, n: ++s.acqSeq }; s.dex[id] = 1; isNew = true; }
+    else { s.spares[id] = (s.spares[id] || 0) + 1; spare = true; refund = CRYSTAL.dupRefund; } // 被った子は「予備」として残る（合成か限界突破に使える）
     s.crystals += refund; // 被りの還元：外れた感じをやわらげる
-    results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted, refund });
+    results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted: false, spare, spares: s.spares[id] || 0, refund });
   }
   return { ok: true, state: s, results };
+}
+
+// ---------------- 合成・限界突破 ----------------
+/**
+ * 合成：いらない仲間を、ほかの仲間の経験値にする（1体＝200＋その子の経験値÷2）。
+ *  source "spare"：ガチャで被った予備（経験値0なので1体＝200。count個まとめて）
+ *  source "owned"：持っている仲間（パーティ外・予備が無い子）。合成するとその子は仲間からいなくなる（図鑑には残る）
+ */
+export function synthesize(state, req) {
+  const targetId = req?.targetId, materialId = req?.materialId, source = req?.source;
+  if (typeof targetId !== "string" || !state.owned[targetId]) return { ok: false, error: "bad-target" };
+  const s = structuredClone(state);
+  let gain = 0, used = 0;
+  if (source === "spare") {
+    const have = s.spares[materialId] || 0;
+    const count = Number.isInteger(req?.count) ? req.count : 1;
+    if (!have || count < 1 || count > have) return { ok: false, error: "no-spare" };
+    s.spares[materialId] = have - count;
+    if (!s.spares[materialId]) delete s.spares[materialId];
+    gain = count * SYNTH.baseExp; used = count;
+  } else if (source === "owned") {
+    const m = s.owned[materialId];
+    if (!m) return { ok: false, error: "bad-material" };
+    if (materialId === targetId) return { ok: false, error: "same-character" };
+    if (s.party.includes(materialId)) return { ok: false, error: "in-party" };
+    if ((s.spares[materialId] || 0) > 0) return { ok: false, error: "use-spare-first" };
+    gain = SYNTH.baseExp + Math.floor((m.exp || 0) * SYNTH.expRate);
+    delete s.owned[materialId]; used = 1;
+  } else return { ok: false, error: "bad-source" };
+  s.owned[targetId].exp += gain;
+  return { ok: true, state: s, gain, used };
+}
+
+/** 限界突破：予備を1つ使って、その子の凸を+1（最大 GACHA.maxBreaks）。 */
+export function limitBreak(state, id) {
+  if (typeof id !== "string" || !state.owned[id]) return { ok: false, error: "bad-target" };
+  if ((state.spares[id] || 0) < 1) return { ok: false, error: "no-spare" };
+  if (state.owned[id].breaks >= GACHA.maxBreaks) return { ok: false, error: "max-breaks" };
+  const s = structuredClone(state);
+  s.spares[id] -= 1; if (!s.spares[id]) delete s.spares[id];
+  s.owned[id].breaks += 1;
+  return { ok: true, state: s, breaks: s.owned[id].breaks };
 }
 
 // ---------------- パーティ編成 ----------------

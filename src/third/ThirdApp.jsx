@@ -15,6 +15,7 @@ import PartyFormation from "./screens/PartyFormation.jsx";
 import ThirdBattle from "./screens/ThirdBattle.jsx";
 import Reward from "./screens/Reward.jsx";
 import ThirdGacha from "./screens/ThirdGacha.jsx";
+import ThirdSynth from "./screens/ThirdSynth.jsx";
 import { isBattleOpen } from "./medals.js";
 import { labUnitIdForBattle } from "./link.js";
 import { getFxSpeed } from "../engine/fxSpeed.js";
@@ -22,7 +23,7 @@ import StoryPlayer from "./story/StoryPlayer.jsx";
 import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
 import "./third.css";
 
-const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha };
+const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha, synth: ThirdSynth };
 const FLASH_IN_MS = 280;
 const FLASH_SETTLE_MS = 60;
 
@@ -37,6 +38,7 @@ function useNav(initial, exit) {
     setStack((s) => [...(replace ? s.slice(0, -1) : s), { screen, params }]);
   }
   function back() {
+    if (stack.length <= 1) { exit?.(); return; } // 直接ひらいた画面（メニューから来た）で戻るを押したら、メニューに戻る
     playUiTapSound();
     setNavKey((k) => k + 1);
     setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));

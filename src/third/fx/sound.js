@@ -243,3 +243,37 @@ export function playDefeatSound() {
   tone(c, { freq: 1040, type: "triangle", duration: 0.22, gain: 0.45, delay: 0.18 });
   noiseBurst(c, { duration: 0.3, gain: 0.3, filterFreq: 1200, filterType: "bandpass", delay: 0.18 });
 }
+
+// ---- ガチャ演出の効果音（2026-09-25）。合成音のみ。rarity: "N" | "R" | "SR" | "UR" ----
+/** 溜め：光が集まって高まっていく上昇音 */
+export function playGachaChargeSound(rarity = "N") {
+  const c = getCtx();
+  if (!c) return;
+  const long = rarity === "UR" ? 2.1 : rarity === "SR" ? 1.7 : 1.4;
+  tone(c, { freq: 180, endFreq: 1500, type: "sawtooth", duration: long, gain: 0.12 });
+  tone(c, { freq: 360, endFreq: 2400, type: "sine", duration: long, gain: 0.14 });
+  for (let i = 0; i < 8; i++) tone(c, { freq: 900 + i * 260, type: "triangle", duration: 0.09, gain: 0.07, delay: 0.25 + i * (long / 9) });
+  noiseBurst(c, { duration: long, gain: 0.05, filterFreq: 2600, filterType: "highpass" });
+}
+/** 爆発：レア度が高いほど豪華（和音・きらめき・低音の衝撃） */
+export function playGachaBurstSound(rarity = "N") {
+  const c = getCtx();
+  if (!c) return;
+  noiseBurst(c, { duration: 0.5, gain: 0.35, filterFreq: 1800, filterType: "bandpass" });
+  tone(c, { freq: 110, endFreq: 40, type: "sine", duration: 0.45, gain: 0.5 });
+  const chords = { N: [523, 659], R: [523, 659, 784], SR: [523, 659, 784, 1047], UR: [523, 659, 784, 1047, 1319] };
+  (chords[rarity] || chords.N).forEach((f, i) => tone(c, { freq: f, type: "triangle", duration: 0.5 + i * 0.05, gain: 0.32, delay: 0.02 + i * 0.05 }));
+  if (rarity === "SR" || rarity === "UR") {
+    const n = rarity === "UR" ? 14 : 8;
+    for (let i = 0; i < n; i++) tone(c, { freq: 1200 + (i % 7) * 240, type: "sine", duration: 0.12, gain: 0.16, delay: 0.25 + i * 0.07 });
+  }
+  if (rarity === "UR") { tone(c, { freq: 1046, type: "square", duration: 0.7, gain: 0.08, delay: 0.1 }); tone(c, { freq: 1568, type: "triangle", duration: 1.0, gain: 0.2, delay: 0.5 }); }
+}
+/** 10連の1枚ずつ：レア度に応じた「ぽんっ」 */
+export function playGachaCardSound(rarity = "N") {
+  const c = getCtx();
+  if (!c) return;
+  const f = { N: 660, R: 784, SR: 988, UR: 1319 }[rarity] || 660;
+  tone(c, { freq: f, endFreq: f * 1.5, type: "triangle", duration: 0.14, gain: rarity === "N" ? 0.22 : 0.4 });
+  if (rarity === "SR" || rarity === "UR") tone(c, { freq: f * 2, type: "sine", duration: 0.35, gain: 0.25, delay: 0.06 });
+}
