@@ -75,6 +75,16 @@ function BattleLockGate({ nav, children }) {
       );
     }
   }
+  if (nav.screen === "battle" && p.kind === "chapterBoss" && p.demo) { // 章ボスも、その章のバトルを全部クリアするまで入れない
+    return (
+      <div className="mw-fantasy-panel mw-center" style={{ minHeight: "40vh", marginTop: 40 }}>
+        <div style={{ fontSize: "2.4rem" }}>🔒</div>
+        <div className="mw-fantasy-title">まだ 章のボスは ひらいていないよ</div>
+        <div style={{ color: "#ffe9b3", margin: "8px 0" }}>この章の小単元のバトルをぜんぶクリアすると、ボスに挑戦できるよ。</div>
+        <button className="mw-btn primary" onClick={() => nav.exit()}>もどる</button>
+      </div>
+    );
+  }
   return children;
 }
 

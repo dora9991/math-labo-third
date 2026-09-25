@@ -159,6 +159,7 @@ export default function ThirdMenu(props) {
   // ---- 学習：小単元
   if ((view === "subunits" || !unit) && view !== "practicePick") {
     const bossAvail = !!getChapter(grade, chapter.id)?.chapterBoss;
+    const bossOpen = chapter.units.every((u) => unitMedals(medalState, u.id).battle); // 章のバトルを全部クリアすると開く
     return (
       <Shell player={player} back="単元" onBack={() => go({ view: "units" })} transitionKey={`${view}:${chapter.id}`} reverse>
         <Title sub="小単元をえらんでね">{chapter.emoji} {chapters.findIndex((c) => c.id === chapter.id) + 1}章　{chapter.name}</Title>
@@ -174,9 +175,9 @@ export default function ThirdMenu(props) {
               </GameButton>
             );
           })}
-          <GameButton tone="danger" icon="👑" disabled={!bossAvail} onClick={() => bossAvail && props.onChapterBoss?.(chapter)}>
-            <strong>章のボスと戦う</strong>
-            <small>{!bossAvail ? "準備中" : chapter.units.every((u) => unitMedals(medalState, u.id).battle) ? `${chapter.name} の総まとめ！ はじめて倒すと 💎+5` : `${chapter.name} の総まとめ（お試し）。小単元のバトルを全部クリアすると、💎がもらえる本番になるよ`}</small>
+          <GameButton tone="danger" icon="👑" disabled={!bossAvail || !bossOpen} onClick={() => bossAvail && bossOpen && props.onChapterBoss?.(chapter)}>
+            <strong>{bossAvail && !bossOpen ? "🔒 " : ""}章のボスと戦う</strong>
+            <small>{!bossAvail ? "準備中" : !bossOpen ? "この章の小単元のバトルを ぜんぶクリアすると開くよ" : `${chapter.name} の総まとめ！ はじめて倒すと 💎+5`}</small>
           </GameButton>
         </div>
       </Shell>

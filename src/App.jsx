@@ -14,6 +14,8 @@ import MedalToast from "./third/menu/MedalToast.jsx";
 import { unitMedals } from "./third/medals.js";
 import { thirdApi, THIRD_SERVER } from "./third/thirdApi.js";
 import { isGuest } from "./auth/session.js";
+// マルチプレイ（みんなで戦う）は一旦非公開。開発者の確認用に URL に ?multi=1 を付けた時だけ出す。公開するときは true にする
+const MULTIPLAY_OPEN = (() => { try { return new URLSearchParams(location.search).has("multi"); } catch { return false; } })();
 import { startSessionPing } from "./third/sessionPing.js";
 import { flushBattleLogs } from "./third/battleLog.js";
 import * as store from "./store/localStore.js"; // ★将来ここを supabase.js に差し替える
@@ -2335,7 +2337,7 @@ export default function App() {
       onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battle) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
-      onRoom={THIRD_SERVER && !isGuest() ? () => { setThirdStart({ screen: "room", params: {} }); setScreen("third"); } : undefined} // マルチプレイ（サーバーモードのみ・ゲストは不可）
+      onRoom={MULTIPLAY_OPEN && THIRD_SERVER && !isGuest() ? () => { setThirdStart({ screen: "room", params: {} }); setScreen("third"); } : undefined} // マルチプレイ（サーバーモードのみ・ゲストは不可）
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
       onFeedback={() => setScreen("feedback")}
     />
