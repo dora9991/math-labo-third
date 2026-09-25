@@ -28,7 +28,7 @@ import WhyBox from "../components/WhyBox.jsx";
 import ProofFigure from "../components/ProofFigure.jsx";
 import ProblemRateBadge from "../components/ProblemRateBadge.jsx";
 import { MEDAL_PRACTICE_TARGET } from "../third/medals.js";
-import { isCorrect, SLOW_TARGET, xpRepeatMultiplier, CYCLE_PRACTICE_TARGET, slowPointsForLevel } from "../engine/scoring.js";
+import { isCorrect, answerMatches, SLOW_TARGET, xpRepeatMultiplier, CYCLE_PRACTICE_TARGET, slowPointsForLevel } from "../engine/scoring.js";
 import { initDifficulty, nextDifficulty, PRACTICE_LEVELS } from "../engine/progress.js";
 
 const todayStr = () => new Date().toLocaleDateString("ja-JP");
@@ -47,7 +47,7 @@ const choicesFor = (q) => (q?.toketa && Array.isArray(q.distractors) ? shuffle(q
 const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
   ? (q.distractors.find((d) => String(d.val) === String(val))?.tag || null)
   : null;
-const ansEq = (val, q) => (hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : isCorrect(val, q.ans));
+const ansEq = (val, q) => (hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : answerMatches(val, q.ans));
 
 // 正負(u1〜u5)は toketa のヒント付き問題に差し替え。無ければ seed 付き生成（サーバー採点の下地）。
 // 【数学ラボ3】seed から完全に再現できる問題を作る（サーバーが同じ問題を作り直して採点し、メダルを付与する）。

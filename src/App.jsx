@@ -11,7 +11,7 @@ import { worldBattleFor } from "./third/link.js";
 import ThirdMenu from "./third/menu/ThirdMenu.jsx";
 import AlarmOverlay from "./third/menu/AlarmOverlay.jsx";
 import MedalToast from "./third/menu/MedalToast.jsx";
-import { unitMedals } from "./third/medals.js";
+import { chapterBattlesCleared } from "./third/core.js";
 import { thirdApi, THIRD_SERVER } from "./third/thirdApi.js";
 import { isGuest } from "./auth/session.js";
 import { setViewGrade } from "./third/gradeView.js";
@@ -539,8 +539,7 @@ export default function App() {
       const monster = MONSTERS.find((m) => m.kind === "unit" && m.unitId === unit.id);
       if (monster && !isUnitMonsterUnlocked(data.player, monster)) {
         markMonstersSeen([monster.id]);
-        // 正負(c1)は「出現！」ポップアップを出さない
-        if ((monster.grade ?? 1) !== 1) setTimeout(() => setNewMonster(monster), 900);
+        // 数学ラボ3では旧「新しい敵出現」の演出は出さない
       }
     }
   }
@@ -706,16 +705,11 @@ export default function App() {
       return out;
     });
     if (newlyCleared) {
-      sfx.levelUp();
       // スキル動線をオフにしたため、クリスタル入手演出は出さない（クリスタルは内部で貯まるだけ）。
-      if (newLevel != null) setTimeout(() => setLevelUpTo(newLevel), 1000);
+      // 数学ラボ3では旧「LEVEL UP!」演出は出さない
       // #4 有能感のピーク（サイクル初クリア）に「応用の扉」を出す。レベルアップ演出の後に表示。
       //  ※中1は祝いモーダルを出さず、サイクル内の「🧮 応用」ボタンで誘導する（ためすクリアで強調）。
-      const clearedChapter = findChapterByUnitId(unitId);
-      const clearedUnit = findUnitById(unitId);
-      if (clearedChapter && (clearedChapter.grade ?? 1) !== 1) {
-        pendingApplyGateRef.current = { chapterId: clearedChapter.id, chapterName: clearedChapter.name, unitName: clearedUnit?.name || "" };
-      }
+      // （旧「応用の扉」も出さない：ラボ3のメニューからは旧Challenge画面に行けないため）
     } else if (wasCleared) {
       // 既にクリア済みの単元を解き直した＝間隔反復の復習。1日後/1週間後の窓が開いていれば石を出す。
       maybeReviewBonus(unitId);
@@ -2329,7 +2323,7 @@ export default function App() {
       onHaichi={(unit) => openHaichiStudio(unit, "home")}
       onPractice={(chapter, unit, level) => { setSel({ chapter, unit, level: level || "standard", nav: false, fixed: true }); setScreen("anshin"); }} // 練習：えらんだ難度で出題（簡単/普通/難しい/鬼）
       onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
-      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battle) } }); setScreen("third"); }}
+      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !chapterBattlesCleared(thirdState, grade, chapter) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
       onRoom={MULTIPLAY_OPEN && THIRD_SERVER && !isGuest() ? () => { setThirdStart({ screen: "room", params: {} }); setScreen("third"); } : undefined} // マルチプレイ（サーバーモードのみ・ゲストは不可）

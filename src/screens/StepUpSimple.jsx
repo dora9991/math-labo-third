@@ -28,7 +28,7 @@ import HintMenu from "../components/HintMenu.jsx";
 import WhyBox from "../components/WhyBox.jsx";
 import ProofFigure from "../components/ProofFigure.jsx";
 import ProblemRateBadge from "../components/ProblemRateBadge.jsx";
-import { isCorrect } from "../engine/scoring.js";
+import { isCorrect, answerMatches } from "../engine/scoring.js";
 import ResultReview from "../components/ResultReview.jsx";
 
 const LEVELS = ["easy", "standard", "advanced"];
@@ -42,7 +42,7 @@ const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[
 const hasChoices = (q) => Array.isArray(q.choices) && q.choices.length > 0;
 const choicesFor = (q) => (q?.toketa && Array.isArray(q.distractors) ? shuffle(q.distractors.map((d) => String(d.val)))
   : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans));
-const ansEq = (val, q) => hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : isCorrect(val, q.ans);
+const ansEq = (val, q) => hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : answerMatches(val, q.ans);
 // 選んだ選択肢の値から、その誤答の診断タグを引く（toketa問題のみ。無ければnull＝正解 or 非toketa）
 const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
   ? (q.distractors.find((d) => String(d.val) === String(val))?.tag || null)

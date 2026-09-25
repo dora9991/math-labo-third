@@ -382,8 +382,10 @@ export default function Battle({ nav, params }) {
   }
 
   function startQuestion(diff) {
-    const p = generateBattleProblem({ subUnitId: params.subUnitId, grade, chapterId }, diff)
-      || generateBattleProblem({ subUnitId: params.subUnitId, grade, chapterId }, "standard");
+    // 問題が作れなかった時は、別のseedで数回引き直す（作れないまま画面が固まるのを防ぐ）
+    let p = null;
+    for (let i = 0; i < 8 && !p; i++) p = generateBattleProblem({ subUnitId: params.subUnitId, grade, chapterId }, i < 4 ? diff : "standard");
+    if (!p) return;
     shownAtRef.current = Date.now();
     setProblem(p);
     setPhase("question");
@@ -481,7 +483,7 @@ export default function Battle({ nav, params }) {
     return turnsLeft > 0 ? { ...buff, turnsLeft } : null;
   }
 
-  // 不正解：その小単元の満タン時間の半分だけ敵の行動ゲージが進む。0以下ならすぐ敵が行動する。
+  // 不正解：その波の満タン時間の半分だけ敵の行動ゲージが進む。0以下ならすぐ敵が行動する。
   // 戻り値: 敵の反撃(doEnemyCycle)が発生したか。呼び出し側(pickChoice)は、発生した場合
   // 次の問題を即座には出さず、doEnemyCycleの演出が終わった後に出す（でないと、敵の行動中
   // ロック(phase="enemyAttack")が同じ描画の中で"question"に上書きされてしまい、ロックが

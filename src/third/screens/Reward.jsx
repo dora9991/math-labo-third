@@ -15,6 +15,7 @@ const ERROR = {
   "too-soon": "すこし間をあけてね",
   "duplicate-claim": "もう受け取ったよ",
   "time-mismatch": "時間が合わなかったよ",
+  "medals-missing": "この章の小単元のバトルを ぜんぶクリアすると、章ボスのごほうびがもらえるよ",
   locked: "前のバトルをクリアすると、このバトルのごほうびがもらえるよ",
 };
 
@@ -50,11 +51,6 @@ export default function Reward({ nav, params }) {
         {r && (
           <>
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.2s" }}>経験値 +{r.exp}（仲間ひとりずつ +{r.perMember ?? 0}）</div>
-            {meters.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 440, margin: "4px auto" }}>
-                {meters.map((m, i) => <ExpMeter key={m.c.id} character={m.c} from={Math.max(0, m.to - per)} to={m.to} delay={500 + i * 120} />)}
-              </div>
-            )}
             {meters.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", maxWidth: 440, margin: "4px auto" }}>
                 {meters.map((m, i) => <ExpMeter key={m.c.id} character={m.c} from={Math.max(0, m.to - per)} to={m.to} delay={500 + i * 120} />)}

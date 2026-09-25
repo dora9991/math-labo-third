@@ -11,7 +11,7 @@ import GameButton from "../../components/GameButton.jsx";
 import { MathBackdrop } from "../../components/Decorations.jsx";
 import { chaptersForGrade } from "../../data/index.js";
 import { unitMedals, medalSummary, MEDAL_PRACTICE_TARGET } from "../medals.js";
-import { battleOpen, battleOrder } from "../core.js";
+import { battleOpen, battleOrder, chapterBattlesCleared } from "../core.js";
 import { findUnitById } from "../../data/index.js";
 import { getChapter } from "../data/storyMap.js";
 import { worldBattleFor } from "../link.js";
@@ -159,7 +159,7 @@ export default function ThirdMenu(props) {
   // ---- 学習：小単元
   if ((view === "subunits" || !unit) && view !== "practicePick") {
     const bossAvail = !!getChapter(grade, chapter.id)?.chapterBoss;
-    const bossOpen = chapter.units.every((u) => unitMedals(medalState, u.id).battle); // 章のバトルを全部クリアすると開く
+    const bossOpen = chapterBattlesCleared(medalState, grade, chapter); // 章のバトルを全部クリアすると開く
     return (
       <Shell player={player} back="単元" onBack={() => go({ view: "units" })} transitionKey={`${view}:${chapter.id}`} reverse>
         <Title sub="小単元をえらんでね">{chapter.emoji} {chapters.findIndex((c) => c.id === chapter.id) + 1}章　{chapter.name}</Title>

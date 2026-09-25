@@ -9,14 +9,11 @@
 import { chaptersForGrade, findUnitById } from "../data/index.js";
 import { genProblemSeeded, makeChoices } from "../engine/generator.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
-import { isCorrect } from "../engine/scoring.js";
+import { answerMatches } from "../engine/scoring.js";
 import { labUnitIdForBattle } from "./link.js";
 import { withSeed, newSeed } from "./seeded.js";
 
-export const DIFFICULTY_KEYS = ["easy", "standard", "advanced", "oni"];
-export const DIFFICULTY_LABEL = { easy: "簡単", standard: "普通", advanced: "難しい", oni: "鬼" };
-// math-world(kazu指定)のダメージ倍率。3の新バトル(30秒ゲージ)では gaugeBattle.js の倍率・上限に置き換える予定。
-export const DIFFICULTY_DAMAGE_MULTIPLIER = { easy: 0.8, standard: 1.0, advanced: 1.2, oni: 1.5 };
+import { DIFFICULTY_KEYS } from "./balance.js"; // 難度の名前・ダメージ倍率は balance.js に一元化
 
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 const pickFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -52,7 +49,7 @@ export function generateThirdProblem(unitId, difficulty = "standard", seed = new
       const correctIndex = choices.findIndex((c) =>
         Array.isArray(q.choices) && q.choices.length
           ? c.replace(/\s/g, "") === ansStr.replace(/\s/g, "")
-          : isCorrect(c, q.ans)
+          : answerMatches(c, q.ans)
       );
       if (correctIndex < 0) continue;
       return {
@@ -106,5 +103,5 @@ export function generatePracticeAvoiding(unitOrId, level, recentIds = []) {
 /** 選んだ答え val が、問題 q の正解か（画面の ansEq と同じ判定）。 */
 export function practiceCorrect(q, val) {
   if (Array.isArray(q.choices) && q.choices.length) return String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "");
-  return isCorrect(val, q.ans);
+  return answerMatches(val, q.ans); // 式の答え(y＝5x・−n/4・π など)も文字列でそろえて判定する
 }

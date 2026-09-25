@@ -266,7 +266,8 @@ export function verifyClaim(claim, state, now) {
   } else { // 章ボス：その章の小単元のバトルメダルがすべてそろっている（＝全部のバトルをクリアした）時だけ。出題はその章のどの単元でもよい
     allowed = labUnitIdsOfChapter(claim.grade, claim.chapterId);
     if (!allowed.length) return fail("unknown-unit");
-    if (!allowed.every((id) => unitMedalsOf(state, id).battle)) return fail("medals-missing");
+    const chObj = chaptersForGrade(Number(claim.grade)).find((x) => x.id === claim.chapterId);
+    if (!chapterBattlesCleared(state, claim.grade, chObj)) return fail("medals-missing");
     unitId = claim.chapterId;
   }
   const at = Array.isArray(claim.attempts) ? claim.attempts : null;
@@ -395,7 +396,17 @@ function spend(s, ms) {
 // ---------------- バトルの順番（ストーリーどおりに進む） ----------------
 /** その学年の小単元を、章の順→小単元の順に並べたID配列（＝バトルを進める順番）。 */
 export function battleOrder(grade) {
-  return chaptersForGrade(Number(grade)).flatMap((c) => (c.units || []).map((u) => u.id));
+  return chaptersForGrade(Number(grade)).flatMap((c) => battleUnitIdsOfChapter(grade, c));
+}
+/** その章の小単元のうち、バトルがあるもの（バトルが準備中の小単元は順番・章ボスの条件から外す）。 */
+export function battleUnitIdsOfChapter(grade, chapter) {
+  const n = getChapter(Number(grade), chapter?.id)?.subUnits?.length || 0;
+  return (chapter?.units || []).slice(0, n).map((u) => u.id);
+}
+/** その章のバトルがすべてクリア済みか（章ボスの本番が開く条件）。 */
+export function chapterBattlesCleared(state, grade, chapter) {
+  const ids = battleUnitIdsOfChapter(grade, chapter);
+  return ids.length > 0 && ids.every((id) => !!state?.medals?.battle?.[id]);
 }
 /**
  * その小単元のバトルに挑戦できるか。ストーリーどおり、**前のバトルをクリアすると次が開く**（章をまたいでも同じ）。

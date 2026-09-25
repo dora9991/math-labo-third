@@ -472,5 +472,23 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t("拒否された合成では何も減らない", !!before.state.owned[e] && before.state.spares[b] === 1);
 }
 
+// ---- 回帰：バトルが無い小単元があっても、順番が止まらない／式の答えも正解と判定される
+{
+  for (const g of [1, 2, 3]) {
+    const st = T.initialThirdState();
+    for (const c of T.chaptersForGrade(g)) for (const u of c.units) {
+      if (T.worldBattleFor(g, c, u) && T.battleOpen(st, g, u.id)) st.medals.battle[u.id] = 1;
+    }
+    const all = T.chaptersForGrade(g).every((c) => T.chapterBattlesCleared(st, g, c));
+    t(`中${g}：戦えるバトルを順に全部クリアすれば、全章の章ボスまで開く`, all);
+  }
+  let bad = 0, n = 0;
+  for (const u of ["h1", "h2", "v1", "v3", "z3"]) for (let k = 1; k <= 60; k++) {
+    const q = T.generatePractice(u, "standard", k * 104729); if (!q) continue; n++;
+    if (!T.practiceCorrect(q, q.ans)) bad++;
+  }
+  t(`式の答え(y＝5x・−n/4・π など)を選ぶと正解になる（${n}問）`, n > 0 && bad === 0, `${bad}問が不正解扱い`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

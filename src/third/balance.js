@@ -1,7 +1,7 @@
 // ============================================================
 // balance.js — 数学ラボ3のバトル数値（30秒ゲージ方式・2026-09-21）。純関数/定数のみ。
 //
-//  ・敵の行動ゲージ(GAUGE_SECONDS)が常に進み、0で敵が行動。不正解でゲージがWRONG_PENALTY_SECONDS秒進む。
+//  ・敵の行動ゲージ(GAUGE_SECONDS)が常に進み、0で敵が行動。不正解でその波のゲージの半分が進む。
 //  ・問題の難度(易/普/難/鬼)は30秒の間いつでも切替可（次の問題から適用）。難度が高いほど倍率が大きい。
 //  ・インフレ対策：1回の正解で1体の敵から削れる量に上限(capFrac＝敵最大HPの割合)。
 //    どれだけ強い編成でも最低 ceil(1/capFrac) 問の正解が要る（学習量のフロア）。
@@ -15,7 +15,6 @@ import { getSubUnitCurriculumPosition, getChapter, SUBUNIT_SEQUENCE } from "./da
 // 敵の行動ゲージの長さ(秒)。雑魚とボスで変えられる（ボスの方が短い＝スリル）。
 export const GAUGE = { mob: 22, boss: 18, early: 7 }; // early＝序盤(tier=0)だけ足す秒数（earlyUntilまでに0へ）
 export const GAUGE_SECONDS = GAUGE.mob; // 互換（既定値）
-export const WRONG_PENALTY_SECONDS = 10;
 // tier(0〜1)＝カリキュラム上の位置。序盤は少し長く（最初の戦闘を遊びやすく）、進むほど本来の秒数になる。
 export const gaugeBaseSeconds = (isBoss, tier = 1) =>
   Math.round((isBoss ? GAUGE.boss : GAUGE.mob) + GAUGE.early * (1 - Math.min(1, Math.max(0, tier) / ENEMY.earlyUntil)));
