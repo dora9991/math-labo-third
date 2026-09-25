@@ -9,7 +9,7 @@
 // ============================================================
 
 import { getLevelCap } from "./growthCurve.js";
-import { getSubUnitCurriculumPosition } from "./data/storyMap.js";
+import { getSubUnitCurriculumPosition, SUBUNIT_SEQUENCE } from "./data/storyMap.js";
 
 export function expToNext(level) {
   if (level <= 9) return 30 * (level + 1);
@@ -71,13 +71,32 @@ function subUnitRewardTable(total) {
   return rewardCache;
 }
 
-/** その小単元を丸ごとクリアしたときの総獲得経験値（カリキュラム上の位置で決まる）。 */
+/**
+ * その小単元を丸ごとクリアしたときの総獲得経験値。
+ * 経験値は学年ごと（キャラは共通・強さ＝経験値は学年ごとにリセット。2026-09-25）。
+ *  中1：全学年通しの位置カーブのまま（従来どおり）。
+ *  中2・中3：中1の経験値の並びを、その学年の小単元数に伸縮して当てる（学年の合計が中1と同じ＝どの学年から始めても同じ成長）。
+ */
 export function getSubUnitClearExpReward(grade, chapterId, subUnitId) {
   const { index, total } = getSubUnitCurriculumPosition(grade, chapterId, subUnitId);
   const table = subUnitRewardTable(Math.max(total, 1));
   if (index < 0 || total <= 1) return table[0];
-  return table[index];
+  if (Number(grade) === 1) return table[index];
+  const g1 = SUBUNIT_SEQUENCE.filter((s) => s.grade === 1).length;
+  const first = SUBUNIT_SEQUENCE.findIndex((s) => s.grade === Number(grade));
+  const n = SUBUNIT_SEQUENCE.filter((s) => s.grade === Number(grade)).length;
+  if (first < 0 || n <= 1 || g1 <= 1) return table[index];
+  const src = Math.round(((index - first) * (g1 - 1)) / (n - 1)); // 中1の何番目に当たるか
+  return Math.round((table[src] * g1) / n);
 }
+
+// ---- 学年ごとの経験値（キャラの持ち物 o = { exp(中1), exp2(中2), exp3(中3), ... }）----
+const EXP_KEY = { 1: "exp", 2: "exp2", 3: "exp3" };
+export const expKey = (grade) => EXP_KEY[Number(grade)] || "exp";
+/** そのキャラの、その学年での経験値 */
+export const expOf = (o, grade) => Math.max(0, Number(o?.[expKey(grade)]) || 0);
+/** そのキャラの、その学年の経験値を増やす（o を書き換える） */
+export function addExp(o, grade, n) { const k = expKey(grade); o[k] = expOf(o, grade) + n; return o[k]; }
 
 export function expProgress(totalExp, rarity) {
   const level = levelFromExp(totalExp, rarity);

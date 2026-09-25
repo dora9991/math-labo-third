@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -429,6 +429,27 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t("バトルの順番(サーバー): 2つ目をクリアすると", r.status === 200);
   r = await call(s, "claim", { claim: claimFor(2, 40004000, now) }, "lk1", now);
   t("バトルの順番(サーバー): 3つ目が開いて通る", r.status === 200 && r.body.state.medals.battle[u1[2]] > 0, JSON.stringify(r.body.error));
+}
+
+// ---------------- 学年ごとの強さ（敵の強さ・経験値・キャラの経験値） ----------------
+{
+  const gsum = (g) => T.SUBUNIT_SEQUENCE.filter((x) => x.grade === g).map((x) => T.getSubUnitClearExpReward(g, x.chapterId, x.subUnitId));
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const s1 = sum(gsum(1)), s2 = sum(gsum(2)), s3 = sum(gsum(3));
+  t("学年ごとの経験値: 中2・中3の合計が中1と(誤差3%以内で)同じ", Math.abs(s2 - s1) / s1 < 0.03 && Math.abs(s3 - s1) / s1 < 0.03, `${s1} ${s2} ${s3}`);
+  const seqOf = (g) => T.SUBUNIT_SEQUENCE.filter((x) => x.grade === g);
+  const last = (g) => { const x = seqOf(g).at(-1); return T.tierOf(g, x.chapterId, x.subUnitId); };
+  const first = (g) => { const x = seqOf(g)[0]; return T.tierOf(g, x.chapterId, x.subUnitId); };
+  t("学年ごとの敵の強さ: どの学年も最初は0、最後は中1の最後と同じ", [1, 2, 3].every((g) => first(g) === 0) && Math.abs(last(2) - last(1)) < 1e-9 && Math.abs(last(3) - last(1)) < 1e-9);
+  const o = { exp: 100, exp2: 0, exp3: 0 };
+  t("学年ごとの経験値: 学年別に読み出せる", T.expOf(o, 1) === 100 && T.expOf(o, 2) === 0 && T.expOf(o, 3) === 0);
+  const st = T.initialThirdState(); const id = T.STARTER_PARTY[0];
+  t("学年ごとの経験値: 初期状態は全学年0", [1, 2, 3].every((g) => T.expOf(st.owned[id], g) === 0));
+  const s = makeStore(); await call(s, "get_state", {}, "gx1", T0);
+  const g = await s.load("gx1"); g.state.spares = { [T.STARTER_PARTY[1]]: 2 }; await s.save("gx1", g.state, g.version);
+  const m = await call(s, "synthesize", { materialId: T.STARTER_PARTY[1], targetId: id, source: "spare", count: 2, grade: 3 }, "gx1", T0);
+  const o2 = m.body.state.owned[id];
+  t("学年ごとの経験値: 合成は指定した学年の経験値だけ増える（中3を指定→中1・中2は増えない）", m.status === 200 && o2.exp3 === 400 && o2.exp === 0 && o2.exp2 === 0, JSON.stringify(o2));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -6,7 +6,8 @@
 // ============================================================
 import { useMemo, useState } from "react";
 import { useGame } from "../ThirdContext.jsx";
-import { levelFromExp } from "../expCurve.js";
+import { levelFromExp, expOf } from "../expCurve.js";
+import { getViewGrade } from "../gradeView.js";
 import { getLevelCap } from "../growthCurve.js";
 import { GACHA, SYNTH } from "../gachaConfig.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
@@ -21,6 +22,7 @@ export default function ThirdSynth({ nav }) {
   const [material, setMaterial] = useState(null); // 素材のキャラID
   const [target, setTarget] = useState(null); // 強くする子
   const [count, setCount] = useState(1);
+  const grade = getViewGrade(); // 合成は「いま見ている学年」の強さ（経験値）で行う
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -35,9 +37,9 @@ export default function ThirdSynth({ nav }) {
   const source = tab === "spare" ? "spare" : "owned";
   const have = source === "spare" ? save.spares?.[material] || 0 : 1;
   const useCount = source === "spare" ? Math.min(Math.max(1, count), have || 1) : 1;
-  const gain = !material ? 0 : source === "spare" ? useCount * SYNTH.baseExp : SYNTH.baseExp + Math.floor((save.owned[material]?.exp || 0) * SYNTH.expRate);
+  const gain = !material ? 0 : source === "spare" ? useCount * SYNTH.baseExp : SYNTH.baseExp + Math.floor(expOf(save.owned[material], grade) * SYNTH.expRate);
   const tChar = target ? charactersById[target] : null;
-  const tExp = target ? save.owned[target]?.exp || 0 : 0;
+  const tExp = target ? expOf(save.owned[target], grade) : 0;
   const lvNow = tChar ? levelFromExp(tExp, tChar.rarity) : 0;
   const lvAfter = tChar ? levelFromExp(tExp + gain, tChar.rarity) : 0;
   const atCap = tChar && lvNow >= getLevelCap(tChar.rarity);
@@ -49,7 +51,7 @@ export default function ThirdSynth({ nav }) {
   async function synth() {
     if (!canSynth) return;
     setBusy(true); setMsg(null);
-    const r = await actions.synthesize({ materialId: material, targetId: target, source, count: useCount });
+    const r = await actions.synthesize({ materialId: material, targetId: target, source, count: useCount, grade });
     setBusy(false);
     if (r.ok) { setMsg({ ok: true, text: `✨ ${tChar?.name} に 経験値 +${r.gain}！` }); setMaterial(null); setCount(1); }
     else setMsg({ ok: false, text: ERR[r.error] || "うまくいかなかったよ" });
@@ -93,7 +95,7 @@ export default function ThirdSynth({ nav }) {
           <div style={{ color: "#c9b98f", fontSize: 12.5, lineHeight: 1.7, textAlign: "center", padding: "10px 0" }}>
             {tab === "spare" ? "ダブりの子は まだいないよ。ガチャで同じ子が出ると、ここに「予備」として残るよ。" : "パーティに入っていない子が いないよ。"}
           </div>
-        ) : <Grid chars={list} selectedId={material} onPick={(id) => { setMaterial(id); setCount(1); setMsg(null); }} badge={tab === "spare" ? spareBadge : (c) => <span className="mw-spare-badge">Exp {save.owned[c.id]?.exp || 0}</span>} />}
+        ) : <Grid chars={list} selectedId={material} onPick={(id) => { setMaterial(id); setCount(1); setMsg(null); }} badge={tab === "spare" ? spareBadge : (c) => <span className="mw-spare-badge">Exp {expOf(save.owned[c.id], grade)}</span>} />}
         {material && source === "spare" && have > 1 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 10 }}>
             <button className="menu-step-btn" onClick={() => setCount((n) => Math.max(1, n - 1))} aria-label="へらす">−</button>
@@ -106,7 +108,7 @@ export default function ThirdSynth({ nav }) {
 
       <div className="mw-fantasy-panel">
         <div className="mw-bench-title">② 強くする子をえらぶ</div>
-        <Grid chars={allChars} selectedId={target} onPick={(id) => { setTarget(id); setMsg(null); }} badge={(c) => <span className="mw-spare-badge">Lv{levelFromExp(save.owned[c.id]?.exp || 0, c.rarity)}</span>} />
+        <Grid chars={allChars} selectedId={target} onPick={(id) => { setTarget(id); setMsg(null); }} badge={(c) => <span className="mw-spare-badge">Lv{levelFromExp(expOf(save.owned[c.id], grade), c.rarity)}</span>} />
       </div>
 
       <div className="mw-fantasy-panel mw-center" style={{ lineHeight: 1.8, minHeight: 0 }}>

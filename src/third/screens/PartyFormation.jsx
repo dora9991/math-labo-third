@@ -12,7 +12,8 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useGame, PARTY_SIZE } from "../ThirdContext.jsx";
-import { levelFromExp } from "../expCurve.js";
+import { levelFromExp, expOf } from "../expCurve.js";
+import { getViewGrade } from "../gradeView.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
 import CharacterPopup from "../components/CharacterPopup.jsx";
 
@@ -63,7 +64,7 @@ export default function PartyFormation({ nav }) {
         return [...ownedByAcquireOrder].reverse();
       case "levelDesc":
         return [...ownedByAcquireOrder].sort(
-          (a, b) => levelFromExp(save.owned[b.id]?.exp || 0, b.rarity) - levelFromExp(save.owned[a.id]?.exp || 0, a.rarity)
+          (a, b) => levelFromExp(expOf(save.owned[b.id], getViewGrade()), b.rarity) - levelFromExp(expOf(save.owned[a.id], getViewGrade()), a.rarity)
         );
       case "rarityDesc":
         return [...ownedByAcquireOrder].sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]);

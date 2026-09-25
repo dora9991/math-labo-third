@@ -76,7 +76,7 @@ export function startRoom(room, { userId, states, now }) {
     for (const id of st.party || []) if (id && st.owned[id] && picked.length < need && !picked.includes(id)) picked.push(id);
     for (const id of Object.keys(st.owned)) if (picked.length < need && !picked.includes(id)) picked.push(id); // パーティが足りなければ所持キャラから補う
     if (picked.length < need) return { ok: false, error: "not-enough-companions", userId: m.id };
-    for (const id of picked) party.push({ id, ownerId: m.id, exp: st.owned[id].exp || 0, breaks: st.owned[id].breaks || 0 });
+    for (const id of picked) party.push({ id, ownerId: m.id, exp: Math.max(st.owned[id].exp || 0, st.owned[id].exp2 || 0, st.owned[id].exp3 || 0), breaks: st.owned[id].breaks || 0 });
   }
   return { ok: true, room: touch({ ...room, status: "started", party }, now) };
 }

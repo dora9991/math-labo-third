@@ -14,7 +14,7 @@ import { chaptersForGrade } from "../data/index.js";
 import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfChapter } from "./problemSource.js";
 import { getChapter, getGrade } from "./data/storyMap.js";
 import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js";
-import { getSubUnitClearExpReward } from "./expCurve.js";
+import { getSubUnitClearExpReward, expOf, addExp } from "./expCurve.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
 import { RAID, RAID_LADDER, raidBoss } from "./raid.js";
 
@@ -35,7 +35,7 @@ export function initialThirdState() {
     v: 2,
     crystals: 0, // ガチャの通貨（旧ガチャチケット）。5個で1回
     coins: 0,
-    owned: Object.fromEntries(STARTER_PARTY.map((id, i) => [id, { exp: 0, breaks: 0, n: i + 1 }])), // n＝入手した順
+    owned: Object.fromEntries(STARTER_PARTY.map((id, i) => [id, { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: i + 1 }])), // n＝入手した順
     acqSeq: STARTER_PARTY.length,
     spares: {}, // ガチャで被った子の予備の数 { id: 個数 }。合成（経験値にする）か限界突破に使う
     dex: Object.fromEntries(STARTER_PARTY.map((id) => [id, 1])), // 図鑑：一度でも仲間にした子（合成でいなくなっても残る）
@@ -62,9 +62,9 @@ export function normalizeThirdState(s) {
   const out = { ...base, ...s };
   out.owned = {};
   for (const [id, v] of Object.entries(s.owned || {})) {
-    if (ROSTER_BY_ID[id]) out.owned[id] = { exp: Math.max(0, Number(v?.exp) || 0), breaks: Math.min(GACHA.maxBreaks, Math.max(0, Number(v?.breaks) || 0)), n: Number(v?.n) || 0 };
+    if (ROSTER_BY_ID[id]) out.owned[id] = { exp: Math.max(0, Number(v?.exp) || 0), exp2: Math.max(0, Number(v?.exp2) || 0), exp3: Math.max(0, Number(v?.exp3) || 0), breaks: Math.min(GACHA.maxBreaks, Math.max(0, Number(v?.breaks) || 0)), n: Number(v?.n) || 0 };
   }
-  for (const id of STARTER_PARTY) if (!out.owned[id]) out.owned[id] = { exp: 0, breaks: 0, n: 0 };
+  for (const id of STARTER_PARTY) if (!out.owned[id]) out.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: 0 };
   let seq = Math.max(Number(s.acqSeq) || 0, ...Object.values(out.owned).map((o) => o.n));
   for (const o of Object.values(out.owned)) if (!o.n) o.n = ++seq;
   out.acqSeq = seq;
@@ -139,7 +139,7 @@ export function pullGacha(state, count, rand = Math.random) {
     const id = ids[Math.min(ids.length - 1, Math.floor(rand() * ids.length))];
     const cur = s.owned[id];
     let isNew = false, spare = false, refund = 0;
-    if (!cur) { s.owned[id] = { exp: 0, breaks: 0, n: ++s.acqSeq }; s.dex[id] = 1; isNew = true; }
+    if (!cur) { s.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: ++s.acqSeq }; s.dex[id] = 1; isNew = true; }
     else { s.spares[id] = (s.spares[id] || 0) + 1; spare = true; refund = CRYSTAL.dupRefund; } // 被った子は「予備」として残る（合成か限界突破に使える）
     s.crystals += refund; // 被りの還元：外れた感じをやわらげる
     results.push({ id, rarity, isNew, breaks: s.owned[id].breaks, converted: false, spare, spares: s.spares[id] || 0, refund });
@@ -183,6 +183,7 @@ export function applyRaidWin(state, index, now) {
  */
 export function synthesize(state, req) {
   const targetId = req?.targetId, materialId = req?.materialId, source = req?.source;
+  const grade = [1, 2, 3].includes(Number(req?.grade)) ? Number(req.grade) : 1; // 合成は「その学年の経験値」どうしで行う
   if (typeof targetId !== "string" || !state.owned[targetId]) return { ok: false, error: "bad-target" };
   const s = structuredClone(state);
   let gain = 0, used = 0;
@@ -199,10 +200,10 @@ export function synthesize(state, req) {
     if (materialId === targetId) return { ok: false, error: "same-character" };
     if (s.party.includes(materialId)) return { ok: false, error: "in-party" };
     if ((s.spares[materialId] || 0) > 0) return { ok: false, error: "use-spare-first" };
-    gain = SYNTH.baseExp + Math.floor((m.exp || 0) * SYNTH.expRate);
+    gain = SYNTH.baseExp + Math.floor(expOf(m, grade) * SYNTH.expRate);
     delete s.owned[materialId]; used = 1;
   } else return { ok: false, error: "bad-source" };
-  s.owned[targetId].exp += gain;
+  addExp(s.owned[targetId], grade, gain);
   return { ok: true, state: s, gain, used };
 }
 
@@ -358,7 +359,7 @@ function applyClaimCore(state, claim, now) {
   const gradeBonus = chapterBonus > 0 ? awardGradeClear(s, claim.grade, now) : 0;
   const members = s.party.filter(Boolean);
   const perMember = members.length ? Math.floor(exp / members.length) : 0;
-  for (const id of members) s.owned[id].exp += perMember;
+  for (const id of members) addExp(s.owned[id], claim.grade, perMember);
   return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, coins, exp, perMember, isFirstClear: first, newMedals }, verified, rows: v.rows };
 }
 

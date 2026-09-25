@@ -1,5 +1,6 @@
 import { getStatsAtLevel } from "../growthCurve.js";
-import { levelFromExp } from "../expCurve.js";
+import { levelFromExp, expOf } from "../expCurve.js";
+import { getViewGrade } from "../gradeView.js";
 import MonsterPortrait from "./MonsterPortrait.jsx";
 import SubjectPentagon from "./SubjectPentagon.jsx";
 
@@ -16,7 +17,7 @@ const STATUS_LABEL = {
 // 2026-09-17追加：レベル・HP・5角形(5パラメータ)・スキル・能力(耐性)をまとめて見せる。
 export default function CharacterPopup({ character, save, onClose }) {
   if (!character) return null;
-  const level = levelFromExp(save.owned[character.id]?.exp || 0, character.rarity);
+  const level = levelFromExp(expOf(save.owned[character.id], getViewGrade()), character.rarity);
   const stats = getStatsAtLevel(character, level);
 
   return (

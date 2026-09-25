@@ -10,7 +10,7 @@
 //  ・敵の強さは、カリキュラム上の位置(tier 0〜1)でなだらかに上がる（どの単元からも始められる）。
 //  数値は sim-gauge-battle.mjs のシミュレーションで調整（#todo 実プレイで再調整）。
 // ============================================================
-import { getSubUnitCurriculumPosition, getChapter } from "./data/storyMap.js";
+import { getSubUnitCurriculumPosition, getChapter, SUBUNIT_SEQUENCE } from "./data/storyMap.js";
 
 // 敵の行動ゲージの長さ(秒)。雑魚とボスで変えられる（ボスの方が短い＝スリル）。
 export const GAUGE = { mob: 22, boss: 18, early: 7 }; // early＝序盤(tier=0)だけ足す秒数（earlyUntilまでに0へ）
@@ -49,13 +49,23 @@ export const ENEMY = {
   bossKindMult: { unitSmallBoss: 1, chapterBoss: 1.5, unitBoss: 1.3, finalBoss: 2 },
 };
 
-/** カリキュラム上の位置(0〜1)。全学年通しの87小単元で、先頭=0・末尾=1。 */
+/**
+ * 敵の強さの「位置」(0〜1)。中1は全学年通し87小単元での位置そのまま（＝従来どおり）。
+ * 中2・中3は、各学年の先頭を中1の先頭と同じ強さにリセットし、学年の末尾が中1の末尾と同じになるよう伸縮する
+ * （中3から始めても、中1と同じバランスで遊べる。2026-09-25）。
+ */
 export function tierOf(grade, chapterId, subUnitId) {
   const ch = getChapter(grade, chapterId);
   const sub = subUnitId ? subUnitId : ch?.subUnits?.[ch.subUnits.length - 1]?.id;
   const { index, total } = getSubUnitCurriculumPosition(grade, chapterId, sub);
   if (index < 0 || total <= 1) return 0;
-  return index / (total - 1);
+  const g1 = SUBUNIT_SEQUENCE.filter((s) => s.grade === 1).length;
+  if (Number(grade) === 1 || g1 <= 1) return index / (total - 1);
+  const first = SUBUNIT_SEQUENCE.findIndex((s) => s.grade === Number(grade));
+  const n = SUBUNIT_SEQUENCE.filter((s) => s.grade === Number(grade)).length;
+  if (first < 0 || n <= 1) return 0;
+  const g1End = (g1 - 1) / (total - 1); // 中1の末尾の位置
+  return ((index - first) / (n - 1)) * g1End;
 }
 
 const hpScale = (t) => 1 + ENEMY.hpPerTier * t;

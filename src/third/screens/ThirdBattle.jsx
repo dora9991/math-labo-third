@@ -30,7 +30,8 @@ import {
   capDamageFor,
   tierOf,
 } from "../balance.js";
-import { levelFromExp, getSubUnitClearExpReward } from "../expCurve.js";
+import { levelFromExp, getSubUnitClearExpReward, expOf } from "../expCurve.js";
+import { setViewGrade } from "../gradeView.js";
 import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
 import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound } from "../fx/sound.js";
 import UltimateCutIn from "../../components/UltimateCutIn.jsx";
@@ -199,7 +200,7 @@ export default function Battle({ nav, params }) {
   // 編成は戦闘中に変わらないので、レベルもsave.ownedのexpから毎回同じ値になる
   // ＝partyHpの初期値としてそのまま使ってよい。
   const partyMembers = save.party.filter(Boolean).map((id) => charactersById[id]);
-  const partyMaxHp = computePartyMaxHp(partyMembers, (c) => levelFromExp(save.owned[c.id]?.exp || 0, c.rarity));
+  const partyMaxHp = computePartyMaxHp(partyMembers, (c) => levelFromExp(expOf(save.owned[c.id], grade), c.rarity));
   const [partyHp, setPartyHp] = useState(partyMaxHp);
   const [quitAsk, setQuitAsk] = useState(false);
   const [paused, setPaused] = useState(false); // 一時停止（ゲージも止まり、問題は隠れる）
@@ -615,7 +616,7 @@ export default function Battle({ nav, params }) {
   }
 
   function resolveSkillAfterCutIn({ character: c, skill }) {
-    const level = levelFromExp(save.owned[c.id]?.exp || 0, c.rarity);
+    const level = levelFromExp(expOf(save.owned[c.id], grade), c.rarity);
     const charSubject = subjectFor(c);
     const atkBuffMultiplier = partyBuffsRef.current.atk?.multiplier ?? 1;
     const stageEl = stageRef.current;
@@ -765,7 +766,7 @@ export default function Battle({ nav, params }) {
       if (!canActThisRound(effects)) return; // 麻痺・石化・スロー(今ターン不可)
       actedCharacterIds.push(c.id);
 
-      const level = levelFromExp(save.owned[c.id]?.exp || 0, c.rarity);
+      const level = levelFromExp(expOf(save.owned[c.id], grade), c.rarity);
       const charSubject = subjectFor(c);
       const from = pointOf(portraitRefs.current[c.id], stageEl);
 

@@ -14,6 +14,7 @@ import MedalToast from "./third/menu/MedalToast.jsx";
 import { unitMedals } from "./third/medals.js";
 import { thirdApi, THIRD_SERVER } from "./third/thirdApi.js";
 import { isGuest } from "./auth/session.js";
+import { setViewGrade } from "./third/gradeView.js";
 // マルチプレイ（みんなで戦う）は一旦非公開。開発者の確認用に URL に ?multi=1 を付けた時だけ出す。公開するときは true にする
 const MULTIPLAY_OPEN = (() => { try { return new URLSearchParams(location.search).has("multi"); } catch { return false; } })();
 import { startSessionPing } from "./third/sessionPing.js";
@@ -1722,7 +1723,7 @@ export default function App() {
   if (screen === "third") {
     return (
       <Suspense fallback={<div className="app"><div className="content"><div className="glass" style={{ padding: 20, textAlign: "center" }}>読み込み中…</div></div></div>}>
-        <ThirdApp player={data.player} start={thirdStart} onExit={() => setScreen("home")} />
+        <ThirdApp player={(setViewGrade(grade), data.player)} start={thirdStart} onExit={() => setScreen("home")} />
       </Suspense>
     );
   }

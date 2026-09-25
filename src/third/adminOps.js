@@ -45,13 +45,13 @@ export function applyAdminOp(state, op, args = {}) {
       else if (args.mode === "rarity") ids = SPECIALIST_ROSTER.filter((c) => c.rarity === args.rarity).map((c) => c.id);
       else if (Array.isArray(args.ids)) ids = args.ids.filter((id) => ROSTER_IDS.has(id));
       let added = 0;
-      for (const id of ids) if (!s.owned[id]) { s.owned[id] = { exp: 0, breaks: 0, n: ++s.acqSeq }; added++; }
+      for (const id of ids) if (!s.owned[id]) { s.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: ++s.acqSeq }; added++; }
       return { ok: true, state: s, message: `仲間を ${added} 体追加しました（いま ${Object.keys(s.owned).length} 体）` };
     }
     case "setCompanionGrowth": { // 所持している仲間全員の経験値・限界突破数をそろえる（強さの確認用）
       const exp = args.exp == null ? null : clampInt(args.exp, 0, 99999999);
       const breaks = args.breaks == null ? null : clampInt(args.breaks, 0, GACHA.maxBreaks);
-      for (const o of Object.values(s.owned)) { if (exp != null) o.exp = exp; if (breaks != null) o.breaks = breaks; }
+      for (const o of Object.values(s.owned)) { if (exp != null) { o.exp = exp; o.exp2 = exp; o.exp3 = exp; } if (breaks != null) o.breaks = breaks; }
       return { ok: true, state: s, message: `仲間全員の${exp != null ? ` 経験値=${exp}` : ""}${breaks != null ? ` 限界突破=${breaks}` : ""} に設定しました` };
     }
     case "resetCompanions": {
