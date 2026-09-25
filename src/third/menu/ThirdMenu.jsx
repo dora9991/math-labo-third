@@ -60,7 +60,7 @@ export function MedalPair({ m, size = 26 }) {
       border: on ? "2px solid #fde68a" : "2px dashed rgba(255,255,255,.25)", filter: on ? "none" : "grayscale(1) opacity(.5)",
     }}>{icon}</span>
   );
-  return <span style={{ display: "inline-flex", gap: 6 }}>{dot(m.haichi, "📺")}{dot(m.practice, "✏️")}</span>;
+  return <span style={{ display: "inline-flex", gap: 6 }}>{dot(m.haichi, "📺")}{dot(m.practice, "✏️")}{dot(m.battle, "⚔️")}</span>;
 }
 
 export default function ThirdMenu(props) {
@@ -144,7 +144,7 @@ export default function ThirdMenu(props) {
             const sum = medalSummary(medalState, c.units || []);
             return (
               <GameButton key={c.id} tone="blue" icon={c.emoji || "📘"} onClick={() => go({ view: "subunits", chapterId: c.id })}>
-                <strong>{i + 1}章　{c.name}</strong><small>メダル {sum.count} / {sum.total}　・　バトル解放 {sum.battlesOpen} / {sum.units}</small>
+                <strong>{i + 1}章　{c.name}</strong><small>メダル {sum.count} / {sum.total}　・　バトルクリア {sum.battlesCleared} / {sum.units}</small>
               </GameButton>
             );
           })}
@@ -163,7 +163,7 @@ export default function ThirdMenu(props) {
           {chapter.units.map((u) => {
             const m = unitMedals(medalState, u.id);
             return (
-              <GameButton key={u.id} tone={m.battleOpen ? "gold" : "violet"} onClick={() => go({ view: "actions", chapterId: chapter.id, unitId: u.id })}>
+              <GameButton key={u.id} tone={m.count >= 3 ? "gold" : "violet"} onClick={() => go({ view: "actions", chapterId: chapter.id, unitId: u.id })}>
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%" }}>
                   <span style={{ textAlign: "left" }}><strong>{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
                   <MedalPair m={m} />
@@ -173,7 +173,7 @@ export default function ThirdMenu(props) {
           })}
           <GameButton tone="danger" icon="👑" disabled={!bossAvail} onClick={() => bossAvail && props.onChapterBoss?.(chapter)}>
             <strong>章のボスと戦う</strong>
-            <small>{!bossAvail ? "準備中" : chapter.units.every((u) => unitMedals(medalState, u.id).battleOpen) ? `${chapter.name} の総まとめ！ はじめて倒すと 💎+5` : `${chapter.name} の総まとめ（お試し）。小単元のメダルを全部そろえると、💎がもらえる本番になるよ`}</small>
+            <small>{!bossAvail ? "準備中" : chapter.units.every((u) => unitMedals(medalState, u.id).battle) ? `${chapter.name} の総まとめ！ はじめて倒すと 💎+5` : `${chapter.name} の総まとめ（お試し）。小単元のバトルを全部クリアすると、💎がもらえる本番になるよ`}</small>
           </GameButton>
         </div>
       </Shell>
@@ -197,7 +197,7 @@ export default function ThirdMenu(props) {
 
   // ---- 学習：小単元を選んだ後の4つ
   const m = unitMedals(medalState, unit.id);
-  const battleAvail = !!worldBattleFor(grade, chapter, unit); // メダル2枚＝本番バトル（初クリアでクリスタル）。それまでは「お試し」でいつでも戦える
+  const battleAvail = !!worldBattleFor(grade, chapter, unit); // バトルはメダルの条件なし。はじめてクリアで💎とバトルメダル
   return (
     <Shell player={player} back={chapter.name} onBack={() => go({ view: "subunits", chapterId: chapter.id })} transitionKey={`${view}:${unit.id}`} reverse>
       <Title sub={chapter.name}>{unit.emoji ? unit.emoji + " " : ""}{unit.name}</Title>
@@ -205,15 +205,16 @@ export default function ThirdMenu(props) {
         <MedalPair m={m} size={34} />
         <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", lineHeight: 1.6 }}>
           📺 はいち：{m.haichi ? "ゲット！" : "確認問題に合格"}<br />
-          ✏️ れんしゅう：{m.practice ? "ゲット！" : `${m.practiceN} / ${MEDAL_PRACTICE_TARGET}問`}
+          ✏️ れんしゅう：{m.practice ? "ゲット！" : `${m.practiceN} / ${MEDAL_PRACTICE_TARGET}問`}<br />
+          ⚔️ バトル：{m.battle ? "ゲット！" : "はじめてクリア"}
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <GameButton tone="danger" icon="📺" onClick={() => props.onHaichi?.(unit)}><strong>学ぶ</strong><small>はいちモード（動画で学ぼう）</small></GameButton>
         <GameButton tone="mint" icon="✏️" onClick={() => go({ view: "practicePick", chapterId: chapter.id, unitId: unit.id })}><strong>練習</strong><small>4択学習モード（むずかしさをえらべるよ）</small></GameButton>
         <GameButton tone="gold" icon="⚔️" disabled={!battleAvail} onClick={() => battleAvail && props.onBattle?.(chapter, unit)}>
-          <strong>{m.battleOpen ? "バトルモード" : "バトルモード（お試し）"}</strong>
-          <small>{!battleAvail ? "この小単元のバトルは準備中" : m.battleOpen ? "はじめてクリアで 💎クリスタル2個！" : "ごほうびなし。メダル2枚で本番バトルが開くよ"}</small>
+          <strong>バトルモード</strong>
+          <small>{!battleAvail ? "この小単元のバトルは準備中" : m.battle ? "クリアずみ！ もう一度たたかえるよ" : "はじめてクリアで ⚔️バトルメダルと 💎クリスタル2個！"}</small>
         </GameButton>
       </div>
     </Shell>

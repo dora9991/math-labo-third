@@ -137,9 +137,14 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
 
 // ===== 5. バトル結果の検証（チート対策の本丸）
 { const s = makeStore(); const now = T0 + 10 * MIN;
-  // 5-0 メダルが無い単元のバトルは受け付けない
-  await call(s, "get_state", {}, "stu1", T0); let r = await call(s, "claim", { claim: makeClaim({ now }) }, "stu1", now);
-  t("メダル2枚が無い小単元のバトル申請は拒否(サーバー判定)", r.status === 400 && r.body.error === "medals-missing", JSON.stringify(r.body).slice(0, 120));
+  // 5-0 メダルが無くても、バトルは受け付ける（メダルの条件なし）。初クリアでバトルメダルを付与する
+  const sN = makeStore(); await call(sN, "get_state", {}, "stuN", T0); let r = await call(sN, "claim", { claim: makeClaim({ now }) }, "stuN", now);
+  t("メダル無しでもバトル申請を受け付け、初クリアでバトルメダルを付与", r.status === 200 && r.body.rewards.granted && r.body.rewards.newMedals?.some((m) => m.kind === "battle") && T.unitMedalsOf(r.body.state, unitId).battle && T.unitMedalsOf(r.body.state, unitId).count === 1, JSON.stringify(r.body).slice(0, 160));
+  { const s0 = makeStore(); await call(s0, "get_state", {}, "stu0", T0);
+    const rr = await call(s0, "claim", { claim: makeClaim({ now }) }, "stu0", now);
+    const r2 = await call(s0, "claim", { claim: makeClaim({ now: now + 5 * MIN }) }, "stu0", now + 5 * MIN);
+    t("バトルメダルは2回目のクリアでは新しく付かない", rr.status === 200 && r2.status === 200 && !(r2.body.rewards.newMedals || []).length); }
+  await call(s, "get_state", {}, "stu1", T0);
   await earnMedals(s, "stu1", T0);
   // 5-1 正しい申請 → 初回クリアでチケット1枚（実時間が十分経過）
   let claim = makeClaim({ now }); r = await call(s, "claim", { claim }, "stu1", now);
@@ -186,7 +191,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   r = await T.handleAdmin({ op: "clearAllMedals", targetId: "adm1", store: s });
   const st = (await s.load("adm1")).state;
   const units = T.chaptersForGrade(1).flatMap((c) => c.units);
-  t("管理者：全クリアで全小単元のバトルが解放される", r.status === 200 && units.every((u) => T.unitMedalsOf(st, u.id).battleOpen));
+  t("管理者：全クリアで全小単元のメダル3枚がそろう", r.status === 200 && units.every((u) => T.unitMedalsOf(st, u.id).count === 3));
   r = await T.handleAdmin({ op: "grantCompanions", args: { mode: "all" }, targetId: "adm1", store: s });
   t("管理者：仲間を全員追加できる", r.status === 200 && r.body.owned > 100, JSON.stringify(r.body));
   r = await T.handleAdmin({ op: "setCompanionGrowth", args: { exp: 5000, breaks: 2 }, targetId: "adm1", store: s });
@@ -247,7 +252,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const ch = T.chaptersForGrade(1)[0]; const units = ch.units.map((u) => u.id);
   const mk = async (u, withMedals = true) => { // 全単元のメダル2枚をそろえた生徒
     const s = makeStore(); await call(s, "get_state", {}, u, T0); const g = await s.load(u);
-    for (const id of units) { if (!withMedals && id === units[units.length - 1]) continue; g.state.medals.practiceN[id] = 5; g.state.medals.haichi[T.haichiKeyForUnit(id)] = T0; }
+    for (const id of units) { if (!withMedals && id === units[units.length - 1]) continue; g.state.medals.practiceN[id] = 5; g.state.medals.haichi[T.haichiKeyForUnit(id)] = T0; g.state.medals.battle[id] = T0; }
     await s.save(u, g.state, g.version); return s;
   };
   const attemptsFor = (unitList, n, seedBase) => Array.from({ length: n }, (_, i) => {
@@ -281,7 +286,7 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   // メダルが1つでも欠けていると、章ボスの申請は受け付けない（学習に遡れない報酬は作らない）
   const s2 = await mk("ch2", false);
   const c2 = await call(s2, "claim", { claim: { ...bossClaim("boss4-" + Math.random().toString(36).slice(2, 10), 9100000), startedAt: T0, endedAt: T0 + 60000 } }, "ch2", T0 + 5 * MIN);
-  t("章ボス: メダルが全単元そろっていないと拒否", c2.status === 400 && c2.body.error === "medals-missing", JSON.stringify(c2.body.error));
+  t("章ボス: バトルメダルが全単元そろっていないと拒否", c2.status === 400 && c2.body.error === "medals-missing", JSON.stringify(c2.body.error));
 }
 
 // ===== 10. 周回ボーナス／毎日の目標／学年クリアボーナス（2026-09-25）

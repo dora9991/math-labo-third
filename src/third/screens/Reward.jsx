@@ -29,8 +29,8 @@ export default function Reward({ nav, params }) {
         <div className="mw-fantasy-title mw-reward-pop" style={{ fontSize: "1.4rem", animationDelay: "0.08s" }}>クリア！</div>
         {!res && (
           <div className="mw-reward-pop" style={{ color: "#c9b98f", animationDelay: "0.2s", textAlign: "center", lineHeight: 1.7 }}>
-            お試しバトルだから、ごほうびはないよ。<br />
-            「学ぶ」と「練習」でメダルを2枚そろえると、<br />はじめてのクリアで💎クリスタルがもらえる本番バトルが開くよ！
+            お試しの総まとめバトルだから、ごほうびはないよ。<br />
+            その章の小単元のバトルを ぜんぶクリアすると、<br />はじめてのクリアで💎クリスタルがもらえる本番になるよ！
           </div>
         )}
         {res && !res.ok && (
@@ -43,6 +43,7 @@ export default function Reward({ nav, params }) {
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.2s" }}>経験値 +{r.exp}（仲間ひとりずつ +{r.perMember ?? 0}）</div>
             <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.3s" }}>🪙 +{r.coins}</div>
             {r.kind === "chapterBoss" && r.isFirstClear && <div className="mw-reward-pop" style={{ color: "#ffe066", fontWeight: 900, animationDelay: "0.36s" }}>👑 章ボスを はじめて たおした！</div>}
+            {(r.newMedals || []).some((m) => m.kind === "battle") && <div className="mw-reward-pop" style={{ color: "#fde047", fontWeight: 900, animationDelay: "0.38s" }}>⚔️ バトルメダル ゲット！</div>}
             {r.crystals > 0 && (
               <div className="mw-reward-pop" style={{ color: "#7cff8a", fontWeight: 900, fontSize: "1.2rem", animationDelay: "0.42s" }}>💎 クリスタル +{r.crystals}！</div>
             )}

@@ -47,7 +47,7 @@ export function initialThirdState() {
     lastClaimAt: 0,
     daily: { date: null, repeat: 0, ok: 0, mission: false }, // 1日の集計：周回の回数／検証済みの正解数／毎日の目標を達成したか
     gradeDone: {}, // 学年クリアボーナスを受け取った学年 { "1": ms }
-    medals: { practiceN: {}, haichi: {}, pracLv: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
+    medals: { practiceN: {}, haichi: {}, pracLv: {}, battle: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
   };
 }
@@ -86,7 +86,13 @@ export function normalizeThirdState(s) {
   out.claimIds = Array.isArray(s.claimIds) ? s.claimIds.slice(-VERIFY.claimIdsKeep) : [];
   out.daily = { ...base.daily, ...(s.daily || {}) };
   const m = s.medals && typeof s.medals === "object" ? s.medals : {};
-  out.medals = { practiceN: { ...(m.practiceN || {}) }, haichi: { ...(m.haichi || {}) }, pracLv: { ...(m.pracLv || {}) } };
+  out.medals = { practiceN: { ...(m.practiceN || {}) }, haichi: { ...(m.haichi || {}) }, pracLv: { ...(m.pracLv || {}) }, battle: { ...(m.battle || {}) } };
+  // バトルメダル：すでに初クリアしている小単元は、バトルメダルもゲット済みにする（メダル3枚化の前からの記録を引き継ぐ）
+  for (const [key, c] of Object.entries(out.cleared)) {
+    const [g, chapterId, subUnitId] = key.split(":");
+    const uid = labUnitIdForBattle({ grade: Number(g), chapterId, subUnitId });
+    if (uid && !out.medals.battle[uid]) out.medals.battle[uid] = c?.first || 1;
+  }
   out.credit = { ms: Math.max(0, Number(s.credit?.ms) || 0), at: Number(s.credit?.at) || 0 };
   return out;
 }
@@ -204,12 +210,11 @@ export function verifyClaim(claim, state, now) {
   if (claim.kind === "subUnit") {
     unitId = labUnitIdForBattle({ grade: claim.grade, chapterId: claim.chapterId, subUnitId: claim.subUnitId });
     if (!unitId) return fail("unknown-unit");
-    if (!unitMedalsOf(state, unitId).battleOpen) return fail("medals-missing"); // サーバーが認めたメダル2枚が無い小単元のバトルは受け付けない
     allowed = [unitId];
-  } else { // 章ボス：その章の小単元のメダルがすべてそろっている（＝全部バトルが開いている）時だけ。出題はその章のどの単元でもよい
+  } else { // 章ボス：その章の小単元のバトルメダルがすべてそろっている（＝全部のバトルをクリアした）時だけ。出題はその章のどの単元でもよい
     allowed = labUnitIdsOfChapter(claim.grade, claim.chapterId);
     if (!allowed.length) return fail("unknown-unit");
-    if (!allowed.every((id) => unitMedalsOf(state, id).battleOpen)) return fail("medals-missing");
+    if (!allowed.every((id) => unitMedalsOf(state, id).battle)) return fail("medals-missing");
     unitId = claim.chapterId;
   }
   const at = Array.isArray(claim.attempts) ? claim.attempts : null;
@@ -305,6 +310,8 @@ function applyClaimCore(state, claim, now) {
     s.daily.repeat += 1;
   } else reason = "daily-limit";
   s.cleared[key] = { first: s.cleared[key]?.first || now, count: (s.cleared[key]?.count || 0) + 1 };
+  const newMedals = [];
+  if (!s.medals.battle[v.unitId]) { s.medals.battle[v.unitId] = now; newMedals.push({ kind: "battle", unitId: v.unitId }); } // バトルメダル：はじめてクリアした時
   // 章クリアボーナス：その章の小単元を全部はじめてクリアした時（章ごとに1回）
   let chapterBonus = 0;
   const wc = getChapter(claim.grade, claim.chapterId);
@@ -318,7 +325,7 @@ function applyClaimCore(state, claim, now) {
   const members = s.party.filter(Boolean);
   const perMember = members.length ? Math.floor(exp / members.length) : 0;
   for (const id of members) s.owned[id].exp += perMember;
-  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, coins, exp, perMember, isFirstClear: first }, verified, rows: v.rows };
+  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, coins, exp, perMember, isFirstClear: first, newMedals }, verified, rows: v.rows };
 }
 
 // ---------------- 実時間の持ち分 ----------------
@@ -343,7 +350,8 @@ export function unitMedalsOf(state, unitId) {
   const haichi = !!state?.medals?.haichi?.[haichiKeyForUnit(unitId)];
   const practiceN = Math.min(MEDAL.practiceTarget, state?.medals?.practiceN?.[unitId] || 0);
   const practice = practiceN >= MEDAL.practiceTarget;
-  return { haichi, practice, practiceN, count: (haichi ? 1 : 0) + (practice ? 1 : 0), battleOpen: haichi && practice };
+  const battle = !!state?.medals?.battle?.[unitId];
+  return { haichi, practice, practiceN, battle, count: (haichi ? 1 : 0) + (practice ? 1 : 0) + (battle ? 1 : 0) };
 }
 
 // 確認問題のキー → 出題してよい単元IDの一覧（動画レッスンの u、動画なしは単元そのもの）

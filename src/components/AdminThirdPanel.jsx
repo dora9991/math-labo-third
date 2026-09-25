@@ -58,7 +58,7 @@ function GrantTools({ run, busy }) {
         <button style={btn()} disabled={busy} onClick={() => go("setCrystals", { n: Number(n) })}>この数にする</button>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-        <button style={btn()} disabled={busy} onClick={() => go("clearAllMedals", {}, "全小単元のメダル（はいち・れんしゅう）を全部そろえて、バトルを全解放します", true)}>🏅 全クリア（メダル全部）</button>
+        <button style={btn()} disabled={busy} onClick={() => go("clearAllMedals", {}, "全小単元のメダル（はいち・れんしゅう・バトル）を全部そろえて、バトルを全解放します", true)}>🏅 全クリア（メダル全部）</button>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 800 }}>🐾 仲間を追加</span>

@@ -46,10 +46,10 @@ export default function MedalCase({ player, grade = 1, onHaichi, onPractice, onB
     <section className="menu-medal-case" style={{ margin: "0 0 14px", padding: "12px 10px", borderRadius: 14, background: "rgba(251,191,36,.07)", border: "1px solid rgba(251,191,36,.3)" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 14, fontWeight: 900, color: "#fde68a" }}>🏅 メダル</span>
-        <span style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,.7)" }}>ぜんぶで {total.count} / {total.total} まい・バトル {total.battlesOpen} / {total.units} 解放</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,.7)" }}>ぜんぶで {total.count} / {total.total} まい・バトルクリア {total.battlesCleared} / {total.units}</span>
       </div>
       <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.6)", marginBottom: 8, lineHeight: 1.5 }}>
-        「はいち」と「れんしゅう」のメダルを2まい集めると、その小単元のバトルが出現するよ。あわてず、じぶんのペースでOK。
+        「はいち」「れんしゅう」「バトル」のメダルを1つの小単元で3まい集めよう。バトルはいつでも挑戦できるよ。
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
@@ -69,18 +69,19 @@ export default function MedalCase({ player, grade = 1, onHaichi, onPractice, onB
           return (
             <div key={u.id} style={{
               padding: "9px", borderRadius: 11, background: "rgba(255,255,255,.04)",
-              border: m.battleOpen ? "2px solid #fde047" : "1px solid rgba(255,255,255,.1)",
-              boxShadow: m.battleOpen ? "0 0 0 2px rgba(253,224,71,.25)" : undefined,
+              border: m.count >= 3 ? "2px solid #fde047" : "1px solid rgba(255,255,255,.1)",
+              boxShadow: m.count >= 3 ? "0 0 0 2px rgba(253,224,71,.25)" : undefined,
             }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: "#fff", marginBottom: 7 }}>{u.emoji ? u.emoji + " " : ""}{u.name}</div>
               <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
                 <Medal on={m.haichi} icon="📺" label="はいち" sub={m.haichi ? "ゲット！" : "確認問題に合格"} />
                 <Medal on={m.practice} icon="✏️" label="れんしゅう" sub={m.practice ? "ゲット！" : `${m.practiceN} / ${MEDAL_PRACTICE_TARGET}問`} />
+                <Medal on={m.battle} icon="⚔️" label="バトル" sub={m.battle ? "ゲット！" : "はじめてクリア"} />
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {btn(() => onHaichi?.(u), "📺 はいち", "linear-gradient(135deg,#ef4444,#dc2626)")}
                 {btn(() => onPractice?.(ch, u), "✏️ れんしゅう", "linear-gradient(135deg,#22c55e,#10b981)")}
-                {btn(() => onBattle?.(ch, u), m.battleOpen ? "⚔️ バトル" : "🔒 バトル", "linear-gradient(135deg,#f59e0b,#b45309)", !m.battleOpen || !worldBattleFor(grade, ch, u))}
+                {btn(() => onBattle?.(ch, u), m.battle ? "⚔️ バトル" : "⚔️ バトル", "linear-gradient(135deg,#f59e0b,#b45309)", !worldBattleFor(grade, ch, u))}
               </div>
             </div>
           );

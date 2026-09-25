@@ -9,15 +9,13 @@
 // ============================================================
 import { useEffect, useState } from "react";
 import * as bgm from "../audio/bgm.js";
-import { ThirdProvider, useGame } from "./ThirdContext.jsx";
+import { ThirdProvider } from "./ThirdContext.jsx";
 import { playUiTapSound } from "./fx/sound.js";
 import PartyFormation from "./screens/PartyFormation.jsx";
 import ThirdBattle from "./screens/ThirdBattle.jsx";
 import Reward from "./screens/Reward.jsx";
 import ThirdGacha from "./screens/ThirdGacha.jsx";
 import ThirdSynth from "./screens/ThirdSynth.jsx";
-import { isBattleOpen } from "./medals.js";
-import { labUnitIdForBattle } from "./link.js";
 import { getFxSpeed } from "../engine/fxSpeed.js";
 import StoryPlayer from "./story/StoryPlayer.jsx";
 import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
@@ -57,26 +55,6 @@ function useNav(initial, exit) {
   return { ...current, go, back, resetTo, flashTo, exit, flashOpacity, navKey };
 }
 
-// メダルゲート：サーバーが認めたメダル2枚(はいち＋れんしゅう)が無い小単元のバトルには入れない。
-//  （申請の時にもサーバーが同じ確認をする。ここは画面上の案内）
-function MedalGate({ nav, onExit, children }) {
-  const { save } = useGame();
-  if (nav.screen === "battle" && nav.params?.kind === "subUnit" && !nav.params?.demo) {
-    const unitId = labUnitIdForBattle(nav.params);
-    if (unitId && !isBattleOpen(save, unitId)) {
-      return (
-        <div className="mw-fantasy-panel mw-center" style={{ minHeight: "40vh", marginTop: 40 }}>
-          <div style={{ fontSize: "2.4rem" }}>🔒</div>
-          <div className="mw-fantasy-title">まだ バトルは ひらいていないよ</div>
-          <div style={{ color: "#ffe9b3", margin: "8px 0" }}>「学ぶ」と「練習」のメダルを2まい集めよう。</div>
-          <button className="mw-btn primary" onClick={onExit}>もどる</button>
-        </div>
-      );
-    }
-  }
-  return children;
-}
-
 export default function ThirdApp({ player, start, onExit }) {
   const nav = useNav(start || { screen: "party", params: {} }, onExit);
   const Screen = SCREENS[nav.screen] || PartyFormation;
@@ -101,11 +79,9 @@ export default function ThirdApp({ player, start, onExit }) {
     <ThirdProvider>
       <div className="mw-app">
         <div key={nav.navKey} className={`mw-screen-enter mw-screen-enter--${getFxSpeed()}`}>
-          <MedalGate nav={nav} onExit={onExit}>
-            {pending.length
-              ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} />
-              : <Screen params={nav.params} nav={nav} />}
-          </MedalGate>
+          {pending.length
+            ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} />
+            : <Screen params={nav.params} nav={nav} />}
         </div>
         <div className="mw-whiteout" style={{ opacity: nav.flashOpacity, pointerEvents: nav.flashOpacity > 0 ? "auto" : "none" }} />
       </div>

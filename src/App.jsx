@@ -12,7 +12,6 @@ import ThirdMenu from "./third/menu/ThirdMenu.jsx";
 import AlarmOverlay from "./third/menu/AlarmOverlay.jsx";
 import MedalToast from "./third/menu/MedalToast.jsx";
 import { unitMedals } from "./third/medals.js";
-import { isBattleOpen } from "./third/medals.js";
 import { thirdApi } from "./third/thirdApi.js";
 import { startSessionPing } from "./third/sessionPing.js";
 import { flushBattleLogs } from "./third/battleLog.js";
@@ -1623,12 +1622,11 @@ export default function App() {
     }
   }
   // 「⚔️ バトル」ボタンの行き先（数学ラボ3）。旧バトル（主人公がターン制で戦う）は外し、
-  //  仲間5体が戦う新バトルだけにした。メダル2枚(はいち＋れんしゅう)が揃っていれば新バトルへ、
-  //  まだならホーム（メダル画面）へ戻す。旧バトルの実装(TurnBattle/Battle)はコードとして残している。
+  //  仲間5体が戦う新バトルだけにした。バトルはメダルの条件なしで新バトルへ（戦えない小単元だけホームへ戻す）。旧バトルの実装(TurnBattle/Battle)はコードとして残している。
   function goBattleForUnit(unit) {
     const chapter = unit && findChapterByUnitId(unit.id);
     const params = chapter && worldBattleFor(grade, chapter, unit);
-    if (params && isBattleOpen(thirdState, unit.id)) {
+    if (params) {
       setThirdStart({ screen: "battle", params });
       setScreen("third");
       return;
@@ -2332,8 +2330,8 @@ export default function App() {
       }}
       onHaichi={(unit) => openHaichiStudio(unit, "home")}
       onPractice={(chapter, unit, level) => { setSel({ chapter, unit, level: level || "standard", nav: false, fixed: true }); setScreen("anshin"); }} // 練習：えらんだ難度で出題（簡単/普通/難しい/鬼）
-      onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params: { ...params, demo: !unitMedals(thirdState, unit.id).battleOpen } }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
-      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battleOpen) } }); setScreen("third"); }}
+      onBattle={(chapter, unit) => { const params = worldBattleFor(grade, chapter, unit); if (params) { setThirdStart({ screen: "battle", params }); setScreen("third"); } }} // メダル2枚で本番（サーバーが認めた初クリアだけクリスタル）
+      onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !(chapter.units || []).every((u) => unitMedals(thirdState, u.id).battle) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}

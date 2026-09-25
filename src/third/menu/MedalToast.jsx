@@ -6,6 +6,7 @@ import * as sfx from "../../audio/sfx.js";
 
 function labelOf(m) {
   if (m.kind === "crystal") return { icon: "💎", title: `クリスタル +${m.n}`, sub: m.label || "", crystal: true };
+  if (m.kind === "battle") return { icon: "⚔️", title: "バトルメダル", sub: findUnitById(m.unitId)?.name || "" };
   if (m.kind === "practice") return { icon: "✏️", title: "れんしゅうメダル", sub: findUnitById(m.unitId)?.name || "" };
   const key = m.key || "";
   if (key.startsWith("nv:")) return { icon: "📺", title: "はいちメダル", sub: findUnitById(key.slice(3))?.name || "" };

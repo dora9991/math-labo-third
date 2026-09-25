@@ -26,15 +26,17 @@ export function applyAdminOp(state, op, args = {}) {
       for (const g of Object.keys(GRADES)) for (const ch of GRADES[g]) for (const u of ch.units || []) {
         s.medals.practiceN[u.id] = MEDAL.practiceTarget;
         s.medals.haichi[haichiKeyForUnit(u.id)] = "admin";
+        s.medals.battle[u.id] = "admin";
         n++; // ※管理者の全クリアではクリスタルは付かない（初クリア報酬の対象外）
       }
-      return { ok: true, state: s, message: `${n}小単元のメダル（はいち・れんしゅう）を全部そろえました（バトルも全解放）` };
+      return { ok: true, state: s, message: `${n}小単元のメダル（はいち・れんしゅう・バトル）を全部そろえました` };
     }
     case "clearUnitMedals": {
       const id = String(args.unitId || "");
       if (!id) return { ok: false, error: "no-unit" };
       s.medals.practiceN[id] = MEDAL.practiceTarget;
       s.medals.haichi[haichiKeyForUnit(id)] = "admin";
+      s.medals.battle[id] = "admin";
       return { ok: true, state: s, message: `${id} のメダルをそろえました` };
     }
     case "grantCompanions": {
