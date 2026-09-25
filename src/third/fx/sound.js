@@ -222,6 +222,21 @@ export function playImpactSound({ crit = false } = {}) {
   playSfx("hit-enemy.m4a", { gain: 0.12, rate: crit ? 0.85 : 1, limited: true });
 }
 
+/** V3着弾の補助音。攻撃専用バスへ送り、実素材の音量は変えずに低音ときらめきだけ足す。 */
+export function playImpactAccent({ crit = false, boss = false } = {}) {
+  const c = getCtx();
+  if (!c) return;
+  const output = attackBus(c);
+  const limitedTone = ({ freq, endFreq, type, duration, gain, delay = 0 }) => {
+    const osc = c.createOscillator(); const g = envGain(c, { attack: .004, peak: gain, decay: duration, delay });
+    const t0 = c.currentTime + delay; osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), t0 + duration);
+    osc.connect(g); g.connect(output); osc.start(t0); osc.stop(t0 + duration + .04);
+  };
+  limitedTone({ freq: boss ? 72 : crit ? 95 : 120, endFreq: 48, type: "sine", duration: boss ? .2 : .13, gain: boss ? .16 : .09 });
+  limitedTone({ freq: crit ? 1760 : 1320, endFreq: crit ? 2500 : 1800, type: "triangle", duration: .09, gain: crit ? .09 : .055, delay: .025 });
+}
+
 /** ミス（たまが届かず失速）の、こもった軽い音。 */
 export function playMissSound() {
   const c = getCtx();

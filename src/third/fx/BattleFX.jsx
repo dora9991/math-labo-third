@@ -27,6 +27,7 @@ import {
   playDefeatSound,
   playEnemyHitSound,
   playPlayerAttackStartSound,
+  playImpactAccent,
 } from "./sound.js";
 import { fxScale, prefersReducedMotion } from "../../engine/fxSpeed.js";
 
@@ -270,14 +271,30 @@ function spawnPoof(app, { x, y, crit }) {
   });
 }
 
+// V3: 数字の段階はダメージそのものだけを見て決める。戦闘計算には一切関与しない。
+function damageTier(damage, crit) {
+  if (crit || damage >= 180) return "huge";
+  if (damage >= 90) return "large";
+  if (damage >= 35) return "medium";
+  return "small";
+}
+
 function spawnDamageText(app, damage, crit, x, y) {
+  const tier = damageTier(damage, crit);
+  const isHuge = tier === "huge";
+  const fontSize = tier === "small" ? 38 : tier === "medium" ? 48 : tier === "large" ? 60 : 74;
   const style = new PIXI.TextStyle({
     fontFamily: "system-ui, sans-serif",
-    fontSize: crit ? 50 : 34,
+    fontSize,
     fontWeight: "800",
-    fill: crit ? 0xffd166 : 0xffffff,
+    fill: isHuge ? ["#ffffff", "#ffe27a", "#c78cff"] : crit ? 0xffd166 : 0xffffff,
+    fillGradientType: isHuge ? PIXI.TEXT_GRADIENT.LINEAR_VERTICAL : undefined,
     stroke: 0x14172b,
-    strokeThickness: 7,
+    strokeThickness: isHuge ? 11 : 8,
+    dropShadow: true,
+    dropShadowColor: 0x080b24,
+    dropShadowBlur: isHuge ? 12 : 7,
+    dropShadowDistance: 2,
   });
   const text = new PIXI.Text(`${damage}`, style);
   text.anchor.set(0.5);
@@ -290,10 +307,10 @@ function spawnDamageText(app, damage, crit, x, y) {
   app.stage.addChild(text);
 
   let subLabel = null;
-  if (crit) {
-    subLabel = new PIXI.Text("CRITICAL!", {
+  if (crit || isHuge) {
+    subLabel = new PIXI.Text(crit ? "CRITICAL!" : "POWER HIT!", {
       fontFamily: "system-ui, sans-serif",
-      fontSize: 20,
+      fontSize: isHuge ? 25 : 20,
       fontWeight: "800",
       fill: 0xffffff,
       stroke: 0xc94848,
@@ -301,7 +318,7 @@ function spawnDamageText(app, damage, crit, x, y) {
     });
     subLabel.anchor.set(0.5);
     subLabel.x = text.x;
-    subLabel.y = text.y - 46;
+    subLabel.y = text.y - fontSize * .78;
     subLabel.scale.set(0.2);
     subLabel.life = 1;
     subLabel.__t = 0;
@@ -312,7 +329,8 @@ function spawnDamageText(app, damage, crit, x, y) {
   addTicked(app, items, (node, delta) => {
     node.__t += delta;
     const growPhase = Math.min(1, node.__t / 6);
-    node.scale.set(0.3 + growPhase * (crit ? 1.0 : 0.8));
+    const bounce = node.__t < 11 ? 1 + Math.sin(node.__t * 1.2) * .14 : 1;
+    node.scale.set((0.3 + growPhase * (isHuge ? 1.25 : crit ? 1.0 : 0.8)) * bounce);
     node.y -= 0.45 * delta;
     if (node.__t > 16) node.alpha = Math.max(0, 1 - (node.__t - 16) / 14);
     node.life = node.__t > 30 ? 0 : 1;
@@ -362,6 +380,33 @@ function flashScreen(app, color = 0xffffff, peak = 0.8) {
     node.alpha -= 0.07;
     node.life = node.alpha > 0 ? 1 : 0;
   });
+}
+
+// V3 の着弾本体。最大でも粒子(48) + 光条(12) + リング(5)に収め、
+// 連打時にも画面を埋め尽くさない。combo は見た目専用の段階値。
+function spawnV3Impact(app, { x, y, color, crit = false, combo = 0, boss = false }) {
+  const level = boss ? 3 : combo >= 10 ? 3 : combo >= 5 ? 2 : combo >= 3 ? 1 : 0;
+  const rings = 3 + level;
+  spawnBurst(app, { crit: crit || level >= 2, x, y });
+  spawnImpactRings(app, x, y, color, rings);
+  const rays = [];
+  const rayCount = 8 + level * 2;
+  for (let i = 0; i < rayCount; i++) {
+    const g = new PIXI.Graphics();
+    const a = (Math.PI * 2 * i) / rayCount + Math.random() * .18;
+    const len = 55 + level * 24 + Math.random() * 55;
+    g.lineStyle(level >= 2 ? 5 : 4, i % 3 === 0 ? 0xffffff : color, .92);
+    g.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
+    g.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+    g.x = x; g.y = y; g.life = 1; g.__t = 0; g.blendMode = PIXI.BLEND_MODES.ADD;
+    app.stage.addChild(g); rays.push(g);
+  }
+  addTicked(app, rays, (r, d) => {
+    r.__t += d; r.scale.set(1 + r.__t / 12); r.alpha = Math.max(0, .95 - r.__t / 16); r.life = r.__t < 16 ? 1 : 0;
+  });
+  // 白→系統色の二段フラッシュ。白のピークは安全上限0.8以内。
+  flashScreen(app, 0xffffff, boss || crit ? .78 : .55);
+  flashScreen(app, color, boss ? .28 : .16);
 }
 
 // 2026-09-18：スキル即時発動（ダメージ以外＝バフ/回復/状態異常回復）用の汎用エフェクト。
@@ -762,7 +807,7 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
   useImperativeHandle(ref, () => ({
     // from/to: {x,y}（舞台=stage基準のCSSピクセル座標）。渡さなければ既定位置にフォールバック。
     // offset: {dx,dy} 複数ヒットが完全に重ならないようにする微調整。
-    playHit({ damage, isCrit, subject, kind = "magic", from, to, offset = { dx: 0, dy: 0 } }) {
+    playHit({ damage, isCrit, subject, kind = "magic", from, to, offset = { dx: 0, dy: 0 }, combo = 0 }) {
       const app = appRef.current;
       if (!app) return;
       const color = SUBJECT_COLOR[subject] ?? 0xffffff;
@@ -771,9 +816,12 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
         const point = to ?? defaultImpactPoint(app);
         const x = point.x + offset.dx;
         const y = point.y + offset.dy;
+        // オフ／reduced-motion は飛翔・多重演出を省略し、短い命中表示だけにする。
         spawnBurst(app, { crit: isCrit, x, y });
+        flashScreen(app, color, .22);
         spawnDamageText(app, damage, isCrit, x, y);
         playImpactSound({ crit: isCrit });
+        playImpactAccent({ crit: isCrit });
         return;
       }
       if (kind !== "magic") {
@@ -781,22 +829,24 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
         const point = to ?? defaultImpactPoint(app);
         const x = point.x + offset.dx;
         const y = point.y + offset.dy;
+        spawnV3Impact(app, { crit: isCrit, x, y, color, combo });
         spawnDamageText(app, damage, isCrit, x, y);
         playImpactSound({ crit: isCrit });
+        playImpactAccent({ crit: isCrit });
         return;
       }
       spawnProjectile(app, {
         color,
-        size: isCrit ? 18 : 14,
+        size: (isCrit ? 18 : 14) + (combo >= 10 ? 8 : combo >= 5 ? 5 : combo >= 3 ? 2 : 0),
         frames: isCrit ? 15 : 12,
         from,
         to,
         offset,
         onArrive: (x, y) => {
-          spawnBurst(app, { crit: isCrit, x, y });
+          spawnV3Impact(app, { crit: isCrit, x, y, color, combo });
           spawnDamageText(app, damage, isCrit, x, y);
           playImpactSound({ crit: isCrit });
-          if (isCrit) flashScreen(app, 0xffffff, 0.85);
+          playImpactAccent({ crit: isCrit });
         },
       });
     },
@@ -828,14 +878,20 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
         },
       });
     },
-    playDefeat({ to } = {}) {
+    playDefeat({ to, boss = false } = {}) {
       const app = appRef.current;
       if (!app) return;
       const point = to ?? defaultImpactPoint(app);
+      spawnV3Impact(app, { crit: true, boss, combo: boss ? 10 : 5, x: point.x, y: point.y, color: 0xffd166 });
       spawnBurst(app, { crit: true, x: point.x, y: point.y });
-      spawnBurst(app, { crit: true, x: point.x, y: point.y });
-      flashScreen(app, 0xffd166, 0.6);
+      // 擬似的な光柱（細長い発光スプライト）。
+      const pillar = new PIXI.Sprite(makeGlowTexture(0xfff1a6, 128));
+      pillar.anchor.set(.5); pillar.x = point.x; pillar.y = point.y; pillar.width = boss ? 130 : 90; pillar.height = boss ? 440 : 290;
+      pillar.alpha = .7; pillar.life = 1; pillar.__t = 0; pillar.blendMode = PIXI.BLEND_MODES.ADD; app.stage.addChild(pillar);
+      addTicked(app, [pillar], (p, d) => { p.__t += d; p.alpha = Math.max(0, .7 - p.__t / 22); p.life = p.__t < 22 ? 1 : 0; });
+      flashScreen(app, 0xffd166, .65);
       playDefeatSound();
+      playImpactAccent({ crit: true, boss });
     },
     // rect: パーティ表示エリアの{x,y,width,height}（舞台基準）。
     // variantIndex: 引っ掻きの向き(0-3、CLAW_VARIANTS参照)。省略時はランダム。
@@ -878,6 +934,8 @@ const BattleFX = forwardRef(function BattleFX({ speed = "normal" }, ref) {
         return;
       }
       spawnUltimate(app, { category, color: ultimateColor, targets, rect, damage, isCrit });
+      // カットイン後の発動感を通常より一段だけ増やす（既存の技別シルエットは維持）。
+      if (targets?.[0]) spawnV3Impact(app, { x: targets[0].x, y: targets[0].y, color: ultimateColor, crit: !!isCrit, combo: 5 });
       const p = targets?.[0];
       if (damage != null && p) spawnDamageText(app, damage, isCrit, p.x, p.y);
       if (text) {

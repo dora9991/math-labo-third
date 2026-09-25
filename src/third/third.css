@@ -645,6 +645,20 @@
   filter: grayscale(1);
 }
 
+/* 攻撃FX V3: UIを遮らない、短いズームパルスと端のコンボ表示。 */
+.mw-impact-pulse-1 { animation: mwImpactPulse .2s ease-out; }
+@keyframes mwImpactPulse { 0%, 18% { transform: scale(1); } 45% { transform: scale(1.035); } 100% { transform: scale(1); } }
+.mw-combo {
+  position: absolute; top: 12px; right: 14px; z-index: 8; pointer-events: none;
+  color: #fff7d1; font: 900 clamp(13px, 2.6vw, 20px)/1 system-ui, sans-serif;
+  letter-spacing: .06em; text-shadow: 0 2px 0 #16152f, 0 0 12px #8aeaff;
+  animation: mwComboIn .22s cubic-bezier(.2,1.5,.4,1);
+}
+.mw-combo-high { color: #ffe27a; text-shadow: 0 2px 0 #5d3515, 0 0 14px #ffbb55; }
+.mw-combo-max { color: #fff; text-shadow: 0 2px 0 #45206e, 0 0 10px #6effff, 0 0 18px #ffd166; }
+@keyframes mwComboIn { from { opacity: 0; transform: translateY(-8px) scale(.72); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mw-impact-pulse-1, .mw-combo { animation: none; } }
+
 /* ドラッグ中、指を乗せている敵を光らせる（攻撃対象のドロップ先） */
 .mw-enemy-slot.mw-enemy-drop-hover {
   background: rgba(255, 207, 77, 0.2);

@@ -265,6 +265,10 @@ export default function Battle({ nav, params }) {
   const fxRef = useRef(null);
   const [shakingIds, setShakingIds] = useState(() => new Set());
   const [partyShake, setPartyShake] = useState(false);
+  // V3演出専用。HP・報酬・出題・敵行動には渡さない連続正解カウント。
+  const comboRef = useRef(0);
+  const [combo, setCombo] = useState(0);
+  const [impactPulse, setImpactPulse] = useState(0);
   // 反撃で「予備動作中(下がって構えている)」の敵。複数体が順番に反撃しうるのでSetで管理。
   const [lungingIds, setLungingIds] = useState(() => new Set());
   // 攻撃中に「枠から飛び出している」キャラをcharacterId->boolで管理。
@@ -338,6 +342,9 @@ export default function Battle({ nav, params }) {
   function triggerPartyShake(ms) {
     setPartyShake(true);
     setTimeout(() => setPartyShake(false), ms);
+  }
+  function triggerImpactPulse() {
+    setImpactPulse((n) => n + 1);
   }
 
   const isBossWave = waveIndex === encounters.length - 1;
@@ -644,8 +651,9 @@ export default function Battle({ nav, params }) {
       const { next: updatedEnemies, hitIds, gainedExp, gainedCoins, defeatedPoints } = applyDamageToEnemies(damageByTarget);
       commitEnemies(updatedEnemies);
       setTimeout(() => {
+        if (fxSpeed !== "off") triggerImpactPulse();
         triggerEnemyShakeFor(hitIds, anyCrit ? 450 : 220);
-        defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to }));
+        defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave }));
       }, fxDelay(PROJECTILE_MS.normal));
       if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
       if (updatedEnemies.every((en) => en.hp <= 0)) onWaveCleared();
@@ -723,6 +731,8 @@ export default function Battle({ nav, params }) {
     const live = enemiesRef.current.filter((en) => en.hp > 0);
 
     if (!correct) {
+      comboRef.current = 0;
+      setCombo(0);
       playIncorrectSound();
       const fromPoint = pointOf(portraitRefs.current[partyMembers[0]?.id], stageEl);
       const toPoint = live[0] ? pointOf(enemyRefs.current[live[0].instanceId], stageEl) : null;
@@ -735,6 +745,9 @@ export default function Battle({ nav, params }) {
     }
 
     playCorrectSound();
+    const nextCombo = comboRef.current + 1;
+    comboRef.current = nextCombo;
+    setCombo(nextCombo);
     fxRef.current?.playCorrectBurst();
 
     // 正解＝行動できるメンバー全員が同時にこうげき（麻痺/石化/スロー(今回不可)は行動そのものを
@@ -791,7 +804,7 @@ export default function Battle({ nav, params }) {
       const stagger = h.charIndex * STAGGER_MS + Math.random() * STAGGER_JITTER_MS;
       const offset = { dx: Math.random() * 12 - 6, dy: Math.random() * 14 - 7 };
       setTimeout(() => {
-        fxRef.current?.playHit({ damage: h.attack.damage, isCrit: h.attack.isCrit, subject: h.subject, kind: playerAttackKind(h.character), from: h.from, to: h.to, offset });
+        fxRef.current?.playHit({ damage: h.attack.damage, isCrit: h.attack.isCrit, subject: h.subject, kind: playerAttackKind(h.character), from: h.from, to: h.to, offset, combo: nextCombo });
       }, fxDelay(stagger));
     });
 
@@ -812,8 +825,9 @@ export default function Battle({ nav, params }) {
     const { next: updatedEnemies, hitIds, gainedExp, gainedCoins, defeatedPoints } = applyDamageToEnemies(damageByTarget);
     commitEnemies(updatedEnemies);
     setTimeout(() => {
+      if (fxSpeed !== "off") triggerImpactPulse();
       triggerEnemyShakeFor(hitIds, hitEntries.some((h) => h.attack.isCrit) ? 450 : 220);
-      defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to }));
+      defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave }));
     }, fxDelay(PROJECTILE_MS.normal + 40));
     if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
 
@@ -910,8 +924,10 @@ export default function Battle({ nav, params }) {
       {/* 敵とパーティを1つの舞台にまとめる：たまが「選んだキャラの位置」から
           飛べるように、敵の攻撃がパーティの上に出せるように、両方が同じ
           座標系の上にいる必要があるため。FXのCanvasはこの舞台全体に1枚だけ重ねる。 */}
-      <div className="mw-panel mw-battle-stage" ref={stageRef}>
+      <div className={`mw-panel mw-battle-stage mw-impact-pulse-${impactPulse % 2}`} ref={stageRef}>
         <BattleFX ref={fxRef} speed={fxSpeed} />
+
+        {combo >= 3 && <div className={`mw-combo mw-combo-${combo >= 10 ? "max" : combo >= 5 ? "high" : "mid"}`}>COMBO ×{combo}</div>}
 
         <div className="mw-enemy-area">
           <div className="mw-enemy-row">
