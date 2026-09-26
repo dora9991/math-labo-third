@@ -15,6 +15,7 @@ import { battleOpen, battleOrder, chapterBattlesCleared } from "../core.js";
 import { findUnitById } from "../../data/index.js";
 import { getChapter } from "../data/storyMap.js";
 import { worldBattleFor } from "../link.js";
+import { hasHaichiLessonForUnit } from "../../data/haichiCourse.js";
 import RecordScreen from "./RecordScreen.jsx";
 import StoryLibrary from "../story/StoryLibrary.jsx";
 import { countNew, loadSeen } from "../story/storyRun.js";
@@ -217,7 +218,7 @@ export default function ThirdMenu(props) {
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <GameButton tone="danger" icon="📺" onClick={() => props.onHaichi?.(unit)}><strong>学ぶ</strong><small>はいちモード（動画で学ぼう）</small></GameButton>
+        <GameButton tone="danger" icon="📺" onClick={() => props.onHaichi?.(unit)}><strong>学ぶ</strong><small>{hasHaichiLessonForUnit(unit.id) ? "はいちモード（動画で学ぼう）" : "この単元は動画がないので、確認問題（5問）で学ぼう"}</small></GameButton>
         <GameButton tone="mint" icon="✏️" onClick={() => go({ view: "practicePick", chapterId: chapter.id, unitId: unit.id })}><strong>練習</strong><small>4択学習モード（むずかしさをえらべるよ）</small></GameButton>
         <GameButton tone="gold" icon="⚔️" disabled={!battleAvail} onClick={() => battleAvail && props.onBattle?.(chapter, unit)}>
           <strong>バトルモード</strong>

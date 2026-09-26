@@ -270,7 +270,10 @@ export default function App() {
   //  葉一さんの「動画＋ワークシート（書き込み）」スタジオを開く。ret=閉じたときの戻り先screen。
   function openHaichiStudio(unit, ret) {
     const found = unit && findHaichiLessonForUnit(unit.id);
-    if (!found) return; // 対応する動画が無ければ何もしない（ボタンは対応がある時だけ出す）
+    if (!found) { // 対応する動画が無い単元（四則混合(複合)・確率(相対度数)など）は、確認問題（5問・80%で合格）へ直接進む
+      if (unit?.id) goConfirmQuiz(unit, ret || "home");
+      return;
+    }
     // 王道サイクルの①講義：その単元の動画を開いたら lecture 済みにする（§10 Step3）
     if (unit?.id) updatePlayer((p) => {
       const cyc = { ...(p.cycle || {}) };
