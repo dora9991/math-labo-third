@@ -13,7 +13,10 @@
 .st-slot-l1{left:2%}.st-slot-l2{left:24%}
 .st-slot-c{left:50%;margin-left:min(-17%,-120px)}
 .st-slot-r{right:2%}
-.st-foe{right:3%;height:min(68%,620px);max-width:52%}
+.st-foe{right:2%;height:min(68%,620px);max-width:48%;z-index:2}
+/* 敵が出ている間は、味方は左の半分に収めて敵と重ならないようにする（敵は必ず手前） */
+.has-foe .st-chara{max-width:26%;z-index:1}
+.has-foe .st-slot-l1{left:1%}.has-foe .st-slot-l2{left:23%}
 .st-box{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(920px,calc(100% - 32px));min-height:22%;box-sizing:border-box;padding:22px 26px 18px;border:1.5px solid rgba(224,181,82,.75);border-radius:8px;background:linear-gradient(180deg,rgba(10,13,38,.92),rgba(6,8,24,.95));box-shadow:0 8px 30px rgba(0,0,0,.5)}
 .st-box p{margin:0;font-size:clamp(1rem,2.5vw,1.25rem);line-height:1.85;letter-spacing:.03em;white-space:pre-wrap}
 .st-box.is-nar p{color:#d7d2f0}
@@ -33,6 +36,9 @@
   .st-chara,.st-foe{height:min(52%,420px);max-width:56%;bottom:calc(30% - 8px)}
   .st-chara.is-ally{height:min(36%,300px)}
   .st-slot-l1{left:-2%}.st-slot-l2{left:30%}.st-slot-c{left:50%;margin-left:-28%}.st-slot-r{right:-2%}
+  .st-foe{right:-2%;max-width:50%}
+  .has-foe .st-chara{max-width:34%}
+  .has-foe .st-slot-l1{left:-3%}.has-foe .st-slot-l2{left:20%}
   .st-box{min-height:26%;padding:20px 18px 14px}
   .st-title{max-width:52%;font-size:.75rem}
 }

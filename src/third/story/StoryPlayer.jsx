@@ -103,7 +103,7 @@ export default function StoryPlayer({ scene, onDone }) {
       {scene.title && <div className="st-title">{scene.title}</div>}
       <button className="st-skip" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); finish(); }}>スキップ ▶▶</button>
 
-      <div className="st-stage">
+      <div className={`st-stage ${showFoe && enemyUrl ? "has-foe" : ""}`}>
         {showFoe && enemyUrl && (
           <img className={`st-foe ${speaker?.who === "foe" ? "is-on" : ""}`} src={enemyUrl} alt="" draggable={false} />
         )}
