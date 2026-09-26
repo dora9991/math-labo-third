@@ -59,7 +59,7 @@ export const MISC = {
 const fracStr = (s, body, n) => `${s < 0 ? "−" : ""}${body}/${n}`;
 
 // 1. 文字式の表記ルール（積・商）
-//    実問題: x×4→4x / 0.5×x→0.5x / 1×n→n / −x÷6→−x/6 / 5x÷2→5x/2 など
+//    実問題: x×4→4x / 0.5×x→0.5x / 1×n→n / −x÷6→−x/6 / 5x÷2→5/2 x など
 function genRule() {
   const r = Math.random();
   const vs = ["x", "a", "y", "n"];
@@ -96,18 +96,19 @@ function genRule() {
         { val: fracStr(neg ? -1 : 1, n, v), tag: "div-frac" },
         { val: fracStr(neg ? 1 : -1, v, n), tag: "sign-flip" }]) };
   }
-  // (d) 係数つき文字÷数 → 5x÷2 → 5x/2（約分できない＝既約になる係数・分母だけ使う）
+  // (d) 係数つき文字÷数 → 5x÷2 → 5/2 x（数の部分を分数にして、文字は後ろ。約分できない係数・分母だけ使う）
+  //     ※「5x/2」と書くと表示の分数変換が 5＋(x/2) と読んでしまうので、答えは「5/2x」の形にする
   const a = ri(2, 7);
   const gcd = (x, y) => (y ? gcd(y, x % y) : x);
   const cand = [2, 3, 4, 5, 6].filter((k) => k !== a && gcd(a, k) === 1);
   const n = cand[ri(0, cand.length - 1)];
-  const ans = `${a}${v}/${n}`;
+  const ans = `${a}/${n}${v}`;
   return { q: `${a}${v} ÷ ${n} を、文字式の表し方で書くと？`, ans,
-    steps: ["÷ は分数で書く", `分子は ${a}${v}、分母は ${n}`],
+    steps: ["÷ は分数で書く（わる数を下に）", `${a}${v} ÷ ${n} ＝ ${a}/${n} × ${v}。数の分数を先に、文字は後ろに書く`],
     distractors: opts(ans, [
       { val: `${a}${v}÷${n}`, tag: "div-frac" },
-      { val: `${n}${v}/${a}`, tag: "div-frac" },
-      { val: `${a}/${n}${v}`, tag: "calc" }]) };
+      { val: `${n}/${a}${v}`, tag: "div-frac" },
+      { val: `${a * n}${v}`, tag: "calc" }]) };
 }
 
 // 2. 式の値（代入）
