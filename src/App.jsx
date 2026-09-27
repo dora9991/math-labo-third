@@ -2329,6 +2329,7 @@ export default function App() {
       onChapterBoss={(chapter) => { setThirdStart({ screen: "battle", params: { grade, chapterId: chapter.id, kind: "chapterBoss", demo: !chapterBattlesCleared(thirdState, grade, chapter) } }); setScreen("third"); }}
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
+      onDex={() => { setThirdStart({ screen: "dex", params: {} }); setScreen("third"); }}
       onRoom={MULTIPLAY_OPEN && THIRD_SERVER && !isGuest() ? () => { setThirdStart({ screen: "room", params: {} }); setScreen("third"); } : undefined} // マルチプレイ（サーバーモードのみ・ゲストは不可）
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
       onFeedback={() => setScreen("feedback")}

@@ -23,6 +23,9 @@ import SettingsScreen from "./SettingsScreen.jsx";
 import { fxScale, getFxSpeed } from "../../engine/fxSpeed.js";
 import { pickToday } from "../todayPick.js";
 import { DAILY, CRYSTAL } from "../gachaConfig.js";
+import { SPECIALIST_ROSTER } from "../specialistRoster.js";
+
+const DEX_TOTAL = SPECIALIST_ROSTER.length;
 
 // 毎日の目標（その日の検証済みの正解が5問で 💎+1）の表示。日付は日本時間。
 function dailyGoalText(state) {
@@ -106,6 +109,7 @@ export default function ThirdMenu(props) {
             <GameButton tone="gold" icon="📖" onClick={() => go({ view: "story" })}><strong>ものがたり{(() => { const n = countNew(grade, medalState, loadSeen()); return n > 0 ? `　NEW ${n}` : ""; })()}</strong><small>これまでのお話を見返そう</small></GameButton>
             <GameButton tone="danger" icon="🎰" onClick={props.onGacha}><strong>ガチャ</strong><small>💎 {medalState?.crystals ?? 0}個　{(medalState?.crystals ?? 0) >= 5 ? "いま引ける！" : `あと${5 - ((medalState?.crystals ?? 0) % 5 || 0)}個で1回`}</small></GameButton>
             <GameButton tone="violet" icon="🛡️" onClick={props.onParty}><strong>パーティ編成</strong><small>5体の仲間をえらぼう</small></GameButton>
+            <GameButton tone="blue" icon="📔" onClick={props.onDex}><strong>図鑑</strong><small>{Object.keys(medalState?.dex || {}).length} / {DEX_TOTAL}体　であった仲間をコレクション</small></GameButton>
             {props.onRoom && <GameButton tone="blue" icon="🤝" onClick={props.onRoom}><strong>みんなで戦う</strong><small>2〜5人で協力（部屋コードで集まる）</small></GameButton>}
             <GameButton tone="mint" icon="⚙️" onClick={() => go({ view: "settings" })}><strong>設定</strong><small>学年の変更・アラーム</small></GameButton>
           </div>

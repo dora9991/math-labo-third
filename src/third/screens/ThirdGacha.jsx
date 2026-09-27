@@ -7,7 +7,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useGame } from "../ThirdContext.jsx";
-import { GACHA } from "../gachaConfig.js";
+import { GACHA, CRYSTAL } from "../gachaConfig.js";
+import { SPECIALIST_ROSTER } from "../specialistRoster.js";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
 import { playGachaChargeSound, playGachaBurstSound, playGachaCardSound } from "../fx/sound.js";
 import "./gacha.css";
@@ -23,6 +24,8 @@ const RARITY = {
 };
 const RANK = { N: 0, R: 1, SR: 2, UR: 3 };
 const BURST_MS = 800;
+// 排出率パネル用：全140体の中の、レア度ごとの体数（1体あたりの確率＝レア度の確率÷この体数）
+const ROSTER_RARITY_COUNT = SPECIALIST_ROSTER.reduce((c, ch) => { c[ch.rarity] = (c[ch.rarity] || 0) + 1; return c; }, { N: 0, R: 0, SR: 0, UR: 0 });
 
 // きらきら粒（位置・大きさ・遅れをランダムに。レア度が高いほど多い）
 function Sparks({ count, seed }) {
@@ -46,6 +49,7 @@ export default function ThirdGacha({ nav }) {
   const [top, setTop] = useState(null);
   const [error, setError] = useState(null);
   const [round, setRound] = useState(0);
+  const [showRates, setShowRates] = useState(false); // 排出率パネル
   const timers = useRef([]);
   const busy = phase === "charge" || phase === "burst";
   const rar = top ? RARITY[top.rarity] : RARITY.N;
@@ -185,6 +189,7 @@ export default function ThirdGacha({ nav }) {
               {!canTen && <span className="gx-pull-lack">あと💎{GACHA.costPerPull * GACHA.packSize - save.crystals}個</span>}
             </button>
             <div className="gx-help">クリスタルは、確認問題・れんしゅう・バトル・章のボスを「はじめてクリア」したり、章や学年のクリア、「今日の目標」（5問せいかい）、クリア済みバトルの周回（1日5回まで）でもらえるよ。</div>
+            <button className="gx-link" onClick={() => setShowRates(true)} data-sfx="none">📊 排出率を見る</button>
           </>
         )}
         {error && <div className="gx-error">{error}</div>}
@@ -209,6 +214,37 @@ export default function ThirdGacha({ nav }) {
           </div>
         )}
       </div>
+
+      {showRates && (
+        <div className="gx-rates-backdrop" onClick={() => setShowRates(false)}>
+          <div className="gx-rates-card" onClick={(e) => e.stopPropagation()}>
+            <div className="gx-rates-title">📊 排出率</div>
+            <table className="gx-rates-table">
+              <thead><tr><th>レア度</th><th>確率</th><th>ガチャの中の体数</th><th>1体あたり</th></tr></thead>
+              <tbody>
+                {["UR", "SR", "R", "N"].map((k) => {
+                  const n = ROSTER_RARITY_COUNT[k];
+                  const per = n > 0 ? GACHA.rates[k] / n : 0;
+                  return (
+                    <tr key={k} className={`gx-rates-row-${k}`}>
+                      <td>{k}</td>
+                      <td>{(GACHA.rates[k] * 100).toFixed(0)}%</td>
+                      <td>{n}体</td>
+                      <td>{n > 0 ? (per * 100).toFixed(2) + "%" : "－"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="gx-rates-note">
+              ・{GACHA.packSize + GACHA.packBonus}連（{GACHA.packSize}回ぶんのクリスタルで）は、SR以上が必ず1体。<br />
+              ・UR天井：{GACHA.urPity}回ひいてもURが出なければ、{GACHA.urPity}回目は必ずUR。いまの天井まで あと{Math.max(0, GACHA.urPity - (save.pity?.sinceUR || 0))}回。<br />
+              ・被った子（すでに持っている子）が出たときは、💎{CRYSTAL.dupRefund}個が もどってくるよ。
+            </div>
+            <button className="gx-btn gx-btn-primary" onClick={() => setShowRates(false)} data-sfx="none">とじる</button>
+          </div>
+        </div>
+      )}
     </div>
   );
   return createPortal(ui, document.body);

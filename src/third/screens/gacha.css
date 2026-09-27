@@ -148,3 +148,23 @@
   .gx-actions{flex-direction:row;flex-wrap:wrap;justify-content:center;padding-bottom:8px}.gx-pull{width:min(44vw,300px);padding:8px 10px}.gx-help{display:none}
   .gx-char-wrap{height:40vh}.gx-reveal{padding-bottom:70px}.gx-list{padding-bottom:80px}
 }
+/* ガチャの種類タブ（通常／分野） */
+.gx-pools{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 6px}
+.gx-pool{padding:6px 10px;font:800 12px inherit;font-family:inherit;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,.35);background:rgba(8,10,34,.6);border-radius:999px}
+.gx-pool.on{border-color:#fde047;background:rgba(253,224,71,.22);box-shadow:0 0 12px rgba(253,224,71,.5)}
+.gx-pooldesc{font-size:12px;color:#ffe9b3;margin:0 0 6px;text-align:center;text-shadow:0 1px 3px #000}
+.gx-poolbox{background:rgba(6,8,30,.78);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 8px 4px;margin:0 0 8px;backdrop-filter:blur(3px)}
+
+/* 排出率パネル（2026-09-28） */
+.gx-rates-backdrop{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,3,12,.78);backdrop-filter:blur(3px)}
+.gx-rates-card{width:min(92vw,420px);max-height:82vh;overflow:auto;padding:18px 16px;border-radius:16px;border:1.5px solid rgba(255,233,168,.6);background:linear-gradient(180deg,rgba(16,20,52,.97),rgba(6,8,28,.98));box-shadow:0 14px 40px rgba(0,0,0,.55);color:#fff}
+.gx-rates-title{font-weight:900;font-size:16px;text-align:center;margin-bottom:12px;letter-spacing:.06em}
+.gx-rates-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.gx-rates-table th,.gx-rates-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(255,255,255,.14)}
+.gx-rates-table th{font-weight:800;color:#ffe9b3;font-size:11px}
+.gx-rates-row-N td:first-child{color:#b9bdd8;font-weight:900}
+.gx-rates-row-R td:first-child{color:#7fd0ff;font-weight:900}
+.gx-rates-row-SR td:first-child{color:#ffd166;font-weight:900}
+.gx-rates-row-UR td:first-child{color:#ff9ecb;font-weight:900}
+.gx-rates-note{margin-top:12px;font-size:11px;line-height:1.8;color:rgba(230,236,255,.8)}
+.gx-rates-card .gx-btn{margin-top:14px}
