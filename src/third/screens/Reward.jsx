@@ -56,7 +56,6 @@ export default function Reward({ nav, params }) {
                 {meters.map((m, i) => <ExpMeter key={m.c.id} character={m.c} from={Math.max(0, m.to - per)} to={m.to} delay={500 + i * 120} />)}
               </div>
             )}
-            <div className="mw-reward-pop" style={{ color: "#ffe9b3", animationDelay: "0.3s" }}>🪙 +{r.coins}</div>
             {r.kind === "chapterBoss" && r.isFirstClear && <div className="mw-reward-pop" style={{ color: "#ffe066", fontWeight: 900, animationDelay: "0.36s" }}>👑 章ボスを はじめて たおした！</div>}
             {(r.newMedals || []).some((m) => m.kind === "battle") && <div className="mw-reward-pop" style={{ color: "#fde047", fontWeight: 900, animationDelay: "0.38s" }}>⚔️ バトルメダル ゲット！</div>}
             {r.crystals > 0 && (

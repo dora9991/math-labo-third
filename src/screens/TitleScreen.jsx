@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as bgm from "../audio/bgm.js";
 import { getFxSpeed, prefersReducedMotion } from "../engine/fxSpeed.js";
+import { CHANGELOG } from "../data/changelog.js";
 
 const GLYPHS = [
   { c: "π", x: "7%", y: "21%", d: 0 }, { c: "∑", x: "89%", y: "27%", d: 1.2 },
@@ -19,6 +20,7 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
   const holdRef = useRef(null);
   const speedRef = useRef(getFxSpeed());
   const [complete, setComplete] = useState(() => speedRef.current === "off" || prefersReducedMotion());
+  const [showLog, setShowLog] = useState(false); // 更新情報
   const finishRef = useRef(null);
   useEffect(() => {
     bgm.play("op");
@@ -55,9 +57,37 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
       </div>
       <nav className="title-menu" aria-label="タイトルメニュー">
         <button onClick={onEnter}><span>◇</span> はじめる <span>◇</span></button>
-        {onHowTo && <button onClick={onHowTo}><span>◇</span> 遊び方 <span>◇</span></button>}
+        {onHowTo && (
+          <span className="title-howto-wrap">
+            {complete && <span className="title-howto-bubble" aria-hidden>💎 クリスタルの集め方も<br />載っているよ！</span>}
+            <button onClick={onHowTo}><span>◇</span> 遊び方 <span>◇</span></button>
+          </span>
+        )}
       </nav><div className="title-audio-note">SOUND ON　·　音楽が流れます</div>
+      {complete && (
+        <button className="title-changelog-btn" onClick={(e) => { e.stopPropagation(); setShowLog(true); }} data-sfx="none">
+          📜 更新情報
+        </button>
+      )}
       {!complete && <div className="title-skip-note">TAP OUTSIDE THE TITLE TO SKIP</div>}
     </main>
+    {showLog && (
+      <div className="title-changelog-backdrop" onPointerDown={(e) => { e.stopPropagation(); setShowLog(false); }}>
+        <div className="title-changelog-card" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="title-changelog-head">
+            <span>📜 更新情報</span>
+            <button onClick={() => setShowLog(false)} data-sfx="none">✕</button>
+          </div>
+          <div className="title-changelog-body">
+            {CHANGELOG.map((day) => (
+              <div className="title-changelog-day" key={day.date}>
+                <div className="title-changelog-date">{day.date}</div>
+                <ul>{day.items.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
   </div>;
 }

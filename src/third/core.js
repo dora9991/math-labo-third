@@ -7,7 +7,7 @@
 //  設計: Obsidian 設計メモ_math-labo-third_ゲームシステム論点整理（2026-09-21）
 // ============================================================
 import { SPECIALIST_ROSTER } from "./specialistRoster.js";
-import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./gachaConfig.js";
+import { STARTER_PARTY, PARTY_SIZE, GACHA, REWARD, VERIFY, MEDAL, CREDIT, CRYSTAL, DAILY, SYNTH } from "./gachaConfig.js";
 import { DIFFICULTY_KEYS } from "./balance.js";
 import { labUnitIdForBattle } from "./link.js";
 import { chaptersForGrade } from "../data/index.js";
@@ -34,7 +34,6 @@ export function initialThirdState() {
   return {
     v: 2,
     crystals: 0, // ガチャの通貨（旧ガチャチケット）。5個で1回
-    coins: 0,
     owned: Object.fromEntries(STARTER_PARTY.map((id, i) => [id, { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: i + 1 }])), // n＝入手した順
     acqSeq: STARTER_PARTY.length,
     spares: {}, // ガチャで被った子の予備の数 { id: 個数 }。合成（経験値にする）か限界突破に使う
@@ -84,7 +83,7 @@ export function normalizeThirdState(s) {
   // 旧ガチャチケット(1枚=1回)は、クリスタル(5個=1回)に換算して引き継ぐ
   out.crystals = Math.max(0, Math.round(Number(s.crystals ?? (Number(s.tickets) || 0) * GACHA.costPerPull) || 0));
   delete out.tickets;
-  out.coins = Math.max(0, Number(out.coins) || 0);
+  delete out.coins; // コイン制度は廃止（2026-09-29）。旧データに残っていても捨てる
   out.pity = { ...base.pity, ...(s.pity || {}) };
   out.cleared = s.cleared && typeof s.cleared === "object" ? s.cleared : {};
   out.chapterDone = s.chapterDone && typeof s.chapterDone === "object" ? s.chapterDone : {};
@@ -339,27 +338,30 @@ function applyClaimCore(state, claim, now) {
   s.lastClaimAt = now;
   const verified = { correct: v.correct, total: v.total, needed: VERIFY.minCorrect };
   if (v.correct < VERIFY.minCorrect) {
-    return { ok: true, state: s, rewards: { granted: false, reason: "not-enough-correct", crystals: 0, coins: 0, exp: 0, isFirstClear: false }, verified, rows: v.rows };
+    return { ok: true, state: s, rewards: { granted: false, reason: "not-enough-correct", crystals: 0, exp: 0, isFirstClear: false }, verified, rows: v.rows };
   }
-  if (claim.kind === "chapterBoss") { // 章ボス：はじめて倒した時だけ、クリスタルとコイン（周回は報酬なし）
+  if (claim.kind === "chapterBoss") { // 章ボス：はじめて倒した時だけクリスタル（周回は報酬なし）
     const bkey = `${claim.grade}:${claim.chapterId}`;
     const firstBoss = !s.bossDone[bkey];
-    let crystals = 0, coins = 0;
-    if (firstBoss) { crystals = CRYSTAL.chapterBossFirst; coins = BOSS_REWARD.firstCoins; s.bossDone[bkey] = now; }
-    s.crystals += crystals; s.coins += coins;
+    let crystals = 0;
+    if (firstBoss) { crystals = CRYSTAL.chapterBossFirst; s.bossDone[bkey] = now; }
+    s.crystals += crystals;
     const gradeBonus = firstBoss ? awardGradeClear(s, claim.grade, now) : 0;
-    return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, gradeBonus, coins, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
+    return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, gradeBonus, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
   }
   const key = `${claim.grade}:${claim.chapterId}:${claim.subUnitId}`;
   const first = !s.cleared[key];
   rollDaily(s, now);
-  let crystals = 0, coins = 0, exp = 0, reason = null;
+  let crystals = 0, exp = 0, reason = null;
   const baseExp = getSubUnitClearExpReward(claim.grade, claim.chapterId, claim.subUnitId);
+  // 経験値：雑魚を倒したぶん(mobExpShare)は2回目以降も減らさない。減るのはボスぶんだけ（2026-09-29 kazu指定）。
+  const mobExp = Math.floor(baseExp * REWARD.mobExpShare);
+  const bossExp = baseExp - mobExp;
   if (first) {
-    crystals = REWARD.firstCrystals; coins = REWARD.firstCoins; exp = baseExp;
+    crystals = REWARD.firstCrystals; exp = baseExp;
   } else if (s.daily.repeat < REWARD.repeatDailyMax) {
-    coins = REWARD.repeatCoins; exp = Math.round(baseExp * REWARD.repeatExpRate);
-    if (s.daily.repeat < REWARD.repeatCrystalMax) crystals = REWARD.repeatCrystals; // 周回ボーナス（1日5回まで）
+    exp = mobExp + Math.round(bossExp * REWARD.repeatExpRate);
+    if (s.daily.repeat < REWARD.repeatCrystalMax) crystals = REWARD.repeatCrystals; // 周回ボーナス（1日10個まで）
     s.daily.repeat += 1;
   } else reason = "daily-limit";
   s.cleared[key] = { first: s.cleared[key]?.first || now, count: (s.cleared[key]?.count || 0) + 1 };
@@ -373,12 +375,11 @@ function applyClaimCore(state, claim, now) {
     chapterBonus = CRYSTAL.chapterClear; s.chapterDone[ck] = now;
   }
   s.crystals += crystals + chapterBonus;
-  s.coins += coins;
   const gradeBonus = chapterBonus > 0 ? awardGradeClear(s, claim.grade, now) : 0;
   const members = s.party.filter(Boolean);
   const perMember = members.length ? Math.floor(exp / members.length) : 0;
   for (const id of members) addExp(s.owned[id], claim.grade, perMember);
-  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, coins, exp, perMember, isFirstClear: first, newMedals }, verified, rows: v.rows };
+  return { ok: true, state: s, rewards: { granted: true, reason, crystals, chapterBonus, gradeBonus, exp, perMember, isFirstClear: first, newMedals }, verified, rows: v.rows };
 }
 
 // ---------------- 実時間の持ち分 ----------------

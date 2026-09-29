@@ -12,7 +12,6 @@ export const GACHA = {
   urPity: 100, // 100回引いてもURが出なければ、100回目はUR確定（天井）
   maxBreaks: 4, // 被り＝限界突破(凸)の上限
   breakBonus: 0.05, // 凸1回ごとの hp/atk 上乗せ（最大 +20%）
-  overflowCoins: 50, // 凸が上限を超えた被り1体あたりのコイン
 };
 
 // 合成（合成するキャラを、ほかの仲間の経験値にする。2026-09-25 kazu指定：キャラ1体＝200＋その子の経験値÷2）
@@ -20,15 +19,14 @@ export const GACHA = {
 //  ・持っている仲間（パーティ外）を素材にすると、200＋（その子の経験値の半分）
 export const SYNTH = { baseExp: 200, expRate: 0.5 };
 
-// バトルのご褒美（初回クリア/2回目以降）
+// バトルのご褒美（初回クリア/2回目以降）。2026-09-29 kazu指定：コイン制度は廃止（クリスタルのみ）。
 export const REWARD = {
   firstCrystals: 2, // 小単元バトルの初回クリア：クリスタル2個
-  firstCoins: 60,
-  repeatCoins: 15,
-  repeatExpRate: 0.3, // 2回目以降の経験値は初回の30%
-  repeatDailyMax: 10, // 1日に2回目以降で報酬を受け取れる回数
+  mobExpShare: 0.6, // 経験値のうち「雑魚を倒した分」の割合（2026-09-18のバトル画面の配分と同じ）。2回目以降もここは減らさない
+  repeatExpRate: 0.3, // 2回目以降の経験値は、ボスぶん(1-mobExpShare)だけ初回の30%に（雑魚ぶんは変わらず全額）
+  repeatDailyMax: 10, // 1日に2回目以降で経験値を受け取れる回数
   repeatCrystals: 1, // 2回目以降のクリアでも、クリスタルが少しずつ入る（周回ボーナス）
-  repeatCrystalMax: 5, // …ただし1日5回まで（それ以降はコイン・経験値のみ）
+  repeatCrystalMax: 10, // …ただし1日10個まで（2026-09-29 kazu指定：5個→10個に引き上げ）
 };
 
 // バトル結果の検証（サーバー）
@@ -49,13 +47,11 @@ export const VERIFY = {
 //  ・章クリアボーナス：その章の小単元バトルを全部はじめてクリアした時：5個（＝ガチャ1回。章ごとに1回）
 //  ・章ボス初撃破：メダル2枚をそろえた小単元がその章で全部ひらいている状態で、章ボスをはじめて倒した時：5個（章ごとに1回）
 //  ・被りの還元：ガチャで持っている仲間が出た（凸・コインになった）時：1個（外れた感じをやわらげる）
-//  ・周回ボーナス：クリア済みの小単元にもう一度勝つと 1個（1日5回まで）
+//  ・周回ボーナス：クリア済みの小単元にもう一度勝つと 1個（1日10個まで）
 //  ・毎日の目標：その日の検証済みの正解が合計5問に届いたら 1個（1日1回）
 //  ・学年クリアボーナス：その学年の全章の章クリアボーナスと章ボス初撃破がそろったら 30個（学年ごとに1回）
 export const CRYSTAL = { confirmFirst: 1, practiceLevelFirst: 1, practiceLevelTarget: 5, chapterClear: 5, chapterBossFirst: 5, dupRefund: 1, dailyMission: 1, gradeClear: 30 };
 export const DAILY = { missionTarget: 5 }; // 毎日の目標：検証済みの正解 5問
-// 章ボス初撃破のコイン（周回では出さない）
-export const BOSS_REWARD = { firstCoins: 100 };
 
 // メダル（サーバーが付与）
 export const MEDAL = {

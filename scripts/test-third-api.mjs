@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, BOSS_REWARD, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -277,9 +277,9 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   const bossClaim = (nonce, seedBase, ul = units) => ({ nonce, pv: T.PROBLEM_VERSION, grade: 1, chapterId: ch.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: attemptsFor(ul, 12, seedBase) });
   const before = (await s.load("ch1")).state;
   let b = await call(s, "claim", { claim: bossClaim("boss1-" + Math.random().toString(36).slice(2, 10), 7000000) }, "ch1", now); now += 5 * MIN;
-  t("章ボス初撃破: クリスタル5個＋コイン100", b.status === 200 && b.body.rewards.kind === "chapterBoss" && b.body.rewards.crystals === T.CRYSTAL.chapterBossFirst && b.body.rewards.coins === T.BOSS_REWARD.firstCoins && b.body.state.crystals === before.crystals + T.CRYSTAL.chapterBossFirst, JSON.stringify(b.body.rewards || b.body));
+  t("章ボス初撃破: クリスタル5個", b.status === 200 && b.body.rewards.kind === "chapterBoss" && b.body.rewards.crystals === T.CRYSTAL.chapterBossFirst && b.body.state.crystals === before.crystals + T.CRYSTAL.chapterBossFirst, JSON.stringify(b.body.rewards || b.body));
   b = await call(s, "claim", { claim: bossClaim("boss2-" + Math.random().toString(36).slice(2, 10), 8000000) }, "ch1", now); now += 5 * MIN;
-  t("章ボス: 2回目以降は報酬なし（何度でも挑戦はできる）", b.status === 200 && b.body.rewards.crystals === 0 && b.body.rewards.coins === 0 && b.body.rewards.reason === "boss-repeat");
+  t("章ボス: 2回目以降は報酬なし（何度でも挑戦はできる）", b.status === 200 && b.body.rewards.crystals === 0 && b.body.rewards.reason === "boss-repeat");
   const foreign = { ...bossClaim("boss3-" + Math.random().toString(36).slice(2, 10), 9000000), attempts: Array.from({ length: 12 }, (_, i) => ({ unitId: "zzz", level: "easy", seed: 9000000 + i, answer: "1", ms: 3000 })) };
   b = await call(s, "claim", { claim: foreign }, "ch1", now);
   t("章ボス: その章に無い単元の解答は数えない（申請は不正で拒否 or 報酬なし）", b.status === 400 || (b.status === 200 && b.body.rewards.crystals === 0));
@@ -307,11 +307,23 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   { const s = await withMedals("rp1", allUnits); let now = T0 + 5 * MIN;
     const first = await call(s, "claim", { claim: subClaim(ch, 0, 10000000, now) }, "rp1", now); now += 5 * MIN;
     const got = [];
-    for (let i = 0; i < 7; i++) { const r = await call(s, "claim", { claim: subClaim(ch, 0, 10100000 + i * 100, now) }, "rp1", now); now += 3 * MIN; got.push(r.body.rewards.crystals); }
-    t("周回ボーナス: 初回は💎2、2回目以降は1日5回まで💎1（6回目からは0）", first.body.rewards.crystals === T.REWARD.firstCrystals && JSON.stringify(got) === JSON.stringify([1, 1, 1, 1, 1, 0, 0]), JSON.stringify(got));
+    for (let i = 0; i < 12; i++) { const r = await call(s, "claim", { claim: subClaim(ch, 0, 10100000 + i * 100, now) }, "rp1", now); now += 3 * MIN; got.push(r.body.rewards.crystals); }
+    t("周回ボーナス: 初回は💎2、2回目以降は1日10回まで💎1（11回目からは0）", first.body.rewards.crystals === T.REWARD.firstCrystals && JSON.stringify(got) === JSON.stringify([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0]), JSON.stringify(got));
     // 翌日はまた5回
     now = T0 + 26 * 60 * MIN; const nx = await call(s, "claim", { claim: subClaim(ch, 0, 10900000, now) }, "rp1", now);
     t("周回ボーナス: 翌日（日本時間）はまた💎1がもらえる", nx.body.rewards.crystals === 1, JSON.stringify(nx.body.rewards));
+  }
+  // --- コインは廃止。経験値は「雑魚のぶん」は2回目以降も減らない（減るのはボスのぶんだけ）
+  { const s = await withMedals("rp2", allUnits); let now = T0 + 5 * MIN;
+    const first = await call(s, "claim", { claim: subClaim(ch, 0, 20000000, now) }, "rp2", now); now += 5 * MIN;
+    const repeat = await call(s, "claim", { claim: subClaim(ch, 0, 20100000, now) }, "rp2", now);
+    const baseExp = T.getSubUnitClearExpReward(1, ch.id, ch.units[0].id);
+    const mobExp = Math.floor(baseExp * T.REWARD.mobExpShare);
+    const bossExp = baseExp - mobExp;
+    const expectRepeatExp = mobExp + Math.round(bossExp * T.REWARD.repeatExpRate);
+    t("コインは無い（報酬にcoinsが無い）", first.status === 200 && !("coins" in first.body.rewards) && !("coins" in repeat.body.rewards), JSON.stringify(first.body.rewards));
+    t("初回クリアの経験値は満額", first.body.rewards.exp === baseExp, JSON.stringify({ exp: first.body.rewards.exp, baseExp }));
+    t("2回目以降：雑魚のぶんは満額のまま、ボスのぶんだけ減る", repeat.body.rewards.exp === expectRepeatExp && expectRepeatExp > mobExp, JSON.stringify({ exp: repeat.body.rewards.exp, mobExp, expectRepeatExp }));
   }
   // --- 毎日の目標：その日の検証済みの正解が5問で💎1（1日1回）
   { const s = makeStore(); await call(s, "get_state", {}, "dm1", T0);
