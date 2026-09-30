@@ -36,13 +36,13 @@ function dailyGoalText(state) {
   return `今日の目標：あと${Math.max(0, DAILY.missionTarget - ok)}問せいかいで 💎+${CRYSTAL.dailyMission}`;
 }
 
-function Shell({ player, back, onBack, children, transitionKey, reverse = false }) {
+function Shell({ player, back, onBack, children, transitionKey, reverse = false, progress = null }) {
   const speed = getFxSpeed();
   const duration = Math.round(320 * fxScale(speed));
   return (
     <div className="app home-hub">
       <MathBackdrop />
-      <Header player={player} back={back} onBack={onBack} />
+      <Header player={player} back={back} onBack={onBack} progress={progress} />
       <main className="content home-content" style={{ paddingBottom: 40 }}>
         <div key={transitionKey} className={`menu-screen-transition ${reverse ? "is-reverse" : ""} ${speed === "off" ? "is-off" : ""}`} style={{ "--menu-transition-ms": `${duration}ms` }}>{children}</div>
       </main>
@@ -58,6 +58,14 @@ const Title = ({ children, sub }) => (
 );
 
 // 「はいち」「れんしゅう」のメダル2枚の表示（獲得＝金色）
+// ヘッダー用：この学年で集めたメダルの数（小単元ごとに はいち・れんしゅう・バトル の3枚）。
+//  以前のヘッダーは数学ラボ2の「単元サイクル」の数（ラボ3では増えない）を出していて、ずっと 0/32 のままだった。
+function gradeMedalProgress(chapters, medalState) {
+  const units = chapters.flatMap((c) => c.units || []);
+  const done = units.reduce((a, u) => a + unitMedals(medalState, u.id).count, 0);
+  return { done, total: units.length * 3, icon: "🏅", title: "この学年で集めたメダル（はいち・れんしゅう・バトル）" };
+}
+
 export function MedalPair({ m, size = 26, battleLocked = false }) {
   const dot = (on, icon, locked = false) => (
     <span title={locked ? "前のバトルをクリアすると開くよ" : undefined} style={{
@@ -82,7 +90,7 @@ export default function ThirdMenu(props) {
     const weak = props.quizWeakUnits || [];
     const today = pickToday({ chapters, medalState, mistakes: props.mistakes || [], quizWeakUnits: weak });
     return (
-      <Shell player={player} transitionKey={view}>
+      <Shell player={player} transitionKey={view} progress={gradeMedalProgress(chapters, medalState)}>
         <div className="menu-title-lockup">
           <div className="home-title-tab"><span>ASTRA ACADEMY ── ADVENTURER'S ARCHIVE</span><b>冒険の書</b><i>MENU</i></div>
           <div>{player.name ? `${player.name}、` : ""}きょうも数学をたのしもう！</div>

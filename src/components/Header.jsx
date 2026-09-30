@@ -4,7 +4,7 @@ import { levelColor, playerLevel, clearedCyclesInWorld } from "../engine/scoring
 import { chaptersForGrade } from "../data/index.js";
 import { isGuest } from "../auth/session.js";
 
-export default function Header({ player, back, onBack }) {
+export default function Header({ player, back, onBack, progress = null }) {
   const lv = playerLevel(player);   // 現在ワールドのレベル＝1＋クリア単元数
   const col = levelColor(lv);
   // バーは「この学年で何単元のサイクルをクリアしたか」を表す
@@ -26,12 +26,20 @@ export default function Header({ player, back, onBack }) {
           <button className="back-btn" onClick={onBack}>← {back}</button>
         ) : (
           <>
-            <div className="chip cs"><span aria-hidden>✦</span>{player.streaks}日</div>
-            <div className="chip cl">
-              <span style={{ fontSize: 11, fontWeight: 700, color: col }}>Lv.{lv}</span>
-              <div className="xpm"><div className="xpf" style={{ width: pct + "%", background: col }} /></div>
-              <span className="xpt">{cleared}/{total}単元</span>
-            </div>
+            <div className="chip cs" title="ログインした連続日数"><span aria-hidden>✦</span>{progress ? "連続" : ""}{player.streaks ?? 0}日</div>
+            {progress ? ( // 数学ラボ3：この学年で集めたメダルの数（ThirdMenu が渡す）
+              <div className="chip cl" title={progress.title}>
+                <span style={{ fontSize: 12 }} aria-hidden>{progress.icon}</span>
+                <div className="xpm"><div className="xpf" style={{ width: `${progress.total ? Math.min(100, (progress.done / progress.total) * 100) : 0}%`, background: "#fbbf24" }} /></div>
+                <span className="xpt">{progress.done}/{progress.total}</span>
+              </div>
+            ) : (
+              <div className="chip cl">
+                <span style={{ fontSize: 11, fontWeight: 700, color: col }}>Lv.{lv}</span>
+                <div className="xpm"><div className="xpf" style={{ width: pct + "%", background: col }} /></div>
+                <span className="xpt">{cleared}/{total}単元</span>
+              </div>
+            )}
           </>
         )}
       </div>
