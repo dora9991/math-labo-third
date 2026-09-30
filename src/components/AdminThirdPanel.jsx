@@ -31,6 +31,35 @@ const primary = { ...btn("#6366f1"), border: "none" };
 const box = { padding: "14px 16px" };
 const dim = { fontSize: 11.5, color: "rgba(255,255,255,.6)" };
 
+// ---- 生徒一覧の道具（2026-09-30：人数が多いと探せなかったので、検索・クラス・並び替え・CSVを追加）
+// 学校コード形式のID（E-101236＝学校E・コード10・1年2組36番）からクラスを読み取る。自由なIDは「その他」
+export function classOf(loginId) {
+  const m = /^([A-Z])-(\d{2})(\d)(\d)(\d{2})$/.exec(String(loginId || ""));
+  return m ? { key: `${m[1]}-${m[2]}:${m[3]}-${m[4]}`, label: `${m[3]}年${m[4]}組（${m[1]}-${m[2]}）`, no: Number(m[5]) } : { key: "other", label: "その他のID", no: 0 };
+}
+const SORTS = {
+  recent: { label: "最後にログインした順", cmp: (a, b) => String(b.loginDays?.[0] || "").localeCompare(String(a.loginDays?.[0] || "")) },
+  answers7d: { label: "この1週間の回答数が多い順", cmp: (a, b) => (b.answers7d || 0) - (a.answers7d || 0) },
+  rateLow: { label: "正答率が低い順", cmp: (a, b) => ((a.attempts ? a.correct / a.attempts : 2) - (b.attempts ? b.correct / b.attempts : 2)) },
+  number: { label: "出席番号（ID）順", cmp: (a, b) => String(a.loginId || "").localeCompare(String(b.loginId || ""), "ja", { numeric: true }) },
+  name: { label: "名前順", cmp: (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ja") },
+};
+const QUICK = {
+  all: { label: "全員", ok: () => true },
+  inactive: { label: "この1週間ログインなし", ok: (s, weekAgo) => !s.loginDays?.[0] || s.loginDays[0] < weekAgo },
+  lowRate: { label: "正答率60%未満（20問以上）", ok: (s) => s.attempts >= 20 && s.correct / s.attempts < 0.6 },
+  follow: { label: "要フォローの単元がある", ok: (s) => (s.weakUnits || []).length > 0 },
+};
+function csvOf(rows) {
+  const esc = (v) => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  return "\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\r\n"); // BOM付き＝Excelで文字化けしない
+}
+function downloadCsv(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 function Stat({ label, value, sub }) {
   return (
     <div style={{ flex: "1 1 120px", background: "rgba(255,255,255,.06)", borderRadius: 12, padding: "10px 12px" }}>
@@ -98,6 +127,10 @@ export default function AdminThirdPanel() {
   const [openId, setOpenId] = useState(null);
   const [overlay, setOverlay] = useState(isRateOverlayOn());
   const [myId, setMyId] = useState(null);
+  const [q, setQ] = useState("");
+  const [cls, setCls] = useState("all");
+  const [sortKey, setSortKey] = useState("recent");
+  const [quick, setQuick] = useState("all");
 
   useEffect(() => {
     if (!AUTH_ENABLED) return;
@@ -139,6 +172,31 @@ export default function AdminThirdPanel() {
         return { ...p, sample };
       });
   }, [data]);
+
+  // 生徒一覧：クラス・検索・しぼりこみ・並び替え
+  const classes = useMemo(() => {
+    const m = new Map();
+    for (const st of data?.students || []) { const c = classOf(st.loginId); if (!m.has(c.key)) m.set(c.key, { ...c, n: 0 }); m.get(c.key).n++; }
+    return [...m.values()].sort((a, b) => (a.key === "other") - (b.key === "other") || a.key.localeCompare(b.key));
+  }, [data]);
+  const shown = useMemo(() => {
+    const weekAgo = new Date(Date.now() + 9 * 3600e3 - 7 * 86400e3).toISOString().slice(0, 10);
+    const needle = q.trim().toLowerCase();
+    return (data?.students || [])
+      .filter((st) => cls === "all" || classOf(st.loginId).key === cls)
+      .filter((st) => !needle || String(st.name || "").toLowerCase().includes(needle) || String(st.loginId || "").toLowerCase().includes(needle))
+      .filter((st) => QUICK[quick].ok(st, weekAgo))
+      .sort(SORTS[sortKey].cmp);
+  }, [data, q, cls, quick, sortKey]);
+  function exportCsv() {
+    const head = ["クラス", "ID", "名前", "累計の回答数", "累計の正答率(%)", "この1週間の回答数", "この1週間のプレイ時間(分)", "累計のプレイ時間(分)", "はいちメダル", "れんしゅうメダル", "最後にログインした日", "ログインした日数(記録)", "仲間の数", "クリスタル", "要フォローの単元"];
+    const rows = shown.map((st) => [
+      classOf(st.loginId).label, st.loginId, st.name, st.attempts, st.attempts ? Math.round((st.correct / st.attempts) * 100) : "",
+      st.answers7d, Math.round((st.playMs7d || 0) / 6000) / 10, Math.round((st.playMsAll || 0) / 6000) / 10, st.medalHaichi, st.medalPractice,
+      st.loginDays?.[0] || "", (st.loginDays || []).length, st.owned, st.crystals, (st.weakUnits || []).map((u) => unitName(u.unitId)).join(" / "),
+    ]);
+    downloadCsv(`数学ラボ3_生徒一覧_${new Date().toISOString().slice(0, 10)}.csv`, csvOf([head, ...rows]));
+  }
 
   const w = data?.week;
   const maxDay = Math.max(1, ...(w?.days || []).map((d) => d.logins));
@@ -212,8 +270,23 @@ export default function AdminThirdPanel() {
           <AdminLogsPanel pass={pass} students={data.students} />
 
           {/* 生徒ごと */}
-          <div style={{ fontSize: 12.5, fontWeight: 900, margin: "6px 0" }}>👥 生徒ごとの詳細（{data.students.length}人）</div>
-          {data.students.map((s) => {
+          <div style={{ fontSize: 12.5, fontWeight: 900, margin: "6px 0" }}>👥 生徒ごとの詳細（{shown.length} / {data.students.length}人）</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+            <input style={{ ...inp, width: 170, fontWeight: 700 }} value={q} placeholder="🔍 名前・IDで探す" onChange={(e) => setQ(e.target.value)} aria-label="名前・IDで探す" />
+            <select style={{ ...inp, width: "auto" }} value={cls} onChange={(e) => setCls(e.target.value)} aria-label="クラス">
+              <option value="all">すべてのクラス</option>
+              {classes.map((c) => <option key={c.key} value={c.key}>{c.label}（{c.n}人）</option>)}
+            </select>
+            <select style={{ ...inp, width: "auto" }} value={quick} onChange={(e) => setQuick(e.target.value)} aria-label="しぼりこみ">
+              {Object.entries(QUICK).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select style={{ ...inp, width: "auto" }} value={sortKey} onChange={(e) => setSortKey(e.target.value)} aria-label="並び替え">
+              {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <button style={btn()} onClick={exportCsv} disabled={!shown.length}>⬇ CSVで保存（{shown.length}人）</button>
+          </div>
+          {shown.length === 0 && <div style={{ ...dim, marginBottom: 8 }}>条件にあう生徒はいません</div>}
+          {shown.map((s) => {
             const open = openId === s.id;
             const p = pct(s.correct, s.attempts);
             const unitRows = Object.entries(s.units || {}).map(([id, v]) => ({ id, ...v, rate: v.c / v.t })).sort((a, b) => a.rate - b.rate);
@@ -222,7 +295,7 @@ export default function AdminThirdPanel() {
                 <button data-sfx="none" onClick={() => setOpenId(open ? null : s.id)}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "#fff", cursor: "pointer", fontFamily: "inherit", textAlign: "left", padding: 0 }}>
                   <span style={{ fontSize: 13.5, fontWeight: 900, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {s.name}{s.id === myId ? "（自分）" : ""} <span style={{ fontWeight: 700, fontSize: 11, color: "rgba(255,255,255,.45)" }}>ID:{s.loginId}</span>
+                    {s.name}{s.id === myId ? "（自分）" : ""} <span style={{ fontWeight: 700, fontSize: 11, color: "rgba(255,255,255,.45)" }}>ID:{s.loginId}{classOf(s.loginId).key !== "other" ? `・${classOf(s.loginId).label.replace(/（.*）/, "")}` : ""}</span>
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,.7)" }}>{s.attempts}問{p != null ? `・${p}%` : ""}</span>
                   <span style={{ fontSize: 10.5, color: "rgba(255,255,255,.45)" }}>{s.loginDays?.[0] ? `最終 ${md(s.loginDays[0])}` : "未ログイン"}</span>
