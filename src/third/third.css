@@ -1663,3 +1663,12 @@
 
 /* 予備(ダブり)の数などの小さなバッジ（2026-09-25） */
 .mw-spare-badge{position:absolute;right:2px;bottom:2px;padding:1px 6px;border-radius:999px;font-size:10.5px;font-weight:900;color:#1b1233;background:linear-gradient(135deg,#fde68a,#fbbf24);box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none}
+
+/* ボスの予告・技名／雑魚の「得意な状態異常」タグ（2026-09-26） */
+.mw-boss-notice { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 12; max-width: 92%; padding: 5px 12px; font-size: 12.5px; font-weight: 900; color: #fff; text-align: center; background: rgba(20,10,40,.88); border: 1px solid rgba(255,190,90,.7); box-shadow: 0 0 14px rgba(255,150,60,.4); animation: mw-notice-in .35s ease-out; }
+.mw-boss-notice.is-warn { color: #ffe066; border-color: #ff5a3a; box-shadow: 0 0 18px rgba(255,80,50,.7); animation: mw-notice-in .35s ease-out, mw-notice-pulse .8s ease-in-out infinite .35s; }
+@keyframes mw-notice-in { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes mw-notice-pulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.5); } }
+.mw-enemy-tag { font-size: 10.5px; font-weight: 800; color: #ffd0d0; text-shadow: 0 1px 3px #000; text-align: center; line-height: 1.2; }
+.mw-enemy-fx { color: #ffe066; }
+.mw-partyfx { margin-left: 8px; font-size: 11px; font-weight: 800; color: #9be7ef; }

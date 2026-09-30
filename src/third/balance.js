@@ -24,7 +24,9 @@ export const DIFFICULTY_LABEL = { easy: "簡単", standard: "普通", advanced: 
 // dmgMult＝ダメージ倍率 / capFrac＝1回の正解で1体の敵から削れる上限（敵最大HPの割合）
 export const DIFFICULTIES = {
   // 簡単だけ、不正解で進むゲージを1/4に（2026-09-30：苦手な子が簡単を選んでも序盤・後半で負け続けていたため。playtest.mjs）
-  easy: { dmgMult: 0.7, capFrac: 0.15, penaltyFrac: 0.25 },
+  // 2026-09-30（状態異常システム込みの通しシミュレーション playtest-journey.mjs で調整）：簡単は倍率0.7→0.8・上限15%→20%。
+  //  苦手な子が簡単で戦っても、学年の後半で3%しか1回目に勝てなかった（倒すのに正解が7問以上要り、その間に敵が何度も動く）。
+  easy: { dmgMult: 0.8, capFrac: 0.2, penaltyFrac: 0.25 },
   standard: { dmgMult: 1.0, capFrac: 0.25 },
   advanced: { dmgMult: 1.2, capFrac: 0.35 },
   oni: { dmgMult: 1.5, capFrac: 0.5 },
@@ -46,11 +48,27 @@ export const ENEMY = {
   bossHitsToKill: 12, // ボスを、初期パーティが普通で倒すのに要る正解数
   mobActionFrac: 0.072, // 雑魚の1波が1回の行動で与える合計ダメージ（REF_HPに対する割合。体数で等分）
   bossActionFrac: 0.11, // ボスの1回の行動ダメージ（REF_HPに対する割合）
-  hpPerTier: 2.2, // カリキュラム末尾の敵HPは先頭の 1+この値 倍
-  dmgPerTier: 5, // 同、敵のダメージ。【2026-09-26】9→5に下げた：学年の後半で敵のダメージが急に上がり、N/R/SR編成が勝てなくなっていた（playtest2.mjs）
-  earlyDmg: 0.32, // 序盤(tierが小さい)の敵の攻撃を弱める倍率（tier=0で×earlyDmg → earlyUntilで×1）＝最初の戦闘は勝てる。2026-09-30 0.42→0.32（苦手な子の最初のバトルの勝率が37%だった）
+  hpPerTier: 1.6, // カリキュラム末尾の敵HPは先頭の 1+この値 倍。2026-09-30 2.2→1.6
+  dmgPerTier: 3, // 同、敵のダメージ。【2026-09-26】9→5（学年の後半で N/R/SR編成が勝てなくなっていた）→【2026-09-30】5→3（状態異常込みで、学年の最初から最後まで
+  //   敵の1回のダメージがパーティHPに対して約5倍に伸び、得意な子でも学年の終わりは1回目の勝率38%だった。playtest-journey.mjs）
+  earlyDmg: 0.45, // 序盤(tierが小さい)の敵の攻撃を弱める倍率（tier=0で×earlyDmg → earlyUntilで×1）＝最初の戦闘は勝てる。
+  //   2026-09-30：0.42→0.32→0.45（伸び dmgPerTier を下げたので、序盤と終盤の差が大きくなりすぎないよう少し戻した）
   earlyUntil: 0.3,
-  bossKindMult: { unitSmallBoss: 1, chapterBoss: 1.5, unitBoss: 1.3, finalBoss: 2 },
+  // chapterBoss 1.5→1.3（2026-09-30：苦手な子が学年の後半の章ボスに平均5〜6回負け、2割が12回でも勝てなかった）。
+  //  raidBase＝協力プレイの裏ボスの土台（章ボスの以前の強さのまま。raid.js）
+  bossKindMult: { unitSmallBoss: 1, chapterBoss: 1.3, unitBoss: 1.3, finalBoss: 2, raidBase: 1.5 },
+};
+
+// 状態異常のかかりやすさ（2026-09-30：バランス調整のため、ここに集めた。効果の中身＝何ターン続くか等は battleEngine.js の STATUS_DEFS）
+//  実際の確率 ＝ baseChance ＋ 技のボーナス − 耐性/100（0〜95%）。耐性100はかからない。
+export const STATUS_TUNING = {
+  baseChance: { poison: 0.6, paralysis: 0.5, sleep: 0.5, petrification: 0.25, confusion: 0.5 },
+  mobShare: 0.6, // 「得意な状態異常」を持つ雑魚の割合
+  // 2026-09-30：0.45→0.30／0.3→0.15／0.35→0.2。状態異常のせいで負ける回数が約3倍になっていた（得意・普通の子の小単元の負け：状態異常なし約12回→あり約43回／学年）。
+  mobAttackChance: 0.3, // 雑魚の攻撃のうち、状態異常もしかけてくる割合
+  mobBonus: 0.15, // 雑魚の状態異常の攻撃のかかりやすさ（確率に足す）
+  bossBonus: 0.2, // ボスの状態異常の技のかかりやすさ（確率に足す）
+  secretBonus: 0.35, // 裏ボス（やり込み）の複合状態異常のかかりやすさ。裏ボスは状態異常が見せ場なので、ふつうのボスより強めにしておける
 };
 
 /**

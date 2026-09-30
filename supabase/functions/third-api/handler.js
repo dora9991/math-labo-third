@@ -41,7 +41,7 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       return { status: 200, body: { state, pv: PROBLEM_VERSION, now } };
     }
     case "gacha": {
-      const r = pullGacha(state, Number(body.count), rand);
+      const r = pullGacha(state, Number(body.count), rand, typeof body.pool === "string" ? body.pool : "normal");
       if (!r.ok) return { status: 400, body: { error: r.error, state } };
       if (!(await commit(r.state))) return conflict;
       await store.logGacha?.(userId, r.results);

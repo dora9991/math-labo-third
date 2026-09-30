@@ -88,6 +88,8 @@ function GrantTools({ run, busy }) {
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
         <button style={btn()} disabled={busy} onClick={() => go("clearAllMedals", {}, "全小単元のメダル（はいち・れんしゅう・バトル）を全部そろえて、バトルを全解放します", true)}>🏅 全クリア（メダル全部）</button>
+        <span style={{ fontSize: 12, fontWeight: 800 }}>👑 章ボス全部クリア</span>
+        {[["all", "全学年"], [1, "中1"], [2, "中2"], [3, "中3"]].map(([g, label]) => <button key={g} style={btn()} disabled={busy} onClick={() => go("clearAllBosses", { grade: g }, `${label}の章ボスを全部クリアしたことにして、学年クリアにします（クリスタルは付きません。裏ボスが出てきます）`, true)}>{label}</button>)}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 800 }}>🐾 仲間を追加</span>

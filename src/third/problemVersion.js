@@ -1,2 +1,2 @@
 // 自動生成（scripts/gen-problem-version.mjs）。手で編集しない。問題データ/生成ロジックのハッシュ。
-export const PROBLEM_VERSION = "67fd1c9e756b";
+export const PROBLEM_VERSION = "d06c66460dc8";

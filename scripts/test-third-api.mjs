@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export * from "./src/third/secretBoss.js"; export * from "./src/third/enemyMoves.js"; export * from "./src/third/enemyFx.js"; export * from "./src/third/skillDefs.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { STATUS_KEYS, STATUS_DEFS, rollStatusInflict, applyStatusEffect, tickStatusEffects, canActThisRound, canUseSkillThisRound } from "./src/third/battleEngine.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -520,6 +520,152 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
     if (overlap(e, o) > 0.2) battleSame.push(u);
   }
   t("バトル：難易度を変えると問題も変わる（とけた式の単元も）", battleSame.length === 0, battleSame.join(","));
+}
+
+// ---------------- 裏ボス（やり込み・非公開）：順番・ごほうび・検証 ----------------
+{
+  const units1 = T.chaptersForGrade(1).flatMap((c) => c.units.map((u) => u.id));
+  const mkAttempts = (n, seedBase) => Array.from({ length: n }, (_, i) => { const uid = units1[i % units1.length]; const lv = ["easy", "standard", "advanced", "oni"][i % 4]; let seed = seedBase + i, p = T.generateThirdProblem(uid, lv, seed); for (let k = 1; !p && k < 60; k++) { seed = seedBase + i + k * 1000; p = T.generateThirdProblem(uid, lv, seed); } return { unitId: uid, level: p.level, seed, answer: p.choices[p.correctIndex], ms: 3000 }; });
+  const s = makeStore(); await call(s, "get_state", {}, "sc1", T0);
+  const claimOf = (idx, seedBase, n = 24) => ({ nonce: "sc-" + idx + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, kind: "secretBoss", index: idx, startedAt: T0, endedAt: T0 + 1, attempts: mkAttempts(n, seedBase) });
+  let now = T0 + 10 * MIN;
+  let r = await call(s, "claim", { claim: claimOf(0, 70000000) }, "sc1", now); now += 3 * MIN;
+  t("裏ボス: 学年をクリアする前は挑戦できない(locked)", r.status === 400 && r.body.error === "locked", JSON.stringify(r.body.error));
+  const g = await s.load("sc1"); g.state.gradeDone = { 1: 1 }; g.state.owned = g.state.owned; await s.save("sc1", g.state, g.version);
+  r = await call(s, "claim", { claim: claimOf(1, 70010000) }, "sc1", now); now += 3 * MIN;
+  t("裏ボス: 前の裏ボスを倒していないと次は挑戦できない", r.status === 400 && r.body.error === "locked");
+  const before = (await s.load("sc1")).state; const p0 = before.party.filter(Boolean)[0];
+  r = await call(s, "claim", { claim: claimOf(0, 70020000) }, "sc1", now); now += 3 * MIN;
+  const st = r.body.state;
+  t("裏ボス: 1体目をはじめて倒すと、クリスタルと経験値（学年別）が入る", r.status === 200 && r.body.rewards.isFirstClear && r.body.rewards.crystals === T.SECRET.firstCrystals[0] && r.body.rewards.perMember === T.secretFirstExp(0) && T.expOf(st.owned[p0], 1) === T.expOf(before.owned[p0], 1) + T.secretFirstExp(0) && T.expOf(st.owned[p0], 2) === 0, JSON.stringify(r.body.rewards || r.body));
+  r = await call(s, "claim", { claim: claimOf(1, 70030000) }, "sc1", now); now += 3 * MIN;
+  t("裏ボス: 1体目を倒すと2体目が開く", r.status === 200 && r.body.rewards.isFirstClear && !!r.body.state.secret.cleared["1:1"]);
+  r = await call(s, "claim", { claim: claimOf(0, 70040000) }, "sc1", now); now += 3 * MIN;
+  t("裏ボス: 周回は経験値だけ（クリスタルなし）", r.status === 200 && !r.body.rewards.isFirstClear && r.body.rewards.crystals === 0 && r.body.rewards.perMember === T.secretRepeatExp(0));
+  r = await call(s, "claim", { claim: claimOf(2, 70050000, 8) }, "sc1", now); now += 3 * MIN;
+  t("裏ボス: 正解が少なすぎる申請は認めない（HPが高いので、そんなに少なく倒せない）", r.status === 200 && r.body.rewards.granted === false);
+  r = await call(s, "claim", { claim: { ...claimOf(9, 70060000) } }, "sc1", now);
+  t("裏ボス: 番号が範囲外なら拒否", r.status === 400);
+  t("裏ボスの強さ: 前の裏ボスより必ずHPが高い・推奨レベルは30〜90", T.secretLadder(1).every((b, i, a) => (i === 0 || b.hp > a[i - 1].hp) && b.recLevel === 30 + 10 * i) && T.secretLadder(2).length === 7 && T.secretLadder(3).length === 7);
+}
+
+// ---------------- 敵の技：ボスのパターン・雑魚の状態異常 ----------------
+{
+  const boss = (id, extra = {}) => ({ id, kind: "chapterBoss", hp: 100, maxHp: 100, ...extra });
+  let ok = true, chargeThenBig = true;
+  for (const kind of ["unitSmallBoss", "chapterBoss"]) for (const name of Object.keys(T.BOSS_PATTERNS)) {
+    const pat = T.BOSS_PATTERNS[name], mv = T.movesFor(kind);
+    // 正規化した平均が1倍になる（強さの調整を崩さない）
+    const norm = T.patternAverage(name, kind);
+    const avg = pat.reduce((a, m) => a + mv[m].dmg / norm, 0) / pat.length;
+    if (Math.abs(avg - 1) > 1e-9) ok = false;
+    pat.forEach((m, i) => { if (m === "charge" && pat[(i + 1) % pat.length] !== "big") chargeThenBig = false; });
+  }
+  t("ボスの技: どのパターンも、1周のダメージ平均がちょうど1倍（強さの調整を崩さない）", ok);
+  const sm = T.movesFor("unitSmallBoss"), cm = T.movesFor("chapterBoss");
+  t("小単元ボスの技: 状態異常1.5倍・ため攻撃4倍・ためずに2倍（ふつうの攻撃を1倍として）", sm.venom.dmg === 1.5 && sm.big.dmg === 4 && sm.heavy.dmg === 2 && sm.slash.dmg === 1 && sm.venom.status === 1);
+  t("章ボスの技: 状態異常2倍・ため攻撃6倍・ためずに4倍", cm.venom.dmg === 2 && cm.big.dmg === 6 && cm.heavy.dmg === 4 && cm.venom.status === 1);
+  t("ボスの技: 「ため」の次は必ず「大技」", chargeThenBig);
+  t("雑魚の攻撃: 約45%が「状態異常＋ふつうのダメージ」、それ以外はふつうの攻撃だけ", (() => { let n = 0; for (let i = 0; i < 4000; i++) if (T.mobAttack({ id: "mob_1" }).statusAttack) n++; return Math.abs(n / 4000 - T.MOB_STATUS_ATTACK_CHANCE) < 0.04 && !T.mobAttack({ id: "x" }, () => 0.99).statusAttack && T.mobAttack({ id: "x" }, () => 0.01).dmgMul === 1; })());
+  const seq = (b) => { const st = {}; return Array.from({ length: 8 }, () => T.nextBossMove(b, st).move); };
+  const a = seq(boss("boss_x")), b = seq(boss("boss_x"));
+  t("ボスの技: 同じボスはいつも同じ順番（覚えると対策できる）", JSON.stringify(a) === JSON.stringify(b) && new Set(a).size >= 3);
+  const pats = new Set(Array.from({ length: 40 }, (_, i) => T.bossPatternName(boss("boss_" + i))));
+  t("ボスの技: いろいろなパターンのボスがいる", pats.size >= 4);
+  t("裏ボス: 7体で、パターンが全部そろう", new Set(Array.from({ length: 7 }, (_, i) => T.bossPatternName({ id: "z", kind: "secretBoss", secretIndex: i }))).size === Object.keys(T.BOSS_PATTERNS).length);
+  const nm = T.nextBossMove({ id: "z", kind: "secretBoss", secretIndex: 0, hp: 40, maxHp: 100 }, { step: 0 });
+  t("裏ボス: HPが半分以下になると激しくなる（ダメージ×1.15）", nm.enraged && Math.abs(nm.dmgMul - (nm.def.dmg / T.patternAverage(T.bossPatternName({ id: "z", kind: "secretBoss", secretIndex: 0 }), "secretBoss")) * 1.15) < 1e-9);
+  const share = Array.from({ length: 200 }, (_, i) => T.mobSpecialty({ id: "mob_" + i })).filter(Boolean).length / 200;
+  t(`雑魚の状態異常: 半分以上の雑魚が得意な状態異常を持つ(${(share * 100).toFixed(0)}%)`, share > 0.5 && share < 0.75);
+  t("雑魚の状態異常: 同じ敵はいつも同じ状態異常", T.mobSpecialty({ id: "mob_5" }) === T.mobSpecialty({ id: "mob_5" }));
+  const ch = { resistances: { poison: 0.3 * 100 } };
+  let n0 = 0, n1 = 0; for (let i = 0; i < 4000; i++) { if (T.rollStatusInflict("poison", ch, 0)) n0++; if (T.rollStatusInflict("poison", ch, T.MOB_STATUS_BONUS)) n1++; }
+  t(`雑魚の状態異常: 得意な状態異常はかかりやすい（確率が約+${Math.round(T.MOB_STATUS_BONUS * 100)}%）`, Math.abs(n1 / 4000 - n0 / 4000 - T.MOB_STATUS_BONUS) < 0.05, `${n0 / 4000} → ${n1 / 4000}`);
+}
+
+// ---------------- 新しいスキル（16種）・状態異常回復の増加・敵とパーティの効果 ----------------
+{
+  const cnt = {}; for (const c of T.SPECIALIST_ROSTER) cnt[c.skill.category] = (cnt[c.skill.category] || 0) + 1;
+  t("仲間: スキルは4種類だけ（全体ダメージ・単体ダメージ・回復・状態異常回復）。ほかは廃止", Object.keys(cnt).sort().join() === "aoeDamage,cure,heal,singleDamage", JSON.stringify(cnt));
+  t("仲間: 各レア度35体＝全体9・単体9・回復9・状態異常回復8", ["N", "R", "SR", "UR"].every((r) => { const of = (k) => T.SPECIALIST_ROSTER.filter((c) => c.rarity === r && c.skill.category === k).length; return of("aoeDamage") === 9 && of("singleDamage") === 9 && of("heal") === 9 && of("cure") === 8; }));
+  t("仲間: 全体140体・初期の仲間5体は変わらない（全体攻撃のまま）", T.SPECIALIST_ROSTER.length === 140 && T.STARTER_PARTY.every((id) => T.SPECIALIST_ROSTER.find((c) => c.id === id).skill.category === "aoeDamage"));
+  t("スキル定義（廃止中・コードだけ残してある）: 説明文つきで作れる", T.NEW_SKILL_KEYS.every((k) => [1, 2, 3, 4].every((tr) => { const s = T.buildSkill(k, tr); return s.desc && s.tier === tr && s.category === k; })));
+  // 敵の効果
+  const map = T.newEnemyFx(), mob = { instanceId: "m1", maxHp: 1000, kind: undefined }, bs = { instanceId: "b1", maxHp: 100000, kind: "chapterBoss" };
+  T.applySkip(map, mob, 2, "sleep"); T.applySkip(map, bs, 2, "sleep"); T.applyPoison(map, mob, 0.05, 3); T.applyPoison(map, bs, 0.05, 3); T.applyCurse(map, mob, 0.7, 2);
+  let a = T.tickEnemyTurn(map, mob), a2 = T.tickEnemyTurn(map, mob), a3 = T.tickEnemyTurn(map, mob);
+  t("敵の効果: ねむりは2回ぶん行動不能→3回目は動ける", a.skip && a2.skip && !a3.skip);
+  t("敵の効果: 毒は3回・そのたびに最大HPの5%", a.poisonDamage === 50 && a2.poisonDamage === 50 && a3.poisonDamage === 50 && T.tickEnemyTurn(map, mob).poisonDamage === 0);
+  t("敵の効果: 呪いは2回ぶん攻撃力ダウン", a.atkMul === 0.7 && a2.atkMul === 0.7 && a3.atkMul === 1);
+  const b1 = T.tickEnemyTurn(map, bs), b2 = T.tickEnemyTurn(map, bs);
+  t("敵の効果: ボスはねむりが1回だけ・毒は半分", b1.skip && !b2.skip && b1.poisonDamage === 2500);
+  const pm = T.newEnemyFx(); T.applyPanic(pm, mob, 2, 1); t("敵の効果: あせりは確率で空振り（確率100%なら必ず）", T.tickEnemyTurn(pm, mob).miss && T.tickEnemyTurn(pm, mob).miss && !T.tickEnemyTurn(pm, mob).miss);
+  // パーティ側
+  const px = T.newPartyFx(); px.decoy = 1; px.shield = 100;
+  const d1 = T.absorbDamage(px, 500), d2 = T.absorbDamage(px, 80), d3 = T.absorbDamage(px, 80);
+  t("パーティの効果: みがわりは1回無効→バリアが先に受けとめる→割れたら通る", d1.dmg === 0 && d2.dmg === 0 && d3.dmg === 60 && px.shield === 0);
+  // バフ消し：ためた大技をふつうの攻撃にする
+  const boss = { id: "boss_dispel", kind: "chapterBoss", hp: 100, maxHp: 100 }; const st = {};
+  let guard = 0; while (T.peekBossMove(boss, st) !== "big" && guard++ < 20) T.nextBossMove(boss, st);
+  st.cancelBig = true; const mv = T.nextBossMove(boss, st);
+  t("スキル「バフ消し」: ためた大技が、ふつうの攻撃になる", mv.move === "slash" && !st.cancelBig);
+}
+
+// ---------------- 新しい状態異常（毒・麻痺・眠り・石化・混乱）と耐性・スキル数値（2026-09-26） ----------------
+{
+  const S = T.SPECIALIST_ROSTER, OWN = { calc: "poison", eq: "paralysis", func: "sleep", geo: "petrification", data: "confusion" };
+  t("状態異常: 5種類（封印・スローは無い）", JSON.stringify(T.STATUS_KEYS.slice().sort()) === JSON.stringify(["confusion", "paralysis", "petrification", "poison", "sleep"]));
+  const okRes = S.every((c) => { const own = Object.keys(c.resistances).filter((k) => c.resistances[k] === 100); const base = { N: 10, R: 20, SR: 30, UR: 40 }[c.rarity]; return own.length >= 1 && Object.entries(c.resistances).every(([k, v]) => v === 100 || v === base) && Object.keys(c.resistances).length === 5; });
+  t("耐性: 全員、その分野の状態異常が100・それ以外はレア度ごとに同じ数", okRes);
+  const byMain = (sub) => S.filter((c) => c.primarySubject === sub);
+  t("耐性: 計算は毒・方程式は麻痺・関数は眠り・図形は石化・統計は混乱に100", Object.entries(OWN).every(([sub, st]) => byMain(sub).every((c) => c.resistances[st] === 100)));
+  t("耐性100は、かからない（ボーナスがあっても）", (() => { const c = { resistances: { poison: 100 } }; for (let i = 0; i < 2000; i++) if (T.rollStatusInflict("poison", c, 0.5)) return false; return true; })());
+  const aoe = (r) => S.find((c) => c.rarity === r && c.skill.category === "aoeDamage").skill.multiplier;
+  t("全体ダメージ: N2倍・R3倍・SR4倍・UR5倍", [aoe("N"), aoe("R"), aoe("SR"), aoe("UR")].join() === "2,3,4,5");
+  const heal = (r) => S.find((c) => c.rarity === r && c.skill.category === "heal").skill, cure = (r) => S.find((c) => c.rarity === r && c.skill.category === "cure").skill;
+  t("回復: Nは6問で5%・Rは8問で10%・SRは10問で15%・URは12問で20%", ["N", "R", "SR", "UR"].map((r) => `${heal(r).gauge}:${heal(r).percent}`).join() === "6:0.05,8:0.1,10:0.15,12:0.2");
+  t("状態異常回復: Nは12・Rは10・SRは8・URは6問で、すべての状態異常を治す", ["N", "R", "SR", "UR"].map((r) => cure(r).gauge).join() === "12,10,8,6" && ["N", "R", "SR", "UR"].every((r) => cure(r).cures.length === 5));
+  // 効果
+  t(`毒: 敵が攻撃するたびに最大HPの${Math.round(T.STATUS_DEFS.poison.dotFraction * 100)}%・3回で終わる`, (() => { let st = T.applyStatusEffect({}, "a", "poison"), tot = 0; for (let i = 0; i < 5; i++) { const r = T.tickStatusEffects(st, 1000); tot += r.poisonDamage; st = r.statusByCharId; } return tot === Math.round(1000 * T.STATUS_DEFS.poison.dotFraction) * 3; })());
+  t("麻痺: 約50%で攻撃できない・2回で終わる", (() => { const e = { paralysis: { turnsLeft: 2 } }; let ok = 0; for (let i = 0; i < 4000; i++) if (T.canActThisRound(e)) ok++; const r1 = T.tickStatusEffects({ a: e }, 1000), r2 = T.tickStatusEffects(r1.statusByCharId, 1000); return Math.abs(ok / 4000 - 0.5) < 0.05 && !r2.statusByCharId.a; })());
+  t("眠り: 行動できない（スキルも）・2回で終わる", (() => { const e = { sleep: { turnsLeft: 2 } }; const r2 = T.tickStatusEffects(T.tickStatusEffects({ a: e }, 1).statusByCharId, 1); return !T.canActThisRound(e) && !T.canUseSkillThisRound(e) && !r2.statusByCharId.a; })());
+  t("石化: 治すまで続く", (() => { let st = T.applyStatusEffect({}, "a", "petrification"); for (let i = 0; i < 10; i++) st = T.tickStatusEffects(st, 1).statusByCharId; return !!st.a?.petrification && !T.canActThisRound(st.a); })());
+}
+
+// ---------------- ガチャの種類（通常・分野）：複合特化は通常ガチャだけ ----------------
+{
+  const s = makeStore(); await call(s, "get_state", {}, "gp1", T0);
+  const give = async (n) => { const g = await s.load("gp1"); g.state.crystals = n; await s.save("gp1", g.state, g.version); };
+  const idsOf = async (pool, times) => { const out = []; for (let i = 0; i < times; i++) { await give(500); const r = await call(s, "gacha", { count: 10, pool }, "gp1", Date.now()); if (r.status !== 200) return { err: r.body.error }; out.push(...r.body.results.map((x) => x.id)); } return { ids: out }; };
+  const OWNSUB = { calc: "sp_calc_", eq: "sp_eq_", func: "sp_func_", geo: "sp_geo_", data: "sp_data_" };
+  let ok = true;
+  for (const [pool, prefix] of Object.entries(OWNSUB)) { const r = await idsOf(pool, 12); if (r.err || !r.ids.every((id) => id.startsWith(prefix))) ok = false; }
+  t("分野ガチャ: その分野の単元特化だけが出る（複合特化は出ない）", ok);
+  const rn = await idsOf("normal", 60);
+  t("通常ガチャ: 複合特化(sp2_)も、単元特化も出る", rn.ids.some((id) => id.startsWith("sp2_")) && rn.ids.some((id) => id.startsWith("sp_")));
+  t("分野ガチャの仲間の数: 各分野12体＝合計60体・通常は140体", ["calc", "eq", "func", "geo", "data"].every((p) => T.poolSize(p) === 12) && T.poolSize("normal") === 140);
+  await give(500);
+  const bad = await call(s, "gacha", { count: 10, pool: "hack" }, "gp1", Date.now());
+  t("ガチャの種類: 知らない種類は拒否（クリスタルも減らない）", bad.status === 400 && bad.body.error === "bad-pool" && (await s.load("gp1")).state.crystals === 500);
+  const before = (await s.load("gp1")).state.pity.pulls;
+  await call(s, "gacha", { count: 1, pool: "geo" }, "gp1", Date.now());
+  await call(s, "gacha", { count: 1, pool: "normal" }, "gp1", Date.now() + 1);
+  t("天井は、ガチャの種類が変わっても共通（回数が続けて数えられる）", (await s.load("gp1")).state.pity.pulls === before + 2);
+  const legacy = await call(s, "gacha", { count: 1 }, "gp1", Date.now() + 2);
+  t("ガチャの種類を指定しない申請は、通常ガチャになる（古い画面との互換）", legacy.status === 200);
+}
+
+// ---------------- 管理モード：章ボス全部クリア ----------------
+{
+  const s0 = T.initialThirdState();
+  const r = T.applyAdminOp(s0, "clearAllBosses", { grade: 1 });
+  const g1 = T.getGrade ? null : null;
+  const st = r.state;
+  t("管理: 中1の章ボス全部クリア→中1の学年クリアが付き、裏ボス1体目が開く", r.ok && !!st.gradeDone[1] && !st.gradeDone[2] && T.secretOpen(st, 1, 0) && !T.secretOpen(st, 2, 0) && st.crystals === s0.crystals, r.message);
+  const all = T.applyAdminOp(s0, "clearAllBosses", { grade: "all" });
+  t("管理: 全学年を指定すると、3学年ぶん付く・章ボスは全部クリア扱い", all.ok && [1, 2, 3].every((g) => !!all.state.gradeDone[g]) && Object.keys(all.state.bossDone).length >= 21);
+  t("管理: 不正な学年は拒否", !T.applyAdminOp(s0, "clearAllBosses", { grade: 9 }).ok);
+  t("管理: クリアした後は、その学年の小単元のバトルが全部開く（順番ロックが外れる）", (() => { const u = T.chaptersForGrade(1).flatMap((c) => c.units.map((x) => x.id)); return u.every((id) => T.battleOpen(st, 1, id)); })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

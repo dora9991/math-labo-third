@@ -8,11 +8,13 @@ import { GACHA, MEDAL } from "./gachaConfig.js";
 import { STARTER_PARTY } from "./gachaConfig.js";
 import { initialThirdState, normalizeThirdState, haichiKeyForUnit } from "./core.js";
 import { GRADES } from "../data/index.js";
+import { getGrade, getChapter } from "./data/storyMap.js";
+import { labUnitIdForBattle } from "./link.js";
 
 const ROSTER_IDS = new Set(SPECIALIST_ROSTER.map((c) => c.id));
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
 
-export const ADMIN_OPS = ["setCrystals", "addCrystals", "setCoins", "clearAllMedals", "clearUnitMedals", "grantCompanions", "setCompanionGrowth", "resetCompanions", "resetAll"];
+export const ADMIN_OPS = ["setCrystals", "addCrystals", "setCoins", "clearAllMedals", "clearAllBosses", "clearUnitMedals", "grantCompanions", "setCompanionGrowth", "resetCompanions", "resetAll"];
 
 /** @returns {{ok:boolean, error?:string, state?:object, message?:string}} */
 export function applyAdminOp(state, op, args = {}) {
@@ -30,6 +32,25 @@ export function applyAdminOp(state, op, args = {}) {
         n++; // ※管理者の全クリアではクリスタルは付かない（初クリア報酬の対象外）
       }
       return { ok: true, state: s, message: `${n}小単元のメダル（はいち・れんしゅう・バトル）を全部そろえました` };
+    }
+    case "clearAllBosses": { // 章ボスを全部クリアしたことにする（学年ごと or 全学年）。小単元のバトル・章クリア・章ボス・学年クリアが付き、裏ボスが出てくる。クリスタルは付かない
+      const grades = args.grade && args.grade !== "all" ? [Number(args.grade)] : [1, 2, 3];
+      if (grades.some((g) => ![1, 2, 3].includes(g))) return { ok: false, error: "bad-grade" };
+      const now = Date.now(); let chapters = 0;
+      for (const g of grades) {
+        for (const ch of GRADES[g] || []) for (const u of ch.units || []) s.medals.battle[u.id] ||= "admin";
+        for (const c of getGrade(g).chapters) {
+          const chap = getChapter(g, c.chapterId);
+          for (const su of chap?.subUnits || []) {
+            s.cleared[`${g}:${c.chapterId}:${su.id}`] ||= { first: now, count: 1 };
+            const uid = labUnitIdForBattle({ grade: g, chapterId: c.chapterId, subUnitId: su.id });
+            if (uid) s.medals.battle[uid] ||= "admin";
+          }
+          s.chapterDone[`${g}:${c.chapterId}`] ||= now; s.bossDone[`${g}:${c.chapterId}`] ||= now; chapters++;
+        }
+        s.gradeDone[g] ||= now;
+      }
+      return { ok: true, state: s, message: `${grades.map((g) => `中${g}`).join("・")}の章ボスを全部クリアしました（${chapters}章）。裏ボスが出てきます` };
     }
     case "clearUnitMedals": {
       const id = String(args.unitId || "");

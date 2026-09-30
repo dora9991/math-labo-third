@@ -68,6 +68,10 @@ export function generateThirdProblem(unitId, difficulty = "standard", seed = new
 
 /** バトル用：戦闘の種類に応じて出題する単元を決めて1問返す。 */
 export function generateBattleProblem({ subUnitId, grade, chapterId }, difficulty) {
+  if (!chapterId && grade) { // 裏ボス：その学年のどの単元からでも出す
+    const all = chaptersForGrade(Number(grade)).flatMap((c) => labUnitIdsOfChapter(grade, c.id));
+    return generateThirdProblem(all.length ? pickFrom(all) : "u1", difficulty);
+  }
   const one = labUnitIdForBattle({ grade, chapterId, subUnitId });
   if (one) return generateThirdProblem(one, difficulty);
   const ids = labUnitIdsOfChapter(grade, chapterId);

@@ -6,6 +6,7 @@
   "description": "数学ラボ3（数学ラボ2から派生・デザイン刷新版／math-labo10を別アプリとして複製）。黒板を見ながらAI先生と発問でやり取りする（math-dialogueから派生）。",
   "scripts": {
     "dev": "vite",
+    "dev:local": "VITE_THIRD_SERVER=0 vite --port 5199 --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && gh-pages -d dist",

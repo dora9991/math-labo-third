@@ -8,6 +8,8 @@ import {
   spawnEnemyGroup,
   spawnBoss,
   rollEnemyInflictedStatus,
+  rollStatusInflict,
+  STATUS_KEYS,
   applyStatusEffect,
   canActThisRound,
   canUseSkillThisRound,
@@ -30,9 +32,14 @@ import {
   capDamageFor,
   tierOf,
   wrongPenaltyFrac,
+  STATUS_TUNING,
 } from "../balance.js";
 import { levelFromExp, getSubUnitClearExpReward, expOf } from "../expCurve.js";
 import { setViewGrade } from "../gradeView.js";
+import { secretBoss } from "../secretBoss.js";
+import { mobSpecialty, mobAttack, isBossKind, nextBossMove, peekBossMove } from "../enemyMoves.js";
+import { newEnemyFx, newPartyFx, applySkip, applyPoison, applyCurse, applyPanic, tickEnemyTurn, enemyFxTags, absorbDamage, partyFxChips } from "../enemyFx.js";
+import { NEW_SKILL_KEYS } from "../skillDefs.js";
 import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
 import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound, playSkillActivateSound } from "../fx/sound.js";
 import UltimateCutIn from "../../components/UltimateCutIn.jsx";
@@ -52,6 +59,7 @@ import { VERIFY } from "../gachaConfig.js";
 const SKILL_GAUGE_MAX = 4; // 互換用の既定値（tierが無いスキル用）
 const SKILL_GAUGE_BY_TIER = { 1: 6, 2: 9, 3: 12, 4: 15 };
 function skillGaugeMaxFor(character) {
+  if (character?.skill?.gauge) return character.skill.gauge; // スキルごとに必要な正解数が決まっているもの（回復・状態異常回復）
   const tier = character?.skill?.tier;
   return SKILL_GAUGE_BY_TIER[tier] ?? SKILL_GAUGE_MAX;
 }
@@ -60,11 +68,12 @@ function skillGaugeMaxFor(character) {
 const STATUS_ICON = {
   poison: "🧪",
   paralysis: "⚡",
-  seal: "🔒",
-  slow: "🐌",
+  sleep: "💤",
   confusion: "❓",
   petrification: "🗿",
 };
+
+const STATUS_LABEL = { poison: "毒", paralysis: "麻痺", sleep: "眠り", confusion: "混乱", petrification: "石化" };
 
 const REWARD_EXP_GROUP = 12;
 const REWARD_EXP_BOSS = 40;
@@ -104,7 +113,12 @@ const DIFF_PICK_DELAY_MS = 600;
 function buildEncounters(params, chapter, gradeData) {
   const { kind, subUnitId } = params;
   // 敵の強さはカリキュラム上の位置(0〜1)でなだらかに上がる（balance.js）。
-  const t = kind === "finalBoss" ? 1 : tierOf(params.grade, params.chapterId, kind === "subUnit" ? subUnitId : null);
+  const t = kind === "finalBoss" || kind === "secretBoss" ? 1 : tierOf(params.grade, params.chapterId, kind === "subUnit" ? subUnitId : null);
+  if (kind === "secretBoss") { // 裏ボス（やり込み）：HPがとても高い1体。強さは secretBoss.js（推奨レベルごと）
+    const b = secretBoss(params.grade, params.secretIndex);
+    if (!b) return [];
+    return [[{ id: b.id, name: b.name, kind: "secretBoss", secretIndex: b.index, art: b.art, instanceId: `${b.id}_secret`, hp: b.hp, maxHp: b.hp, dmg: b.dmg }]];
+  }
   if (kind === "subUnit") {
     const subUnit = chapter.subUnits.find((s) => s.id === subUnitId);
     const waves = [1, 2].map(() => {
@@ -174,7 +188,7 @@ export default function Battle({ nav, params }) {
     return subIndex >= 0 ? chaptersForGrade(grade).find((c) => c.id === chapterId)?.units[subIndex]?.id : null;
   }, [chapter, chapterId, grade, params.subUnitId]);
   // 敵の強さ・ゲージの序盤補正に使う「カリキュラム上の位置」(0〜1)
-  const tierNow = kind === "finalBoss" ? 1 : tierOf(grade, chapterId, kind === "subUnit" ? params.subUnitId : null);
+  const tierNow = kind === "finalBoss" || kind === "secretBoss" ? 1 : tierOf(grade, chapterId, kind === "subUnit" ? params.subUnitId : null);
   const gaugeMaxFor = (isBoss) => gaugeSecondsFor(unitId, isBoss, tierNow); // 雑魚の波／ボスの波でゲージの長さが変わる
 
   const encounters = useMemo(() => buildEncounters(params, chapter, gradeData), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -281,6 +295,13 @@ export default function Battle({ nav, params }) {
   // 演出だけの状態。ダメージ計算・ターン進行とは分離しているため、スキップ／オフでも結果は変わらない。
   const [fxSpeed, setBattleFxSpeed] = useState(() => getFxSpeed());
   const [cutIn, setCutIn] = useState(null);
+  const bossMoveRef = useRef({}); // ボスごとの技の順番 { instanceId: { step } }
+  const enemyFxRef = useRef(newEnemyFx()); // スキルで敵にかかった効果（ねむり・どく・呪い・あせり）
+  const partyFxRef = useRef(newPartyFx()); // パーティ側の効果（バリア・みがわり・状態異常封じ・再生・次の一撃）
+  const freezeRef = useRef(0); // 敵の行動ゲージが止まっている残り秒（スキル「時間妨害」）
+  const [, setFxTick] = useState(0); // 効果の表示を更新するだけの数
+  const bumpFx = () => setFxTick((n) => n + 1);
+  const [bossNotice, setBossNotice] = useState(null); // ボスの予告・技名
   // PC画面（幅900px以上）：計算用紙をバトルの横に常設し、⇄で左右を入れ替える
   //  （HaichiStudio.jsx / StepUpSimple.jsxと同じ isDesktop の仕組み）。結果には一切影響しない見た目だけの状態。
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches);
@@ -357,7 +378,7 @@ export default function Battle({ nav, params }) {
   useEffect(() => {
     if (phase === "defeat") bgm.play("defeat", { loop: false });
     else if (phase === "claiming") return; // 勝利曲は結果画面で
-    else if (isBossWave && (kind === "chapterBoss" || kind === "finalBoss")) bgm.play("chapterboss");
+    else if (isBossWave && (kind === "chapterBoss" || kind === "finalBoss" || kind === "secretBoss")) bgm.play("chapterboss");
     else if (isBossWave) bgm.play("boss");
     else bgm.play(normalBattleTrack(grade, chapterId, params.subUnitId)); // 章・小単元ごとに曲を巡回（story/battleBgm.js）
   }, [isBossWave, phase, kind]);
@@ -518,25 +539,70 @@ export default function Battle({ nav, params }) {
     let hp = partyHpRef.current;
     let downed = false;
     const events = [];
-    for (let i = 0; i < pool.length; i++) {
-      const attacker = pool[i];
-      const dmg = Math.round(resolveEnemyAction(attacker) * guardMult);
+    let notice = null; // ボスの予告・技名（画面に出す）
+    // 敵ごとの効果を進める：毒のダメージ・行動不能・攻撃力ダウン・空振り（スキルでかけたもの）
+    const ticks = {};
+    const poisonDmg = {};
+    for (const en of pool) { const tk = tickEnemyTurn(enemyFxRef.current, en); ticks[en.instanceId] = tk; if (tk.poisonDamage) poisonDmg[en.instanceId] = tk.poisonDamage; }
+    if (Object.keys(poisonDmg).length) {
+      const { next: afterPoison, hitIds: pIds } = applyDamageToEnemies(poisonDmg);
+      commitEnemies(afterPoison); triggerEnemyShakeFor(pIds, 200);
+      if (afterPoison.every((en) => en.hp <= 0)) { bumpFx(); onWaveCleared(); return; }
+    }
+    const attackers = enemiesRef.current.filter((en) => en.hp > 0);
+    const px = partyFxRef.current;
+    for (let i = 0; i < attackers.length; i++) {
+      const attacker = attackers[i];
+      const tk = ticks[attacker.instanceId] || { skip: false, atkMul: 1, miss: false };
+      // 技：ボスはパターンをくり返す（ため→大技 など）。雑魚は、得意な状態異常を持っていれば、それがかかりやすい。
+      let mul = 1, statusCount = 0, statusKeyFixed = null, statusBonus = 0, isCharge = false;
+      if (isBossKind(attacker.kind)) {
+        const st = (bossMoveRef.current[attacker.instanceId] ||= {});
+        const mv = nextBossMove(attacker, st);
+        mul = mv.dmgMul; statusCount = mv.def.status || 0; statusBonus = statusCount ? (attacker.kind === "secretBoss" ? STATUS_TUNING.secretBonus : STATUS_TUNING.bossBonus) : 0; isCharge = mv.move === "charge";
+        notice = mv.def.telegraph || mv.def.note || null;
+        if (mv.enraged) notice = `激しく怒っている！ ${notice || ""}`;
+      } else { // 雑魚：確率で「状態異常＋ふつうのダメージ」の攻撃。それ以外はふつうの攻撃だけ
+        const ma = mobAttack(attacker);
+        if (ma.statusAttack) { statusCount = 1; statusKeyFixed = ma.statusKey; statusBonus = ma.bonus; notice = `${attacker.name}の状態異常攻撃！`; }
+      }
+      let dmg = isCharge ? 0 : Math.round(resolveEnemyAction(attacker) * mul * tk.atkMul * guardMult);
+      let acted = !isCharge;
+      if (tk.skip) { dmg = 0; acted = false; notice = `${attacker.name}は、${ticks[attacker.instanceId].skipKind === "stun" ? "しびれて" : "ねむって"}動けない！`; }
+      else if (tk.miss && dmg > 0) { dmg = 0; acted = false; notice = `${attacker.name}の攻撃は空振りした！`; }
+      else if (dmg > 0) { const ab = absorbDamage(px, dmg); dmg = ab.dmg; if (ab.note) notice = ab.note; }
       hp = Math.max(0, hp - dmg);
-      events.push({ attacker, dmg, variantIndex: variantOrder[i % variantOrder.length], kind: enemyAttackKind(attacker) });
-      // 命中した相手にランダムで状態異常も仕掛けてくる（石化していない生存メンバーから1体）。
+      events.push({ attacker, dmg, variantIndex: variantOrder[i % variantOrder.length], kind: enemyAttackKind(attacker), charge: !acted || dmg === 0 && (isCharge || tk.skip || tk.miss) });
+      // 命中した相手にランダムで状態異常も仕掛けてくる（石化していない生存メンバーから）。ためている間・動けない間・空振り・状態異常封じの間は仕掛けない。
       const eligibleIds = memberIds.filter((id) => !partyStatusRef.current[id]?.petrification);
-      if (eligibleIds.length) {
-        const targetId = eligibleIds[Math.floor(Math.random() * eligibleIds.length)];
-        const statusKey = rollEnemyInflictedStatus(charactersById[targetId]);
-        if (statusKey) {
-          const nextStatus = applyStatusEffect(partyStatusRef.current, targetId, statusKey);
-          partyStatusRef.current = nextStatus;
-          setPartyStatus(nextStatus);
-          if (isPartyAllPetrified(nextStatus, memberIds)) downed = true;
+      const tries = isCharge || tk.skip || tk.miss || px.silence > 0 ? 0 : Math.min(eligibleIds.length, statusCount); // 状態異常をしかけるのは、状態異常の技のときだけ
+      const picks = [...eligibleIds].sort(() => Math.random() - 0.5).slice(0, tries);
+      // 裏ボスの状態異常の技は「単元の複合」：1回で複数種類の状態異常を同時にしかけてくる
+      //  （推奨Lv70〜（4体目以降）は3種類以上、それより前は2種類。kazu指定 2026-09-28）。
+      const comboKeys = attacker.kind === "secretBoss" && picks.length && !statusKeyFixed
+        ? [...STATUS_KEYS].sort(() => Math.random() - 0.5).slice(0, (attacker.secretIndex ?? 0) >= 4 ? 3 : 2)
+        : null;
+      if (comboKeys) notice = `${comboKeys.map((k) => STATUS_LABEL[k]).join("・")}の複合攻撃！`;
+      for (const targetId of picks) {
+        const keysToTry = comboKeys || [statusKeyFixed || STATUS_KEYS[Math.floor(Math.random() * STATUS_KEYS.length)]];
+        for (const key of keysToTry) {
+          const statusKey = comboKeys
+            ? (rollStatusInflict(key, charactersById[targetId], statusBonus) ? key : null)
+            : rollEnemyInflictedStatus(charactersById[targetId], { statusKey: key, bonus: statusBonus });
+          if (statusKey) {
+            const nextStatus = applyStatusEffect(partyStatusRef.current, targetId, statusKey);
+            partyStatusRef.current = nextStatus;
+            setPartyStatus(nextStatus);
+            if (isPartyAllPetrified(nextStatus, memberIds)) downed = true;
+          }
         }
       }
       if (hp <= 0 || downed) break;
     }
+    if (px.silence > 0) px.silence -= 1;
+    if (px.regen) { hp = Math.min(partyMaxHp, hp + Math.round(partyMaxHp * px.regen.frac)); if (--px.regen.n <= 0) px.regen = null; }
+    bumpFx();
+    setBossNotice(notice);
 
     // 演出（見た目だけ）
     const partyRect = rectOf(partyAreaRef.current, stageRef.current);
@@ -545,8 +611,7 @@ export default function Battle({ nav, params }) {
         setLungingIds((prev) => new Set([...prev, ev.attacker.instanceId]));
         playEnemyAttackStartSound();
         scheduleEnemyFx(() => {
-          fxRef.current?.playEnemyCounter({ rect: partyRect, variantIndex: ev.variantIndex, kind: ev.kind, damage: ev.dmg });
-          triggerPartyShake(fxDelay(260));
+          if (!ev.charge) { fxRef.current?.playEnemyCounter({ rect: partyRect, variantIndex: ev.variantIndex, kind: ev.kind, damage: ev.dmg }); triggerPartyShake(fxDelay(260)); }
           scheduleEnemyFx(() => {
             setLungingIds((prev) => {
               const next = new Set(prev);
@@ -612,7 +677,7 @@ export default function Battle({ nav, params }) {
     const skill = c?.skill;
     if (!skill) return;
     const effects = partyStatus[characterId];
-    if (!canActThisRound(effects) || !canUseSkillThisRound(effects)) return;
+    if (!canActThisRound(effects, () => 1) || !canUseSkillThisRound(effects)) return; // 麻痺は攻撃だけに影響（スキルは使える）
     if ((gauge[characterId] || 0) < skillGaugeMaxFor(c)) return;
 
     setGauge((g) => ({ ...g, [characterId]: 0 }));
@@ -630,6 +695,8 @@ export default function Battle({ nav, params }) {
     const atkBuffMultiplier = partyBuffsRef.current.atk?.multiplier ?? 1;
     const stageEl = stageRef.current;
     const partyRect = rectOf(partyAreaRef.current, stageEl);
+
+    if (NEW_SKILL_KEYS.includes(skill.category)) { applyNewSkill(c, level, charSubject, skill, partyRect, stageEl); return; }
 
     if (skill.category === "aoeDamage" || skill.category === "singleDamage") {
       const live = enemiesRef.current.filter((en) => en.hp > 0);
@@ -700,6 +767,56 @@ export default function Battle({ nav, params }) {
       fxRef.current?.playUltimate({ category: skill.category, subject: charSubject, color: c.color || 0xbfe3ff, rect: partyRect, text: "状態異常回復" });
       setPhase("question");
     }
+  }
+
+  // 新しいスキル16種（skillDefs.js）。敵にダメージ＋効果／敵に効果だけ／味方への効果、のどれか。
+  function applyNewSkill(c, level, charSubject, skill, partyRect, stageEl) {
+    const cat = skill.category;
+    const live = enemiesRef.current.filter((en) => en.hp > 0);
+    const tid = resolveTarget(c.id, 0);
+    const target = live.find((e) => e.instanceId === tid) || live[0];
+    const atkBuffMultiplier = partyBuffsRef.current.atk?.multiplier ?? 1;
+    const px = partyFxRef.current, ef = enemyFxRef.current;
+    const color = c.color;
+    const say = (text) => fxRef.current?.playUltimate({ category: "buffGuard", subject: charSubject, color, rect: partyRect, text });
+    const sayAt = (en, text, damage, isCrit) => { const pt = pointOf(enemyRefs.current[en.instanceId], stageEl); fxRef.current?.playUltimate({ category: "singleDamage", subject: charSubject, color, targets: pt ? [pt] : [], rect: partyRect, text, damage, isCrit }); };
+    const HIT = ["multiHit", "pierceHit", "stunHit", "curseHit", "dispel"];
+
+    if (HIT.includes(cat)) {
+      if (!target) { setPhase("question"); return; }
+      const hits = cat === "multiHit" ? skill.hits : 1;
+      const capFrac = cat === "pierceHit" ? skill.capFrac : SKILL_CAP_FRAC;
+      let total = 0, anyCrit = false;
+      for (let i = 0; i < hits; i++) { const r = resolvePlayerAttack(c, level, charSubject, true, { skillMultiplier: skill.multiplier, atkBuffMultiplier }); total += r.damage; if (r.isCrit) anyCrit = true; }
+      total = Math.min(total, Math.max(1, Math.round(target.maxHp * capFrac)));
+      let label = null;
+      if (cat === "stunHit") { applySkip(ef, target, skill.turns, "stun"); label = "しびれた！"; }
+      if (cat === "curseHit") { applyCurse(ef, target, skill.atkMul, skill.cycles); label = "攻撃力ダウン！"; }
+      if (cat === "dispel") {
+        const st = bossMoveRef.current[target.instanceId];
+        if (isBossKind(target.kind) && st && peekBossMove(target, st) === "big") { st.cancelBig = true; label = "ためた大技を消した！"; setBossNotice("ボスの大技を消した！"); }
+      }
+      sayAt(target, label, total, anyCrit);
+      const { next: updated, hitIds, gainedExp, gainedCoins, defeatedPoints } = applyDamageToEnemies({ [target.instanceId]: total });
+      commitEnemies(updated); bumpFx();
+      setTimeout(() => { if (fxSpeed !== "off") triggerImpactPulse(); triggerEnemyShakeFor(hitIds, anyCrit ? 450 : 220); defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave })); }, fxDelay(PROJECTILE_MS.normal));
+      if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
+      if (updated.every((en) => en.hp <= 0)) onWaveCleared(); else setPhase("question");
+      return;
+    }
+    if (cat === "sleep") { if (target) { applySkip(ef, target, skill.turns, "sleep"); sayAt(target, "ねむった…💤"); } }
+    else if (cat === "poisonEnemy") { if (target) { applyPoison(ef, target, skill.frac, skill.cycles); sayAt(target, "毒にかかった！"); } }
+    else if (cat === "panic") { live.forEach((en) => applyPanic(ef, en, skill.cycles, skill.missChance)); say("敵があわてている！"); }
+    else if (cat === "timeSteal") { gaugeRef.current += skill.seconds; setGaugeSec(gaugeRef.current); say(`敵の行動まで +${skill.seconds}秒`); }
+    else if (cat === "timeJam") { freezeRef.current = Math.max(freezeRef.current, skill.seconds); say(`敵の時間が止まった！ ${skill.seconds}秒`); }
+    else if (cat === "silence") { px.silence = Math.max(px.silence, skill.cycles); say("状態異常を封じた！"); }
+    else if (cat === "spDrain") { setGauge((g) => { const n = { ...g }; for (const m of partyMembers) if (m.id !== c.id) n[m.id] = Math.min(skillGaugeMaxFor(m), (g[m.id] || 0) + skill.gain); return n; }); say(`スキルゲージ +${skill.gain}`); }
+    else if (cat === "decoy") { px.decoy += skill.times; say("みがわりを立てた！"); }
+    else if (cat === "barrier") { px.shield += Math.round(partyMaxHp * skill.frac); say("バリアを張った！"); }
+    else if (cat === "regen") { px.regen = { n: skill.cycles, frac: skill.frac }; say("じわじわ回復！"); }
+    else if (cat === "chargeNext") { px.nextMul = Math.max(px.nextMul, skill.multiplier); say(`次の一撃が ×${skill.multiplier}！`); }
+    bumpFx();
+    setPhase("question");
   }
 
   // ダメージを敵に反映した結果（新しい敵配列・撃破ボーナス・撃破位置）を返す。ログ用の副作用は持たない。
@@ -776,7 +893,7 @@ export default function Battle({ nav, params }) {
 
     partyMembers.forEach((c, i) => {
       const effects = statusSnapshot[c.id];
-      if (!canActThisRound(effects)) return; // 麻痺・石化・スロー(今ターン不可)
+      if (!canActThisRound(effects)) return; // 眠り・石化は行動できない／麻痺は50%で攻撃できない
       actedCharacterIds.push(c.id);
 
       const level = levelFromExp(expOf(save.owned[c.id], grade), c.rarity);
@@ -791,11 +908,12 @@ export default function Battle({ nav, params }) {
       }
 
       const rawAttack = resolvePlayerAttack(c, level, charSubject, true, { atkBuffMultiplier });
-      const damage = Math.max(1, Math.round(rawAttack.damage * DIFFICULTY_DAMAGE_MULTIPLIER[diff]));
+      const damage = Math.max(1, Math.round(rawAttack.damage * DIFFICULTY_DAMAGE_MULTIPLIER[diff] * partyFxRef.current.nextMul)); // スキル「ためて大技」の次の一撃
       const targetId = resolveTarget(c.id, i);
       hitEntries.push({ character: c, attack: { ...rawAttack, damage }, subject: charSubject, targetId, charIndex: i, from, to: targetId ? pointOf(enemyRefs.current[targetId], stageEl) : null });
     });
 
+    if (partyFxRef.current.nextMul > 1) { partyFxRef.current.nextMul = 1; bumpFx(); } // 「ためて大技」を使い切った
     // ダメージ上限（インフレ対策）：1回の正解で1体の敵から削れるのは「敵最大HP × 難度別の割合」まで。
     //  どれだけ強い編成でも、最低 ceil(1/割合) 問の正解が要る（学習量のフロア）。
     {
@@ -862,6 +980,13 @@ export default function Battle({ nav, params }) {
     else startQuestion(difficultyRef.current); // すぐ次の問題
   }
 
+  // 開発用：スキルゲージを満タンにする（画面確認用。本番ビルドでは付かない）
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    window.__battleDev = { fillGauge: () => setGauge(Object.fromEntries(partyMembers.map((m) => [m.id, skillGaugeMaxFor(m)]))) };
+    return () => { delete window.__battleDev; };
+  });
+
   // 戦闘開始時に一度だけ「START!」を出す。BattleFXの初期化(子のuseEffect)は
   // このuseEffectより先に走るので、マウント直後でもfxRef.currentは使える。
   useEffect(() => {
@@ -876,6 +1001,7 @@ export default function Battle({ nav, params }) {
   useEffect(() => {
     if (phase !== "question" || paused) return undefined;
     const id = setInterval(() => {
+      if (freezeRef.current > 0) { freezeRef.current = Math.max(0, freezeRef.current - 0.1); return; } // スキル「時間妨害」：敵の行動ゲージが止まっている
       gaugeRef.current -= 0.1;
       if (gaugeRef.current <= 0) {
         gaugeRef.current = 0;
@@ -891,7 +1017,7 @@ export default function Battle({ nav, params }) {
   // バトルに勝った：解答の記録をサーバーへ送り、**サーバーが認めた報酬**を受け取る（自己申告は使わない）。
   async function finishBattle() {
     winRef.current = true; // 勝ち（章ボス・お試しは報酬の申請が無いので、出る時の報告で解答を記録する）
-    if ((kind !== "subUnit" && kind !== "chapterBoss") || params.demo) { // お試し戦はサーバー申請なし（報酬なし）。章ボスは、その章の小単元のメダルが全部そろっていれば本番（申請する）
+    if ((kind !== "subUnit" && kind !== "chapterBoss" && kind !== "secretBoss") || params.demo) { // お試し戦はサーバー申請なし（報酬なし）。章ボスは、その章の小単元のメダルが全部そろっていれば本番（申請する）
       nav.go("reward", { ...params, res: null }, { replace: true });
       return;
     }
@@ -899,7 +1025,7 @@ export default function Battle({ nav, params }) {
     const claim = {
       nonce: (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       pv: PROBLEM_VERSION,
-      grade, chapterId, kind, subUnitId: params.subUnitId,
+      grade, chapterId, kind, subUnitId: params.subUnitId, index: params.secretIndex,
       startedAt: battleStartRef.current,
       endedAt: actions.serverNow(),
       attempts: attemptsRef.current,
@@ -946,6 +1072,7 @@ export default function Battle({ nav, params }) {
 
         {combo >= 3 && <div className={`mw-combo mw-combo-${combo >= 10 ? "max" : combo >= 5 ? "high" : "mid"}`}>COMBO ×{combo}</div>}
 
+        {bossNotice && <div className={`mw-boss-notice ${/ため|大技/.test(bossNotice) ? "is-warn" : ""}`}>{/ため/.test(bossNotice) ? "⚠ " : "💥 "}{bossNotice}</div>}
         <div className="mw-enemy-area">
           <div className="mw-enemy-row">
             {enemies.map((en, enIndex) => {
@@ -965,6 +1092,8 @@ export default function Battle({ nav, params }) {
                 >
                   <MonsterPortrait character={en} size="full" frameless />
                   <div className="mw-enemy-name">{en.name}</div>
+                  {enemyFxTags(enemyFxRef.current, en).length > 0 && <div className="mw-enemy-tag mw-enemy-fx">{enemyFxTags(enemyFxRef.current, en).join(" ")}</div>}
+                  {!isBossKind(en.kind) && mobSpecialty(en) && <div className="mw-enemy-tag">{STATUS_ICON[mobSpecialty(en)]} {STATUS_LABEL[mobSpecialty(en)]}をしかけてくる</div>}
                   {/* 相手の正確なHPはあえて隠す（2026-09-18指示）。バーだけ残す。 */}
                   <div className="mw-hpbar" style={{ width: "90%" }}>
                     <div style={{ width: `${Math.max(0, (en.hp / en.maxHp) * 100)}%` }} />
@@ -1027,6 +1156,8 @@ export default function Battle({ nav, params }) {
           </div>
           <div className="mw-sub">
             {partyHp} / {partyMaxHp}
+            {partyFxChips(partyFxRef.current).length > 0 && <span className="mw-partyfx"> {partyFxChips(partyFxRef.current).join("　")}</span>}
+            {freezeRef.current > 0 && <span className="mw-partyfx"> ⏱時間停止 {Math.ceil(freezeRef.current)}秒</span>}
           </div>
           {(partyBuffs.atk || partyBuffs.guard) && (
             <div className="mw-buff-row">

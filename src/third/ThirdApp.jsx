@@ -20,12 +20,14 @@ import ThirdSynth from "./screens/ThirdSynth.jsx";
 import RoomLobby from "./screens/RoomLobby.jsx";
 import { getFxSpeed } from "../engine/fxSpeed.js";
 import { battleOpen } from "./core.js";
+import { secretOpen } from "./secretBoss.js";
+import SecretBossList from "./screens/SecretBossList.jsx";
 import { labUnitIdForBattle } from "./link.js";
 import StoryPlayer from "./story/StoryPlayer.jsx";
 import { scenesFor, loadSeen, saveSeen, isStoryAuto } from "./story/storyRun.js";
 import "./third.css";
 
-const SCREENS = { party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha, dex: ThirdDex, synth: ThirdSynth, room: RoomLobby };
+const SCREENS = { secret: SecretBossList, party: PartyFormation, battle: ThirdBattle, reward: Reward, gacha: ThirdGacha, dex: ThirdDex, synth: ThirdSynth, room: RoomLobby };
 const FLASH_IN_MS = 280;
 const FLASH_SETTLE_MS = 60;
 
@@ -75,6 +77,16 @@ function BattleLockGate({ nav, children }) {
         </div>
       );
     }
+  }
+  if (nav.screen === "battle" && p.kind === "secretBoss" && !secretOpen(save, p.grade, p.secretIndex)) { // 裏ボス：学年クリア後、前の裏ボスを倒すと開く
+    return (
+      <div className="mw-fantasy-panel mw-center" style={{ minHeight: "40vh", marginTop: 40 }}>
+        <div style={{ fontSize: "2.4rem" }}>🔒</div>
+        <div className="mw-fantasy-title">まだ この裏ボスは ひらいていないよ</div>
+        <div style={{ color: "#ffe9b3", margin: "8px 0" }}>その学年をクリアして、ひとつ前の裏ボスをたおすと開くよ。</div>
+        <button className="mw-btn primary" onClick={() => nav.exit()}>もどる</button>
+      </div>
+    );
   }
   if (nav.screen === "battle" && p.kind === "chapterBoss" && p.demo) { // 章ボスも、その章のバトルを全部クリアするまで入れない
     return (

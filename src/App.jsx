@@ -16,6 +16,8 @@ import { thirdApi, THIRD_SERVER } from "./third/thirdApi.js";
 import { isGuest } from "./auth/session.js";
 import { setViewGrade } from "./third/gradeView.js";
 // マルチプレイ（みんなで戦う）は一旦非公開。開発者の確認用に URL に ?multi=1 を付けた時だけ出す。公開するときは true にする
+// 裏ボス（クリア後のやり込み）も一旦非公開。URL に ?secret=1 を付けた時だけメニューに出す。公開するときは true にする
+const SECRET_OPEN = (() => { try { return new URLSearchParams(location.search).has("secret"); } catch { return false; } })();
 const MULTIPLAY_OPEN = (() => { try { return new URLSearchParams(location.search).has("multi"); } catch { return false; } })();
 import { startSessionPing } from "./third/sessionPing.js";
 import { flushBattleLogs } from "./third/battleLog.js";
@@ -2333,6 +2335,7 @@ export default function App() {
       onParty={() => { setThirdStart({ screen: "party", params: {} }); setScreen("third"); }}
       onGacha={() => { setThirdStart({ screen: "gacha", params: {} }); setScreen("third"); }}
       onDex={() => { setThirdStart({ screen: "dex", params: {} }); setScreen("third"); }}
+      onSecret={SECRET_OPEN ? () => { setThirdStart({ screen: "secret", params: {} }); setScreen("third"); } : undefined} // 裏ボス（非公開）
       onRoom={MULTIPLAY_OPEN && THIRD_SERVER && !isGuest() ? () => { setThirdStart({ screen: "room", params: {} }); setScreen("third"); } : undefined} // マルチプレイ（サーバーモードのみ・ゲストは不可）
       onWeakness={() => { setRelearnFocus(null); setScreen("relearn"); }}
       onFeedback={() => setScreen("feedback")}

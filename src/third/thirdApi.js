@@ -52,7 +52,7 @@ async function call(action, body = {}) {
 
 export const thirdApi = {
   getState: () => call("get_state"),
-  gacha: (count) => call("gacha", { count }),
+  gacha: (count, pool = "normal") => call("gacha", { count, pool }),
   setParty: (party) => call("set_party", { party }),
   synthesize: (req) => call("synthesize", req), // 合成するキャラを経験値にする
   limitBreak: (id) => call("limit_break", { id }), // 予備を使って限界突破
@@ -84,6 +84,32 @@ export async function localAdminGrant(op, args = {}) {
 // 開発用（ローカルモードのみ）：コンソールから crystal を付与して動作確認できる。サーバーモードでは存在しない。
 if (!THIRD_SERVER && typeof window !== "undefined") {
   window.__thirdDev = {
+    async patch(fn) { // 開発用：いまのローカル状態を関数で書き換える（例：patch((s) => { s.gradeDone = { 1: 1 }; })）
+      const cur = await localStore.load();
+      const base = (await thirdApi.getState()).body.state;
+      const next = structuredClone(cur?.state || base); fn(next);
+      await localStore.save("local", next, cur ? cur.version : null);
+      return true;
+    },
+    /** 開発用・裏ボスの試し戦：その学年をクリア済みにし、全員を仲間にして、指定のレア度・レベルの5体をパーティに入れる。
+     *  例：await __thirdDev.secretTest({ rarity: "SR", level: 30 })   /   await __thirdDev.secretTest({ rarity: "UR", level: 70, breaks: 3 })
+     *  clear: 最初の何体を「倒した」ことにするか（2体目以降に挑戦したい時）。 */
+    async secretTest({ rarity = "SR", level = 30, breaks = 0, clear = 0, crystals = 500 } = {}) {
+      const { SPECIALIST_ROSTER } = await import("./specialistRoster.js");
+      const { expForLevel } = await import("./expCurve.js");
+      const exp = expForLevel(level);
+      const pick = (cat, nth = 0) => SPECIALIST_ROSTER.filter((c) => c.rarity === rarity && c.id.startsWith("sp_") && c.skill.category === cat)[nth];
+      const team = [pick("aoeDamage"), pick("singleDamage"), pick("singleDamage", 1), pick("heal"), pick("cure")].map((c) => c.id);
+      await this.patch((s) => {
+        s.gradeDone = { 1: 1, 2: 1, 3: 1 };
+        s.secret = { cleared: Object.fromEntries(Array.from({ length: clear }, (_, i) => [`1:${i}`, 1])), daily: { date: null, n: 0 } };
+        let n = 0;
+        for (const c of SPECIALIST_ROSTER) s.owned[c.id] = { exp, exp2: exp, exp3: exp, breaks: c.rarity === "UR" ? breaks : 0, n: s.owned[c.id]?.n || ++n + 1000 };
+        s.party = team;
+        s.crystals = crystals;
+      });
+      return { party: team, level, rarity, breaks, clear };
+    },
     async giveCrystals(n = 50) {
       const cur = await localStore.load();
       const base = (await thirdApi.getState()).body.state;

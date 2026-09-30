@@ -52,7 +52,7 @@ const clearedKey = (b) => `${b.grade}:${b.chapterId}`;
 export function raidStats(index) {
   const b = raidBoss(index);
   if (!b) return null;
-  const base = bossStats("chapterBoss", tierOf(b.grade, b.chapterId, null));
+  const base = bossStats("raidBase", tierOf(b.grade, b.chapterId, null)); // 章ボスを弱めても(2026-09-30)、協力の裏ボスは変えない
   return { hp: Math.round(base.hp * RAID.hpMul), dmg: Math.round(base.dmg * RAID.dmgMul) };
 }
 

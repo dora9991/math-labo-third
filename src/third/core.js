@@ -15,6 +15,7 @@ import { generateThirdProblem, generatePractice, practiceCorrect, labUnitIdsOfCh
 import { getChapter, getGrade } from "./data/storyMap.js";
 import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js";
 import { getSubUnitClearExpReward, expOf, addExp } from "./expCurve.js";
+import { SECRET, SECRET_COUNT, secretOpen, secretKey, secretFirstExp, secretRepeatExp } from "./secretBoss.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
 import { RAID, RAID_LADDER, raidBoss } from "./raid.js";
 
@@ -24,8 +25,17 @@ export { PROBLEM_VERSION };
 export const problemTypeId = (q, unitId) => q?.id ?? `${unitId}:${String(q?.q || "").replace(/[+\-−]?\d+(\.\d+)?/g, "#").replace(/\s+/g, "").slice(0, 36)}`;
 
 const ROSTER_BY_ID = Object.fromEntries(SPECIALIST_ROSTER.map((c) => [c.id, c]));
-const POOL = { N: [], R: [], SR: [], UR: [] };
-for (const c of SPECIALIST_ROSTER) POOL[c.rarity]?.push(c.id);
+// ガチャの種類（2026-09-26 kazu指定）：通常ガチャ＝全員（複合特化はここだけ）／分野ガチャ＝その分野の単元特化(sp_)だけ。天井などは共通。
+export const GACHA_POOLS = ["normal", "calc", "eq", "func", "geo", "data"];
+const newPool = () => ({ N: [], R: [], SR: [], UR: [] });
+const POOLS = Object.fromEntries(GACHA_POOLS.map((k) => [k, newPool()]));
+for (const c of SPECIALIST_ROSTER) {
+  POOLS.normal[c.rarity]?.push(c.id);
+  const m = c.id.match(/^sp_([a-z]+)_/); // 単元特化（複合特化は sp2_ なので分野ガチャには入らない）
+  if (m && POOLS[m[1]]) POOLS[m[1]][c.rarity]?.push(c.id);
+}
+export const poolSize = (pool) => Object.values(POOLS[pool] || {}).reduce((a, l) => a + l.length, 0);
+export const poolIds = (pool) => Object.values(POOLS[pool] || {}).flat();
 
 /** JST基準の日付キー（1日の上限用） */
 export const dayKey = (now) => new Date(now + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -48,6 +58,7 @@ export function initialThirdState() {
     lastClaimAt: 0,
     daily: { date: null, repeat: 0, ok: 0, mission: false }, // 1日の集計：周回の回数／検証済みの正解数／毎日の目標を達成したか
     gradeDone: {}, // 学年クリアボーナスを受け取った学年 { "1": ms }
+    secret: { cleared: {}, daily: { date: null, n: 0 } }, // 裏ボス（やり込み）：倒した裏ボス { "学年:番号": ms }・周回の1日カウント
     raid: { cleared: {}, gradeDone: {}, allDone: 0, daily: { date: null, n: 0 } }, // 協力プレイ「裏ボス連戦」：倒した裏ボス { "grade:chapter": ms }・学年/全制覇ボーナス受取・周回の1日カウント
     medals: { practiceN: {}, haichi: {}, pracLv: {}, battle: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
@@ -89,6 +100,8 @@ export function normalizeThirdState(s) {
   out.chapterDone = s.chapterDone && typeof s.chapterDone === "object" ? s.chapterDone : {};
   out.bossDone = s.bossDone && typeof s.bossDone === "object" ? s.bossDone : {};
   out.gradeDone = s.gradeDone && typeof s.gradeDone === "object" ? s.gradeDone : {};
+  const sc = s.secret && typeof s.secret === "object" ? s.secret : {};
+  out.secret = { cleared: { ...(sc.cleared || {}) }, daily: { date: sc.daily?.date || null, n: Number(sc.daily?.n) || 0 } };
   const rd = s.raid && typeof s.raid === "object" ? s.raid : {};
   out.raid = { cleared: { ...(rd.cleared || {}) }, gradeDone: { ...(rd.gradeDone || {}) }, allDone: Number(rd.allDone) || 0, daily: { date: rd.daily?.date || null, n: Number(rd.daily?.n) || 0 } };
   out.seenSeeds = Array.isArray(s.seenSeeds) ? s.seenSeeds.slice(-VERIFY.seenSeedsKeep) : [];
@@ -122,7 +135,8 @@ function rollRarity(rand, pity) {
  * ガチャを引く。count は 1 か GACHA.packSize。チケットが足りなければ何も変えずにエラー。
  * @returns {{ok:boolean, error?:string, state?:object, results?:object[]}}
  */
-export function pullGacha(state, count, rand = Math.random) {
+export function pullGacha(state, count, rand = Math.random, pool = "normal") {
+  if (!GACHA_POOLS.includes(pool)) return { ok: false, error: "bad-pool" };
   if (count !== 1 && count !== GACHA.packSize) return { ok: false, error: "bad-count" };
   const cost = count * GACHA.costPerPull;
   if (state.crystals < cost) return { ok: false, error: "not-enough-crystals" };
@@ -140,7 +154,7 @@ export function pullGacha(state, count, rand = Math.random) {
     if (count === GACHA.packSize && i === rolls - 1 && !results.some((x) => x.rarity === "SR" || x.rarity === "UR") && rarity !== "SR" && rarity !== "UR") rarity = rollUpgrade();
     if (rarity === "UR") { s.pity.sinceUR = 0; s.pity.sinceSR = 0; }
     else if (rarity === "SR") s.pity.sinceSR = 0;
-    const ids = POOL[rarity];
+    const ids = POOLS[pool][rarity];
     const id = ids[Math.min(ids.length - 1, Math.floor(rand() * ids.length))];
     const cur = s.owned[id];
     let isNew = false, spare = false, refund = 0;
@@ -255,13 +269,20 @@ export function verifyClaim(claim, state, now) {
   if (claim.pv !== PROBLEM_VERSION) return fail("client-outdated"); // 問題データの版がずれている→再読み込み
   if (typeof claim.nonce !== "string" || claim.nonce.length < 8 || claim.nonce.length > 80) return fail("bad-nonce");
   if (state.claimIds.includes(claim.nonce)) return fail("duplicate-claim");
-  if (claim.kind !== "subUnit" && claim.kind !== "chapterBoss") return fail("unsupported-kind");
+  if (claim.kind !== "subUnit" && claim.kind !== "chapterBoss" && claim.kind !== "secretBoss") return fail("unsupported-kind");
   let allowed, unitId;
   if (claim.kind === "subUnit") {
     unitId = labUnitIdForBattle({ grade: claim.grade, chapterId: claim.chapterId, subUnitId: claim.subUnitId });
     if (!unitId) return fail("unknown-unit");
     if (!battleOpen(state, claim.grade, unitId)) return fail("locked"); // 前のバトルをクリアしていない小単元は、申請を受け付けない（ストーリーどおりに進む）
     allowed = [unitId];
+  } else if (claim.kind === "secretBoss") { // 裏ボス：その学年をクリアしていて、前の裏ボスを倒している時だけ。出題はその学年のどの単元でもよい
+    const g = Number(claim.grade);
+    if (![1, 2, 3].includes(g) || !Number.isInteger(claim.index) || claim.index < 0 || claim.index >= SECRET_COUNT) return fail("unknown-unit");
+    if (!secretOpen(state, g, claim.index)) return fail("locked");
+    allowed = chaptersForGrade(g).flatMap((c) => labUnitIdsOfChapter(g, c.id));
+    if (!allowed.length) return fail("unknown-unit");
+    unitId = `secret:${g}:${claim.index}`;
   } else { // 章ボス：その章の小単元のバトルメダルがすべてそろっている（＝全部のバトルをクリアした）時だけ。出題はその章のどの単元でもよい
     allowed = labUnitIdsOfChapter(claim.grade, claim.chapterId);
     if (!allowed.length) return fail("unknown-unit");
@@ -337,8 +358,24 @@ function applyClaimCore(state, claim, now) {
   s.seenSeeds = v.seenSeeds.slice(-VERIFY.seenSeedsKeep);
   s.lastClaimAt = now;
   const verified = { correct: v.correct, total: v.total, needed: VERIFY.minCorrect };
-  if (v.correct < VERIFY.minCorrect) {
+  const minCorrect = claim.kind === "secretBoss" ? SECRET.minCorrect : VERIFY.minCorrect;
+  verified.needed = minCorrect;
+  if (v.correct < minCorrect) {
     return { ok: true, state: s, rewards: { granted: false, reason: "not-enough-correct", crystals: 0, exp: 0, isFirstClear: false }, verified, rows: v.rows };
+  }
+  if (claim.kind === "secretBoss") { // 裏ボス：はじめて倒すとクリスタルと大きな経験値。周回は経験値のみ（1日5回まで）
+    const g = Number(claim.grade), idx = claim.index, skey = secretKey(g, idx);
+    const first = !s.secret.cleared[skey];
+    const today = dayKey(now);
+    if (s.secret.daily.date !== today) s.secret.daily = { date: today, n: 0 };
+    let crystals = 0, per = 0, reason = null;
+    if (first) { crystals = SECRET.firstCrystals[idx]; per = secretFirstExp(idx); s.secret.cleared[skey] = now; }
+    else if (s.secret.daily.n < SECRET.repeatDailyMax) { per = secretRepeatExp(idx); s.secret.daily.n += 1; }
+    else reason = "daily-limit";
+    const members = s.party.filter(Boolean);
+    for (const id of members) addExp(s.owned[id], g, per);
+    s.crystals += crystals;
+    return { ok: true, state: s, rewards: { granted: true, reason, crystals, coins: 0, exp: per * members.length, perMember: per, isFirstClear: first, kind: "secretBoss", index: idx }, verified, rows: v.rows };
   }
   if (claim.kind === "chapterBoss") { // 章ボス：はじめて倒した時だけクリスタル（周回は報酬なし）
     const bkey = `${claim.grade}:${claim.chapterId}`;

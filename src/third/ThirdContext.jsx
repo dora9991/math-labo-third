@@ -55,8 +55,8 @@ export function ThirdProvider({ children }) {
       if (r.status === 200) setSave(r.body.state);
       else await load(); // 拒否された（未所持など）→ サーバーの状態に戻す
     },
-    async pullGacha(count) {
-      const r = await thirdApi.gacha(count);
+    async pullGacha(count, pool = "normal") {
+      const r = await thirdApi.gacha(count, pool);
       if (r.status === 200) { setSave(r.body.state); return { ok: true, results: r.body.results }; }
       if (r.body?.state) setSave(r.body.state);
       return { ok: false, error: r.body?.error || "failed" };

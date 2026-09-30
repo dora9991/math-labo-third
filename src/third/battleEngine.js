@@ -21,7 +21,7 @@
 // ============================================================
 
 import { getStatsAtLevel } from "./growthCurve.js";
-import { mobStats, bossStats } from "./balance.js";
+import { mobStats, bossStats, STATUS_TUNING } from "./balance.js";
 
 /** 今のパーティ編成からパーティ最大HPを合計する。
  * @param {object[]} partyMembers charactersById由来のキャラ本体の配列（nullを含めない）
@@ -283,40 +283,42 @@ export function resolveEnemyAction(enemy) {
 //   石化　：治療されるまでずっと行動できない（ターン経過では治らない）。
 //           パーティ全員が同時に石化した場合はその時点で敗北。
 // ============================================================
-const STATUS_BASE_CHANCE = {
-  poison: 0.6,
-  paralysis: 0.5,
-  petrification: 0.25,
-  seal: 0.7,
-  confusion: 0.5,
-  slow: 0.5, // #todo kazu指定に無かったための仮値
-};
+// 【2026-09-26 kazu指定で改訂】状態異常は5種類：毒・麻痺・眠り・石化・混乱（封印・スローは廃止）。
+//  毒＝敵が攻撃するたびに、最大HPの10%の追加ダメージ（敵が3回攻撃するまで）。
+//  麻痺＝50%の確率で攻撃できない（敵が2回攻撃するまで）。 眠り＝行動できない（敵が2回攻撃するまで）。
+//  石化＝状態異常回復するまで行動できない（全員が石化すると負け）。 混乱＝味方を攻撃する・ダメージは通常の1/10（敵が2回攻撃するまで）。
+//  耐性：計算＝毒・方程式＝麻痺・関数＝眠り・図形＝石化・統計＝混乱に、その分野のキャラは耐性100（＝かからない）。
+const STATUS_BASE_CHANCE = STATUS_TUNING.baseChance; // 数値は balance.js（STATUS_TUNING）で調整する
+
+export const STATUS_KEYS = Object.keys(STATUS_BASE_CHANCE);
 
 export const STATUS_DEFS = {
-  poison: { durationTurns: 3, dotFraction: 1 / 12 }, // 数学ラボ3：時計は「敵の行動1回」ごと。math-worldの1/5だと重すぎるため1/12
-  paralysis: { durationTurns: 2 },
-  seal: { durationTurns: 3 },
-  slow: { durationTurns: 4 },
+  // 毒：時計は「敵の行動1回」ごと。敵が攻撃するたびに、毒の仲間1体につき最大HPの4%（2026-09-30 10%→4%：毒は仲間1体ごとに重なるので、
+  //  2体が毒だと1回20%＝ボスの攻撃(約15%)より痛く、負けの大きな原因になっていた。耐性で「かからない」子がいるほど軽くなる仕組みは同じ）
+  poison: { durationTurns: 3, dotFraction: 0.04 },
+  paralysis: { durationTurns: 2, actChance: 0.5 }, // 攻撃できる確率50%
+  sleep: { durationTurns: 2 },
   confusion: { durationTurns: 2, damageFraction: 1 / 10 },
   petrification: {}, // durationなし＝cureStatusEffectsで治すまで解除されない
 };
 
 /** その状態異常が、この1体にかかるかどうかを判定する（キャラ1体ごとに別判定）。 */
-export function rollStatusInflict(statusKey, character) {
+export function rollStatusInflict(statusKey, character, bonus = 0) {
   const base = STATUS_BASE_CHANCE[statusKey];
   if (base == null) return false; // 対応していない状態異常キー
   const resist = character?.resistances?.[statusKey] ?? 0;
-  const chance = Math.max(0, base - resist / 100);
+  if (resist >= 100) return false; // 耐性100＝その状態異常にはならない
+  const chance = Math.min(0.95, Math.max(0, base + bonus - resist / 100));
   return Math.random() < chance;
 }
 
 /** 敵の1攻撃が、狙った1体に状態異常も仕掛けてくるかどうか。6種類から1つだけ
  * ランダムに選んで抽選する（毎回全種類判定すると発生しすぎるため）。
  * かからなければnullを返す。 */
-export function rollEnemyInflictedStatus(targetCharacter) {
+export function rollEnemyInflictedStatus(targetCharacter, { statusKey = null, bonus = 0 } = {}) {
   const keys = Object.keys(STATUS_BASE_CHANCE);
-  const key = keys[Math.floor(Math.random() * keys.length)];
-  return rollStatusInflict(key, targetCharacter) ? key : null;
+  const key = statusKey || keys[Math.floor(Math.random() * keys.length)];
+  return rollStatusInflict(key, targetCharacter, bonus) ? key : null;
 }
 
 /** statusByCharId（{characterId: {statusKey: {turnsLeft, readyToAct?}}}）に
@@ -326,7 +328,6 @@ export function applyStatusEffect(statusByCharId, characterId, statusKey) {
   const def = STATUS_DEFS[statusKey];
   if (!def) return statusByCharId;
   const state = def.durationTurns ? { turnsLeft: def.durationTurns } : { active: true };
-  if (statusKey === "slow") state.readyToAct = false; // かかった次のターンはまだ動けない
   return {
     ...statusByCharId,
     [characterId]: { ...statusByCharId[characterId], [statusKey]: state },
@@ -335,15 +336,15 @@ export function applyStatusEffect(statusByCharId, characterId, statusKey) {
 
 /** そのキャラが今ラウンド行動できるか（麻痺・石化は不可、スローは4ターンの間
  * 2ターンに1回だけ）。 */
-export function canActThisRound(effects) {
+export function canActThisRound(effects, rand = Math.random) {
   if (!effects) return true;
-  if (effects.paralysis || effects.petrification) return false;
-  if (effects.slow && !effects.slow.readyToAct) return false;
+  if (effects.sleep || effects.petrification) return false;
+  if (effects.paralysis && rand() >= STATUS_DEFS.paralysis.actChance) return false; // 麻痺：50%の確率で攻撃できない
   return true;
 }
 
 export function canUseSkillThisRound(effects) {
-  return !(effects && effects.seal);
+  return !(effects && effects.sleep);
 }
 
 export function isConfusedThisRound(effects) {
@@ -372,11 +373,6 @@ export function tickStatusEffects(statusByCharId, partyMaxHp) {
       }
       if (key === "petrification") {
         nextEffects[key] = state; // 治療されるまで消えない
-        continue;
-      }
-      if (key === "slow") {
-        const turnsLeft = state.turnsLeft - 1;
-        if (turnsLeft > 0) nextEffects[key] = { turnsLeft, readyToAct: !state.readyToAct };
         continue;
       }
       const turnsLeft = state.turnsLeft - 1;

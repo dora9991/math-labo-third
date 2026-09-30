@@ -9,8 +9,7 @@ import SubjectPentagon from "./SubjectPentagon.jsx";
 const STATUS_LABEL = {
   poison: "毒",
   paralysis: "麻痺",
-  seal: "封印",
-  slow: "スロー",
+  sleep: "眠り",
   confusion: "混乱",
   petrification: "石化",
 };

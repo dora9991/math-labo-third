@@ -51,7 +51,7 @@ export const SUBJECT_LABEL = {
   eq: "方程式",
   func: "関数",
   geo: "図形",
-  data: "データ",
+  data: "統計",
 };
 
 // 学年ごとの表示名
