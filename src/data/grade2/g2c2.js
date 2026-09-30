@@ -76,8 +76,13 @@ function genBuy(r, level) {
   const askA = r(0, 1) === 0;
   const ans = askA ? s.x0 : s.y0;
   const askName = askA ? it.a : it.b;
+  // 人の組（おとな・こども）は「買う」ではなく入館料の文にする（「こどもを買う」は不自然）。おとなの方を高くする
+  if (it.unit === "人" && s.pa < s.pb) { [s.pa, s.pb] = [s.pb, s.pa]; s.total = s.pa * s.x0 + s.pb * s.y0; }
+  const q = it.unit === "人"
+    ? `ある博物館の入館料は、おとな1人${s.pa}円、こども1人${s.pb}円だった。おとなとこどもあわせて${s.n}人で入館し、入館料の合計は${s.total}円だった。${askName}は何人か求めなさい。`
+    : `1${it.unit}${s.pa}円の${it.a}と1${it.unit}${s.pb}円の${it.b}を合わせて${s.n}${it.unit}買うと、代金の合計は${s.total}円だった。${askName}は何${it.unit}買ったか求めなさい。`;
   return {
-    q: `1${it.unit}${s.pa}円の${it.a}と1${it.unit}${s.pb}円の${it.b}を合わせて${s.n}${it.unit}買うと、代金の合計は${s.total}円だった。${askName}は何${it.unit}買ったか求めなさい。`,
+    q,
     ans,
     choices: numChoices(ans, r, [askA ? s.y0 : s.x0, s.n - ans]),
     h1: "個数をx,yとして「x+y=個数の合計」「代金の式」の2つを作る",
@@ -114,15 +119,87 @@ function genOni(r) {
   return { q: `連立方程式 ${eqStr(a1, b1, c1)}、${eqStr(a2, b2, c2)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "係数をそろえて1文字を消す（大きい数に注意）", h2: "消去→1次方程式→代入の順で求める" };
 }
 
+// ── 難易度をはっきり分けるための生成器（2026-09-30）──
+// 簡単：たすか引くだけで1文字が消える（正の小さい解）  例 2x+y=8、x−y=1
+function genSimple(r) {
+  const x0 = r(1, 6), y0 = r(1, 6), b = r(1, 3), a1 = r(1, 4), a2 = r(1, 4);
+  const sub = r(0, 1) === 1; // 2つ目を「a2x−by」にして、たすと y が消える
+  const c1 = a1 * x0 + b * y0, c2 = a2 * x0 - b * y0;
+  const q = sub
+    ? `連立方程式 ${eqStr(a1, b, c1)}、${eqStr(a2, -b, c2)} を解きなさい。`
+    : `連立方程式 ${eqStr(a1, b, c1)}、${eqStr(a1 + a2, b, c1 + a2 * x0)} を解きなさい。`; // ひくと y が消える
+  return { q, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "y の係数が同じ(または反対)。たすか引くかで y が消える", h2: "x を求めたら、どちらかの式に代入して y を求める" };
+}
+// 難しい（加減法）：両方の式を何倍かしないと消えない  例 3x+4y=…、2x−5y=…
+function genKagenHard(r) {
+  const x0 = rnz(r, -6, 6), y0 = rnz(r, -6, 6);
+  const noDiv = (p1, p2) => Math.abs(p1) % Math.abs(p2) !== 0 && Math.abs(p2) % Math.abs(p1) !== 0;
+  let a1, b1, a2, b2, g = 0;
+  do { a1 = rnz(r, -7, 7); b1 = rnz(r, -7, 7); a2 = rnz(r, -7, 7); b2 = rnz(r, -7, 7); g++; }
+  while ((a1 * b2 - a2 * b1 === 0 || !noDiv(a1, a2) || !noDiv(b1, b2)) && g < 200);
+  return { q: `連立方程式 ${eqStr(a1, b1, a1 * x0 + b1 * y0)}、${eqStr(a2, b2, a2 * x0 + b2 * y0)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "両方の式を何倍かして、消したい文字の係数の絶対値をそろえる", h2: "最小公倍数にそろえると計算が楽" };
+}
+// 代入法・簡単：y=x+○ の形（正の小さい解）
+function genDainyuEasy(r) {
+  const x0 = r(1, 6), k = r(1, 5), y0 = x0 + k, a = r(1, 3), b = r(1, 3);
+  return { q: `連立方程式 y=x+${k}、${eqStr(a, b, a * x0 + b * y0)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: H.dainyu.h1, h2: H.dainyu.h2 };
+}
+// かっこをふくむ連立  例 2(x+3y)−y=13、x−y=1
+function genParen(r) {
+  const x0 = rnz(r, -5, 5), y0 = rnz(r, -5, 5), k = r(2, 3), pp = rnz(r, -3, 3), m = rnz(r, -3, 3);
+  const a1 = k, b1 = k * pp + m; // k(x+py)+my → kx+(kp+m)y
+  let a2, b2, g = 0;
+  do { a2 = rnz(r, -3, 3); b2 = rnz(r, -3, 3); g++; } while (a1 * b2 - a2 * b1 === 0 && g < 50);
+  if (a1 * b2 - a2 * b1 === 0) return { skip: true };
+  const lhs1 = `${k}(${polyStr([{ c: 1, v: { x: 1 } }, { c: pp, v: { y: 1 } }])})${m < 0 ? "−" : "+"}${Math.abs(m) === 1 ? "" : Math.abs(m)}y`;
+  return { q: `連立方程式 ${lhs1}=${neg(a1 * x0 + b1 * y0)}、${eqStr(a2, b2, a2 * x0 + b2 * y0)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "まずかっこをはずして、ax+by=c の形に整理する", h2: "整理したら、加減法か代入法で解く" };
+}
+// 小数をふくむ連立  例 0.3x+0.2y=1.3、x+y=5
+function genDecimal(r) {
+  const x0 = rnz(r, -5, 5), y0 = rnz(r, -5, 5), a = r(1, 9), b = rnz(r, -9, 9);
+  let a2, b2, g = 0;
+  do { a2 = rnz(r, -3, 3); b2 = rnz(r, -3, 3); g++; } while (a * b2 - a2 * b === 0 && g < 50);
+  if (a * b2 - a2 * b === 0) return { skip: true };
+  const c = a * x0 + b * y0; // 10倍した式の右辺
+  const dec = (n) => neg(Math.round(n) / 10);
+  const lhs = `${a / 10}x${b < 0 ? "−" : "+"}${Math.abs(b) / 10}y`;
+  return { q: `連立方程式 ${lhs}=${dec(c)}、${eqStr(a2, b2, a2 * x0 + b2 * y0)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "小数の式は、両辺を10倍して整数の式にする", h2: `10倍すると ${eqStr(a, b, c)}` };
+}
+// 分数をふくむ連立  例 x/2+y/3=4、x−y=3
+function genFraction(r) {
+  const pp = rpickG2(r, [2, 3, 4]), qq = rpickG2(r, [2, 3, 5]), x0 = pp * rnz(r, -3, 3), y0 = qq * rnz(r, -3, 3), s = r(0, 1) ? 1 : -1;
+  const c1 = x0 / pp + s * (y0 / qq);
+  let a2, b2, g = 0;
+  do { a2 = rnz(r, -3, 3); b2 = rnz(r, -3, 3); g++; } while (b2 * qq === a2 * pp * s && g < 50); // 係数(1/p, s/q)と比例しない
+  const lhs = `x/${pp}${s > 0 ? "+" : "−"}y/${qq}`;
+  return { q: `連立方程式 ${lhs}=${neg(c1)}、${eqStr(a2, b2, a2 * x0 + b2 * y0)} を解きなさい。`, ans: pairStr(x0, y0), choices: pairChoices(x0, y0, r), h1: "分数の式は、分母の最小公倍数を両辺にかけて整数の式にする", h2: `両辺を ${(pp * qq) / gcdN(pp, qq)} 倍する` };
+}
+const gcdN = (a, b) => (b ? gcdN(b, a % b) : a);
+// 文章題・鬼：割合（去年と今年の人数）
+function genPercent(r) {
+  const x0 = 20 * r(5, 15), y0 = 20 * r(5, 15), p1 = rpickG2(r, [5, 10, 15, 20]), q1 = rpickG2(r, [5, 10, 15]);
+  const d = (p1 * x0 - q1 * y0) / 100; // 今年の増減（人）
+  if (d === 0) return { skip: true };
+  const askBoys = r(0, 1) === 0, ans = askBoys ? x0 : y0;
+  return {
+    q: `ある中学校の昨年の生徒数は、男女合わせて${x0 + y0}人だった。今年は男子が${p1}%増え、女子が${q1}%減ったので、全体では${Math.abs(d)}人${d > 0 ? "増えた" : "減った"}。昨年の${askBoys ? "男子" : "女子"}は何人か求めなさい。`,
+    ans,
+    choices: numChoices(ans, r, [askBoys ? y0 : x0, Math.round(ans * (1 + (askBoys ? p1 : -q1) / 100))]),
+    h1: "昨年の男子を x 人、女子を y 人として2つの式を作る",
+    h2: `x+y=${x0 + y0}、${p1}/100 x − ${q1}/100 y=${neg(d)}`,
+  };
+}
+
 // 各レベル10問に拡張：同じ生成器でも id を変えて10問ぶん並べる（毎回ランダム生成・解は構成法で必ず正答）
 const tens = (idp, suffix, fn, skill) =>
   Array.from({ length: 10 }, (_, i) => p(idp + suffix + (i + 1), fn, skill));
+const mix = (...fns) => (r) => fns[r(0, fns.length - 1)](r);
 
 const lv = (fns, idp, skill) => ({
   easy: tens(idp, "e", fns.e, skill),
   standard: tens(idp, "s", fns.s, skill),
   advanced: tens(idp, "a", fns.a, skill),
-  oni: tens(idp, "o", genOni, skill), // 🔥鬼（全単元共通：大係数の連立）
+  oni: tens(idp, "o", fns.o || genOni, skill), // 🔥鬼（既定は全単元共通：大係数の連立）
 });
 
 export const chapter = {
@@ -132,9 +209,9 @@ export const chapter = {
   color: "#60a5fa",
   grade: 2,
   units: [
-    { id: "g2c2u1", name: "連立方程式の解き方（加減法・代入法）", emoji: "🧩", desc: "1文字を消して解く", problems: lv({ e: genBasic, s: genBasic, a: genKagen }, "g2c2u1", "S-SIM-SOLVE") },
-    { id: "g2c2u2", name: "連立方程式（加減法の練習）", emoji: "➕", desc: "係数をそろえて消去", problems: lv({ e: genBasic, s: genKagen, a: genKagen }, "g2c2u2", "S-SIM-KAGEN") },
-    { id: "g2c2u3", name: "連立方程式（代入法・かっこ・分数・小数）", emoji: "↪️", desc: "y=… を代入", problems: lv({ e: genDainyu, s: genDainyu, a: genDainyu }, "g2c2u3", "S-SIM-DAINYU") },
-    { id: "g2c2u4", name: "連立方程式の利用（文章題）", emoji: "📝", desc: "代金・速さの文章題", problems: lv({ e: (r) => genWord(r, "easy"), s: (r) => genWord(r, "standard"), a: (r) => genWord(r, "advanced") }, "g2c2u4", "S-SIM-USE") },
+    { id: "g2c2u1", name: "連立方程式の解き方（加減法・代入法）", emoji: "🧩", desc: "1文字を消して解く", problems: lv({ e: genSimple, s: mix(genBasic, genDainyu), a: genKagen }, "g2c2u1", "S-SIM-SOLVE") },
+    { id: "g2c2u2", name: "連立方程式（加減法の練習）", emoji: "➕", desc: "係数をそろえて消去", problems: lv({ e: genSimple, s: genBasic, a: genKagenHard }, "g2c2u2", "S-SIM-KAGEN") },
+    { id: "g2c2u3", name: "連立方程式（代入法・かっこ・分数・小数）", emoji: "↪️", desc: "y=… を代入", problems: lv({ e: genDainyuEasy, s: genDainyu, a: mix(genParen, genDecimal), o: mix(genFraction, genOni) }, "g2c2u3", "S-SIM-DAINYU") },
+    { id: "g2c2u4", name: "連立方程式の利用（文章題）", emoji: "📝", desc: "代金・速さの文章題", problems: lv({ e: (r) => genWord(r, "easy"), s: (r) => genWord(r, "standard"), a: (r) => genWord(r, "advanced"), o: genPercent }, "g2c2u4", "S-SIM-USE") },
   ],
 };

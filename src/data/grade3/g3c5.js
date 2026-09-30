@@ -30,19 +30,40 @@ function genProp(r, level) {
   return { q: `比例式 ${A}:x = ${C}:${D} が成り立つとき、x の値を求めなさい。`, ans: B, choices: numChoices(B, r, [C, D, A + D - C]), h1: "a:x=c:d のとき a×d = x×c", h2: `x=${A}×${D}÷${C}=${B}` };
 }
 
-// u2 面積比・体積比
+// u2 面積比・体積比（2026-09-30：簡単＝相似比→面積比／普通＝面積比→相似比・表面積比／難しい＝体積比・面積比→体積比）
 function genRatio(r, level) {
   const [m, n] = rpick(r, COP);
-  if (level === "advanced") {
+  if (level === "easy") {
+    const ans = `${m * m}:${n * n}`;
+    return { q: `相似比が ${m}:${n} の2つの図形の面積比を求めなさい。`, ans, choices: exprChoices(ans, [`${m}:${n}`, `${m * m * m}:${n * n * n}`, `${n * n}:${m * m}`], [`${m}:${n * n}`], r), h1: H.ratio.h1, h2: `${m}²:${n}²=${m * m}:${n * n}` };
+  }
+  if (level === "standard") {
+    if (r(0, 1)) {
+      const ans = `${m}:${n}`;
+      return { q: `相似な2つの図形の面積比が ${m * m}:${n * n} のとき、相似比を求めなさい。`, ans, choices: exprChoices(ans, [`${m * m}:${n * n}`, `${m * 2}:${n * 2}`, `${n}:${m}`], [`${m + 1}:${n + 1}`], r), h1: "面積比は相似比の2乗。逆に、面積比の数を「何の2乗か」と考える", h2: `${m * m}=${m}²、${n * n}=${n}²` };
+    }
+    const ans = `${m * m}:${n * n}`;
+    return { q: `相似比が ${m}:${n} の2つの立体の表面積の比を求めなさい。`, ans, choices: exprChoices(ans, [`${m}:${n}`, `${m * m * m}:${n * n * n}`, `${n * n}:${m * m}`], [`${m}:${n * n}`], r), h1: "表面積も「面積」なので、相似比の2乗", h2: `${m}²:${n}²` };
+  }
+  if (r(0, 1)) {
     const ans = `${m * m * m}:${n * n * n}`;
     return { q: `相似比が ${m}:${n} の2つの立体の体積比を求めなさい。`, ans, choices: exprChoices(ans, [`${m}:${n}`, `${m * m}:${n * n}`, `${n * n * n}:${m * m * m}`], [`${m * m}:${n * n * n}`], r), h1: H.ratio.h1, h2: `${m}³:${n}³=${m * m * m}:${n * n * n}` };
   }
-  const ans = `${m * m}:${n * n}`;
-  return { q: `相似比が ${m}:${n} の2つの図形の面積比を求めなさい。`, ans, choices: exprChoices(ans, [`${m}:${n}`, `${m * m * m}:${n * n * n}`, `${n * n}:${m * m}`], [`${m}:${n * n}`], r), h1: H.ratio.h1, h2: `${m}²:${n}²=${m * m}:${n * n}` };
+  const ans = `${m * m * m}:${n * n * n}`;
+  return { q: `相似な2つの立体の表面積の比が ${m * m}:${n * n} のとき、体積比を求めなさい。`, ans, choices: exprChoices(ans, [`${m * m}:${n * n}`, `${m ** 4}:${n ** 4}`, `${m}:${n}`], [`${n * n * n}:${m * m * m}`], r), h1: "まず表面積の比から相似比を出し、それを3乗する", h2: `相似比 ${m}:${n} → 体積比 ${m}³:${n}³` };
 }
 
-// u3 影と測定（相似の利用）
-function genShadow(r) {
+// u3 影と測定（相似の利用）（2026-09-30：簡単＝整数の影／普通＝小数の棒／難しい＝地図の縮尺／鬼＝縮図と目の高さ）
+function genShadow(r, level = "easy") {
+  if (level === "standard") {
+    const k = rpick(r, [1, 3, 5]), h = k / 2, s = r(1, 3), t = 2 * r(1, 5), treeShadow = s * t, x = (k * t) / 2;
+    return { q: `長さ ${h}m の棒の影が ${s}m のとき、同じ時刻に影が ${treeShadow}m の木の高さは何mですか。`, ans: x, choices: numChoices(x, r, [treeShadow, treeShadow - s + h, x * 2]), h1: "同じ時刻なら 高さ:影 の比は等しい", h2: `${h}:${s} = x:${treeShadow}` };
+  }
+  if (level === "advanced") return genMapScale(r);
+  if (level === "oni") {
+    const N = rpick(r, [100, 200, 500]), a = r(2, 9), eye = 1.5, ans = (a * N) / 100 + eye;
+    return { q: `木から少し離れた地点に立ち、木のてっぺんを見上げた。縮尺 1:${N} の縮図をかくと、目の高さから木のてっぺんまでの高さは ${a}cm になった。目の高さを ${eye}m とすると、木の高さは何mですか。`, ans, choices: numChoices(ans, r, [(a * N) / 100, ans + eye, (a * N) / 10 + eye]), h1: "縮図の長さ×N＝実際の長さ（cm）。最後に目の高さをたす", h2: `${a}×${N}=${a * N}cm=${(a * N) / 100}m、${(a * N) / 100}+${eye}` };
+  }
   const h = r(1, 3), s = r(1, 4), t = r(2, 5);
   const treeShadow = s * t, x = h * t;
   return { q: `高さ ${h}m の棒の影が ${s}m のとき、同じ時刻に影が ${treeShadow}m の木の高さは何mですか。`, ans: x, choices: numChoices(x, r, [treeShadow - s + h, h + treeShadow - s, treeShadow]), h1: "同じ時刻なら 高さ:影 の比は等しい", h2: `${h}:${s} = x:${treeShadow} → x=${x}` };
@@ -73,9 +94,9 @@ function genOniRatio(r) {
   return { q: `相似な2つの立体があり、相似比は ${m}:${n} です。小さい方の体積が ${Vsmall}cm³ のとき、大きい方の体積を求めなさい。`, ans: Vbig, choices: numChoices(Vbig, r, [Vsmall * n / m, Vsmall * (n * n) / (m * m), Vsmall + Vsmall]), h1: H.ratio.h1, h2: `体積比 ${m}³:${n}³=${m * m * m}:${n * n * n}。${Vsmall}×${n * n * n}÷${m * m * m}=${Vbig}` };
 }
 
-// u3 鬼：縮図（地図の縮尺）の応用。縮尺 1:N、地図上 a cm → 実際の距離（m）
+// u3 難しい：地図の縮尺。縮尺 1:N、地図上 a cm → 実際の距離（m）
 //   実際の長さ = a×N cm = a×N÷100 m（100で割り切れる N のみ採用）
-function genOniShadow(r) {
+function genMapScale(r) {
   const N = rpick(r, [1000, 2000, 5000, 10000, 25000, 50000]);
   const aCm = r(2, 12);
   const realM = aCm * N / 100;             // N は全て100の倍数 → 必ず整数
@@ -106,7 +127,7 @@ export const chapter = {
   units: [
     { id: "g3c5u1", name: "比例式とxの値", emoji: "➗", desc: "a:b=c:x", problems: lv(genProp, genOniProp, "g3c5u1", "S-SIM-PROP") },
     { id: "g3c5u2", name: "相似な図形の面積比・体積比", emoji: "📐", desc: "m²:n²・m³:n³", problems: lv(genRatio, genOniRatio, "g3c5u2", "S-SIM-RATIO") },
-    { id: "g3c5u3", name: "相似の利用（影と測定）", emoji: "🌳", desc: "影で高さを測る", problems: lv(genShadow, genOniShadow, "g3c5u3", "S-SIM-USE") },
+    { id: "g3c5u3", name: "相似の利用（影と測定）", emoji: "🌳", desc: "影で高さを測る", problems: lv(genShadow, (r) => genShadow(r, "oni"), "g3c5u3", "S-SIM-USE") },
     // 証明（穴うめ・選択式）：根拠／相似条件／等しい比 を4択で選ぶ。難易度ごとに問う内容が変わる（oni＝根拠と条件の組みあわせ）
     { id: "g3c5u4", name: "相似の証明", emoji: "📝", desc: "根拠・相似条件を選ぶ", problems: proofSet(genSimProof, "g3c5u4", "S-SIM-PROOF") },
   ],

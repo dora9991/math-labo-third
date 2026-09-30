@@ -502,5 +502,25 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t(`式の答え(y＝5x・−n/4・π など)を選ぶと正解になる（${n}問）`, n > 0 && bad === 0, `${bad}問が不正解扱い`);
 }
 
+// ---- 難易度で問題が変わる（2026-09-30：生成関数に難易度が届かず、簡単〜難しいが同じ問題になっていた不具合の再発防止）
+{
+  const L = ["easy", "standard", "advanced", "oni"];
+  const qs = (fn) => new Set(Array.from({ length: 40 }, (_, i) => fn(9001 + i * 7919)).filter(Boolean).map((p) => String(p.q ?? p.question)));
+  const overlap = (a, b) => { let k = 0; for (const x of a) if (b.has(x)) k++; return k / Math.max(1, Math.min(a.size, b.size)); };
+  const worst = [];
+  for (const g of [1, 2, 3]) for (const ch of T.chaptersForGrade(g)) for (const u of ch.units) {
+    const sets = L.map((l) => qs((seed) => T.generatePractice(u, l, seed)));
+    const ea = overlap(sets[0], sets[2]), ao = overlap(sets[2], sets[3]);
+    if (ea >= 0.5 || ao >= 0.5) worst.push(`${u.id}(簡単-難しい${Math.round(ea * 100)}%・難しい-鬼${Math.round(ao * 100)}%)`);
+  }
+  t("練習：どの単元も、簡単と難しい・難しいと鬼で同じ問題が半分以上にならない", worst.length === 0, worst.join(" "));
+  const battleSame = [];
+  for (const u of ["u2", "u4", "e1", "h1", "g2c1u1", "g3c1u3"]) {
+    const e = qs((seed) => T.generateThirdProblem(u, "easy", seed)), o = qs((seed) => T.generateThirdProblem(u, "oni", seed));
+    if (overlap(e, o) > 0.2) battleSame.push(u);
+  }
+  t("バトル：難易度を変えると問題も変わる（とけた式の単元も）", battleSame.length === 0, battleSame.join(","));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

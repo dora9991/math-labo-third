@@ -38,7 +38,9 @@ export function generateThirdProblem(unitId, difficulty = "standard", seed = new
   const s32 = seed >>> 0;
   return withSeed(s32, () => {
     for (let tries = 0; tries < 6; tries++) {
-      const q = hasToketa(unitId) ? genToketa(unitId) : genProblemSeeded(unit, level);
+      // とけた式（誤答の理由つき）は「普通」だけ。簡単・難しい・鬼はその難度の問題を出す（練習と同じ。
+      //  2026-09-30 まではバトルだけ全難度でとけた式になり、難度を変えても問題が同じ＝鬼が得なだけだった）
+      const q = level === "standard" && hasToketa(unitId) ? genToketa(unitId) : genProblemSeeded(unit, level);
       if (!q) continue;
       let choices;
       if (q.toketa && Array.isArray(q.distractors)) choices = shuffle(q.distractors.map((d) => String(d.val)));
