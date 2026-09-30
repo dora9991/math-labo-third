@@ -1,0 +1,69 @@
+/* ============================================================
+   recommend.css — メニューの「今日のおすすめ」3枚と「わたしの理解度」マップ（2026-09-30）
+   ============================================================ */
+.rec-plan { margin: 0 0 16px; padding: 14px; border: 1px solid rgba(255, 223, 134, .55); border-radius: 20px;
+  background: linear-gradient(135deg, rgba(20, 38, 96, .9), rgba(40, 24, 88, .82)); box-shadow: 0 14px 30px rgba(0, 3, 26, .35), inset 0 1px rgba(255, 255, 255, .16); }
+.rec-plan__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 2px 10px; }
+.rec-plan__head b { font: 900 18px 'M PLUS Rounded 1c', sans-serif; color: #ffe7a0; letter-spacing: .04em; }
+.rec-plan__head small { color: #d9e5ff; font-size: 12.5px; font-weight: 700; }
+.rec-plan__rest { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.rec-plan__map { width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 1px dashed rgba(145, 235, 255, .55);
+  background: rgba(8, 22, 60, .5); color: #bff3ff; font: 800 14px inherit; font-family: inherit; cursor: pointer; }
+
+.rec-card { --slot: #ffe087; position: relative; display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; cursor: pointer;
+  padding: 12px 14px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--slot) 70%, white); color: #fff; font-family: inherit;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--slot) 24%, #1c2f78), rgba(14, 20, 64, .94));
+  box-shadow: 0 5px 0 rgba(3, 8, 34, .7), inset 0 1px rgba(255, 255, 255, .2); transition: transform .15s, filter .15s; }
+.rec-card:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.rec-card:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(3, 8, 34, .7); }
+.rec-card--grow { --slot: #69e8bf; }
+.rec-card--review { --slot: #7fdcff; }
+.rec-card--challenge { --slot: #ff8bc7; }
+.rec-card--next { --slot: #ffe087; }
+.rec-card__slot { display: flex; align-items: center; gap: 6px; color: var(--slot); font-size: 13px; font-weight: 900; letter-spacing: .06em; }
+.rec-card__slot small { color: #d4def7; font-size: 11.5px; font-weight: 700; letter-spacing: 0; margin-left: 4px; }
+.rec-card__unit { font: 900 17px 'M PLUS Rounded 1c', sans-serif; line-height: 1.3; }
+.rec-card__unit em { font-style: normal; font-size: 11.5px; margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, .16); vertical-align: 2px; }
+.rec-card__why { color: #e6edff; font-size: 13px; font-weight: 700; line-height: 1.55; }
+.rec-card__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 2px; }
+.rec-card__u { color: #cfe0ff; font-size: 12px; font-weight: 800; }
+.rec-card__go { margin-left: auto; padding: 5px 12px; border-radius: 999px; background: var(--slot); color: #10193f; font-size: 13px; font-weight: 900; }
+.rec-card.is-big { padding: 16px 18px; }
+.rec-card.is-big .rec-card__unit { font-size: 22px; }
+.rec-card.is-big .rec-card__why { font-size: 14px; }
+.rec-card.is-big .rec-card__go { font-size: 15px; padding: 7px 16px; }
+.rec-lv { padding: 2px 9px; border-radius: 8px; border: 1px solid var(--lv); color: var(--lv); background: rgba(0, 0, 0, .25); font-size: 12px; font-weight: 900; }
+
+/* ---- わたしの理解度 */
+.rec-map__note { padding: 12px 14px; border-radius: 14px; background: rgba(8, 22, 60, .62); border: 1px solid rgba(166, 220, 255, .3); color: #dfe8ff; font-size: 13px; line-height: 1.65; margin-bottom: 10px; }
+.rec-map__note b { color: #ffe7a0; }
+.rec-map__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12.5px; font-weight: 800; }
+.rec-map__legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
+.rec-map__sum { margin: 0 2px 12px; color: #dfe8ff; font-size: 14px; font-weight: 700; }
+.rec-map__sum b { font-size: 18px; color: #fff; }
+.rec-map__ch { margin-bottom: 14px; padding: 10px 12px; border-radius: 16px; background: rgba(12, 24, 66, .72); border: 1px solid rgba(166, 220, 255, .22); }
+.rec-map__ch h3 { font: 900 15px 'M PLUS Rounded 1c', sans-serif; color: #ffe7a0; margin: 2px 2px 8px; }
+.rec-row { display: flex; gap: 8px; align-items: stretch; border-top: 1px solid rgba(166, 220, 255, .16); padding: 7px 0; }
+.rec-row:first-of-type { border-top: 0; }
+.rec-row__main { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; grid-template-areas: "name band pct" "bar bar bar" "sub sub sub";
+  gap: 4px 8px; align-items: center; text-align: left; background: none; border: 0; color: #fff; cursor: pointer; font-family: inherit; padding: 2px; }
+.rec-row__name { grid-area: name; font-size: 14.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-row__band { grid-area: band; font-size: 12px; font-weight: 900; color: var(--band); border: 1px solid var(--band); border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
+.rec-row__pct { grid-area: pct; font-size: 15px; font-weight: 900; text-align: right; }
+.rec-row__bar { grid-area: bar; display: block; height: 8px; border-radius: 5px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.rec-row__bar i { display: block; height: 100%; border-radius: 5px; }
+.rec-row__sub { grid-area: sub; font-size: 12px; font-weight: 700; color: #b9c9ea; }
+.rec-row__go { flex: 0 0 auto; align-self: center; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255, 223, 134, .6); background: rgba(255, 223, 134, .12);
+  color: #ffe7a0; font: 900 12.5px inherit; font-family: inherit; cursor: pointer; white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .rec-plan { padding: 12px; }
+  .rec-plan__rest { grid-template-columns: 1fr; }
+  .rec-card.is-big .rec-card__unit { font-size: 19px; }
+  .rec-row { flex-direction: column; }
+  .rec-row__go { align-self: flex-end; }
+}
+
+/* メニューのボタン共通の「ふわっ・ぐっ」演出を、理解度マップの行には付けない（行が横にはみ出すため） */
+.home-hub .content .rec-row__main:not(:disabled):hover, .home-hub .content .rec-row__main:not(:disabled):focus-visible { animation: none; }
+.home-hub .content .rec-row__main:not(:disabled):active { transform: none !important; }

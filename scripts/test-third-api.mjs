@@ -668,5 +668,32 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   t("管理: クリアした後は、その学年の小単元のバトルが全部開く（順番ロックが外れる）", (() => { const u = T.chaptersForGrade(1).flatMap((c) => c.units.map((x) => x.id)); return u.every((id) => T.battleOpen(st, 1, id)); })());
 }
 
+// ---------------- おすすめ用のプロフィール（my_profile） ----------------
+{
+  const s = makeStore();
+  const now = Date.parse("2026-09-30T03:00:00Z");
+  const asked = {};
+  s.attemptHistory = async (uid, since, max) => {
+    asked.uid = uid; asked.since = since; asked.max = max;
+    return [
+      { unit_id: "e1", difficulty: "standard", ok: false, created_at: "2026-09-29T01:00:00Z" },
+      { unit_id: "e1", difficulty: "easy", ok: true, created_at: "2026-09-28T01:00:00Z" },
+      { unit_id: "u2", difficulty: "oni", ok: true, created_at: "2026-09-20T01:00:00Z" },
+    ];
+  };
+  s.mistakeTagHistory = async () => [{ unit_id: "e1", mistake_tag: "sign-flip" }, { unit_id: "e1", mistake_tag: "sign-flip" }];
+  const r = await call(s, "my_profile", {}, "pf1", now);
+  t("プロフィール: 自分の解答を単元×難易度に集計して返す", r.status === 200 && r.body.source === "server" && r.body.units.e1.lv.easy[1] === 1 && r.body.units.e1.lv.standard[0] === 1 && r.body.units.e1.seq === "Es", JSON.stringify(r.body.units?.e1));
+  t("プロフィール: 読むのは自分の分・180日以内・最大6000件", asked.uid === "pf1" && asked.max === 6000 && Math.round((now - Date.parse(asked.since)) / 86400000) === 180);
+  t("プロフィール: 誤答タグも単元ごとに数える", r.body.tags.e1["sign-flip"] === 2);
+  t("プロフィール: ゲーム状態は作らない・書かない", !(await s.load("pf1")));
+  const s2 = makeStore();
+  const r2 = await call(s2, "my_profile", {}, "pf2", now);
+  t("プロフィール: 記録を読めないストア（ローカル）では source:none の空の集計", r2.status === 200 && r2.body.source === "none" && Object.keys(r2.body.units).length === 0);
+  s.attemptHistory = async () => { throw new Error("db down"); };
+  const r3 = await call(s, "my_profile", {}, "pf1", now);
+  t("プロフィール: 読み込みに失敗しても 200 で空の集計（おすすめは端末の記録で出す）", r3.status === 200 && Object.keys(r3.body.units).length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -6,6 +6,7 @@
 //  画面の位置(pos)は App が持つ（はいち・練習・バトルから戻ってきた時に、同じ小単元の画面へ戻すため）。
 //  デザインは既存の部品(GameButton/Header)を使った仮置き。仕上げはCodex側で。
 // ============================================================
+import { useMemo } from "react";
 import Header from "../../components/Header.jsx";
 import GameButton from "../../components/GameButton.jsx";
 import { MathBackdrop } from "../../components/Decorations.jsx";
@@ -21,7 +22,9 @@ import StoryLibrary from "../story/StoryLibrary.jsx";
 import { countNew, loadSeen } from "../story/storyRun.js";
 import SettingsScreen from "./SettingsScreen.jsx";
 import { fxScale, getFxSpeed } from "../../engine/fxSpeed.js";
-import { pickToday } from "../todayPick.js";
+import { analyzeLearner, recommendToday } from "../recommend.js";
+import { profileFromRecords, tagsFromStats, mergeTags } from "../learnerProfile.js";
+import TodayPlan, { UnderstandingMap } from "./TodayPlan.jsx";
 import { DAILY, CRYSTAL } from "../gachaConfig.js";
 import { SPECIALIST_ROSTER } from "../specialistRoster.js";
 
@@ -85,10 +88,19 @@ export default function ThirdMenu(props) {
   const unit = chapter?.units?.find((u) => u.id === pos?.unitId) || null;
   const go = (next) => setPos(next);
 
+  // ---- 学習の分析（理解度）と今日のおすすめ（recommend.js）
+  //  解答の記録は、サーバーの my_profile（全モード・どの端末で解いた分も）を使う。無いとき（ゲスト・通信エラー）は端末の records。
+  const learnProfile = props.learnProfile;
+  const analysis = useMemo(() => analyzeLearner({
+    units: learnProfile?.source === "server" ? learnProfile.units || {} : profileFromRecords(records || []),
+    tags: mergeTags(learnProfile?.tags || {}, tagsFromStats(player?.mistakeTagStats)),
+    mistakes: props.mistakes || [], medalState, quizWeakUnits: props.quizWeakUnits || [], grade,
+  }), [learnProfile, records, player?.mistakeTagStats, props.mistakes, medalState, props.quizWeakUnits, grade]);
+  const todayCards = useMemo(() => recommendToday(analysis), [analysis]);
+
   // ---- メニュー
   if (view === "main") {
     const weak = props.quizWeakUnits || [];
-    const today = pickToday({ chapters, medalState, mistakes: props.mistakes || [], quizWeakUnits: weak });
     return (
       <Shell player={player} transitionKey={view} progress={gradeMedalProgress(chapters, medalState)}>
         <div className="menu-title-lockup">
@@ -103,13 +115,8 @@ export default function ThirdMenu(props) {
             ))}
           </section>
         )}
-        {today && (
-          <div style={{ marginBottom: 14 }}>
-            <GameButton tone="gold" icon="🌟" onClick={() => props.onTodayPick?.(today.chapter, today.unit)}>
-              <strong>今日のおすすめ（5問）</strong><small>{today.unit.emoji ? today.unit.emoji + " " : ""}{today.unit.name}　・　{today.reason}　・　{dailyGoalText(medalState)}</small>
-            </GameButton>
-          </div>
-        )}
+        {/* 今日のおすすめ（2026-09-30）：理解度・難易度・誤答・忘れかけ から、のびしろ／ふくしゅう／ちょうせん・つぎへ の最大3枚 */}
+        <TodayPlan cards={todayCards} grade={grade} goalText={dailyGoalText(medalState)} onStart={(c) => props.onTodayPick?.(c)} onMap={() => go({ view: "understanding" })} />
         <div className="astra-menu-tiles">
           <GameButton className="astra-menu-tiles__primary" tone="gold" icon="📚" onClick={() => go({ view: "units" })}><strong>学習を始める</strong><small>単元をえらんで学ぼう</small></GameButton>
           {/* パソコン画面では、学習を始めるの右に1列3行で並べる（学習の記録／まちがいをなおす／パーティ編成） */}
@@ -136,6 +143,16 @@ export default function ThirdMenu(props) {
     return (
       <Shell player={player} back="メニュー" onBack={() => go({ view: "main" })} transitionKey={view} reverse>
         <RecordScreen player={player} records={records} onWeakness={props.onWeakness} state={medalState} />
+      </Shell>
+    );
+  }
+
+  if (view === "understanding") {
+    return (
+      <Shell player={player} back="メニュー" onBack={() => go({ view: "main" })} transitionKey={view} reverse>
+        <Title sub={`中学${grade}年生の単元ごとの理解度。押すと、その単元の「学ぶ・練習・バトル」へ`}>📈 わたしの理解度</Title>
+        <UnderstandingMap A={analysis} grade={grade} onStart={(c) => props.onTodayPick?.(c)}
+          onUnit={(x) => go({ view: "actions", chapterId: x.chapter.id, unitId: x.unitId })} />
       </Shell>
     );
   }

@@ -68,6 +68,7 @@ export const thirdApi = {
   roomLeave: (code) => call("room_leave", { code }),
   roomStart: (code) => call("room_start", { code }),
   ping: (sid) => call("ping", { sid }), // 滞在時間の計測（1分おき）
+  profile: () => call("my_profile"), // おすすめ用：自分の解答を単元×難易度に集計したもの（サーバーが無いときは source:"none"）
 };
 
 /** ローカルモード用：この端末のテスト用データを管理操作で調整する（サーバーモードでは使わない） */

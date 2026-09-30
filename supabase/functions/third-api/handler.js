@@ -8,6 +8,10 @@ import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
 import { ROOM, newRoomCode, normalizeCode, createRoom, joinRoom, leaveRoom, startRoom, roomView, isActive, memberIds } from "../../../src/third/room.js";
 import { initialThirdState, normalizeThirdState, pullGacha, setParty, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
+import { summarizeAttempts, summarizeTags } from "../../../src/third/learnerProfile.js";
+
+// おすすめ（今日のおすすめ・理解度マップ）用に読む解答の範囲
+export const PROFILE = { days: 180, maxRows: 6000, tagDays: 90 };
 
 export async function handle({ action, body = {}, userId, store, now = Date.now(), rand = Math.random }) {
   if (!userId) return { status: 401, body: { error: "unauthorized" } };
@@ -23,6 +27,14 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
     if (!r.ok) return { status: 400, body: { error: r.error } };
     await recordLogs({ store, userId, mode: "battle", attempts: r.attempts, rows: [], ctx: r.ctx, now });
     return { status: 200, body: { ok: true } };
+  }
+  if (action === "my_profile") { // 自分の解答（全モード）を単元×難易度に集計して返す（状態は読まない・書かない）
+    const since = new Date(now - PROFILE.days * 86400000).toISOString();
+    const tagSince = new Date(now - PROFILE.tagDays * 86400000).toISOString();
+    let rows = [], tagRows = [];
+    try { rows = (await store.attemptHistory?.(userId, since, PROFILE.maxRows)) || []; } catch { rows = []; }
+    try { tagRows = (await store.mistakeTagHistory?.(userId, tagSince)) || []; } catch { tagRows = []; }
+    return { status: 200, body: { ok: true, source: store.attemptHistory ? "server" : "none", units: summarizeAttempts(rows), tags: summarizeTags(tagRows), now } };
   }
   if (String(action).startsWith("room_")) return handleRoom({ action, body, userId, store, now, rand });
   const loaded = await store.load(userId);

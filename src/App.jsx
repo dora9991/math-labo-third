@@ -258,6 +258,37 @@ export default function App() {
     return () => { alive = false; };
   }, []); // eslint-disable-line
 
+  // 今日のおすすめ・理解度マップ用：自分の解答（全モード・どの端末の分も）をサーバーで単元×難易度に集計したもの。
+  //  メニューに戻るたびに読み直す（5秒に1回まで）。取れないとき（ゲスト・通信エラー）は null のまま＝端末の記録で計算する。
+  const [learnProfile, setLearnProfile] = useState(null);
+  const profileAtRef = useRef(0);
+  // 【開発用】?recMock=weak|avg|strong で架空の解答履歴を使う（見た目の確認用・本番のビルドでは消える）
+  const recMock = import.meta.env.DEV ? (/[?&]recMock=(\w+)/.exec(location.search) || [])[1] : null;
+  useEffect(() => {
+    if (import.meta.env.DEV && recMock) import("./third/recMock.js").then(({ mockLearnProfile }) => setLearnProfile(mockLearnProfile(recMock)));
+  }, []); // eslint-disable-line
+  useEffect(() => {
+    if (screen !== "home" || !THIRD_SERVER || isGuest() || recMock) return;
+    if (Date.now() - profileAtRef.current < 5000) return;
+    profileAtRef.current = Date.now();
+    let alive = true;
+    thirdApi.profile().then((r) => { if (alive && r.status === 200 && r.body?.source === "server") setLearnProfile(r.body); }).catch(() => {});
+    return () => { alive = false; };
+  }, [screen]); // eslint-disable-line
+
+  // 今日のおすすめ／理解度マップのカードから始める：練習（その難しさから・難易度ナビつき）／学び直し（その単元）／学ぶ（はいち）
+  function startRecommendation(c) {
+    const unit = c?.unit || (c?.unitId ? findUnitById(c.unitId) : null);
+    const chapter = c?.chapter || (unit ? findChapterByUnitId(unit.id) : null);
+    if (!unit || !chapter) return;
+    if (c.action === "relearn") { setRelearnFocus(unit.id); setScreen("relearn"); return; }
+    if (c.action === "haichi") { openHaichiStudio(unit, "home"); return; }
+    const lv = c.level || "standard";
+    if (lv === "oni") setSel({ chapter, unit, level: "oni", nav: false, fixed: true }); // 鬼は難易度ナビの外（えらんだ難度でずっと）
+    else setSel({ chapter, unit, level: lv, nav: true, startLevel: lv });
+    setScreen("anshin");
+  }
+
   // ワールド（学年）を切り替える。レベル/atk/HP はこのワールドのXPで決まるので、
   // 表示用 grade と保存用 player.world を必ず同期させる。
   function setWorld(g) {
@@ -1997,7 +2028,7 @@ export default function App() {
         anshin
         navDifficulty={!!sel.nav}
         fixedLevel={!!sel.fixed}
-        initialNavLevel={(data.player.navLevel && data.player.navLevel[sel.unit.id]) || "standard"}
+        initialNavLevel={sel.startLevel || (data.player.navLevel && data.player.navLevel[sel.unit.id]) || "standard"} // おすすめから来たときは、おすすめの難しさから
         onNavLevelChange={(lv) => updatePlayer((p) => ({ ...p, navLevel: { ...(p.navLevel || {}), [sel.unit.id]: lv } }))}
         cyclePracticeN={thirdState?.medals?.practiceN?.[sel.unit.id] || 0} // れんしゅうメダルの進捗（サーバーが認めた正解数）
         onComplete={saveSlowResult}
@@ -2322,7 +2353,8 @@ export default function App() {
       setPos={setMenuPos}
       quizWeakUnits={quizWeakUnits}
       mistakes={data.mistakes}
-      onTodayPick={(chapter, unit) => { setSel({ chapter, unit, level: "standard", nav: true }); setScreen("anshin"); }}
+      learnProfile={learnProfile}
+      onTodayPick={startRecommendation}
       onQuizWeakUnitClick={(unitId) => {
         const unit = findUnitById(unitId);
         const chapter = findChapterByUnitId(unitId);

@@ -7,8 +7,9 @@
 //  SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY は Supabase が自動で注入する。
 // ============================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { handle, handleAdmin } from "./handler.js";
+import { handle, handleAdmin, PROFILE } from "./handler.js";
 import { dailyArgs } from "./logging.js";
+import { summarizeAttempts, summarizeTags } from "../../../src/third/learnerProfile.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +68,9 @@ async function adminStats(db: any) {
   const per: Record<string, any> = {};
   const problems: Record<string, any> = {};
   const activeByDay: Record<string, Set<string>> = {};
+  const rowsBy: Record<string, any[]> = {}; // おすすめ用：生徒ごとの解答（単元×難易度の集計に使う）
   for (const r of att.rows) {
+    (rowsBy[r.student_id] ||= []).push(r);
     const p = (per[r.student_id] ||= { t: 0, c: 0, a7: 0, ms7: 0, msAll: 0, units: {} });
     p.t += 1; if (r.ok) p.c += 1;
     const u = (p.units[r.unit_id || "?"] ||= { t: 0, c: 0 });
@@ -85,9 +88,26 @@ async function adminStats(db: any) {
     }
   }
 
+  // 誤答タグ（学習ログの表が無い環境では空のまま）
+  const tagBy: Record<string, any[]> = {};
+  {
+    const since = new Date(now - PROFILE.tagDays * 86400000).toISOString();
+    for (let page = 0; page < 30; page++) {
+      const { data, error } = await db.from("third_answer_log").select("student_id, unit_id, mistake_tag").eq("ok", false).not("mistake_tag", "is", null)
+        .gte("created_at", since).order("created_at", { ascending: true }).range(page * 1000, page * 1000 + 999);
+      if (error || !data) break;
+      for (const r of data) (tagBy[r.student_id] ||= []).push(r);
+      if (data.length < 1000) break;
+    }
+  }
+
   const out = (students || []).map((s: any) => {
     const st = stateBy[s.id]?.state || {};
     const p = per[s.id] || { t: 0, c: 0, a7: 0, ms7: 0, msAll: 0, units: {} };
+    // 単元ごと：これまでの {t,c} に、難易度ごとの内訳(lv)・直近の並び(seq)・最後の日(last) を足す（先生の画面の「おすすめ」「理解度」用）
+    const prof = summarizeAttempts(rowsBy[s.id] || []);
+    const units: Record<string, any> = {};
+    for (const [id, v] of Object.entries(p.units) as [string, any][]) units[id] = { ...v, ...(prof[id] ? { lv: prof[id].lv, seq: prof[id].seq, last: prof[id].last, n: prof[id].n } : {}) };
     const medals = st.medals || {};
     const practiceDone = Object.values(medals.practiceN || {}).filter((n: any) => Number(n) >= 5).length;
     const weak = Object.entries(p.units).filter(([, v]: any) => v.t >= 5).map(([id, v]: any) => ({ unitId: id, t: v.t, c: v.c }))
@@ -99,7 +119,9 @@ async function adminStats(db: any) {
       medalPractice: practiceDone, medalHaichi: Object.keys(medals.haichi || {}).length,
       attempts: p.t, correct: p.c, answers7d: p.a7, playMs7d: p.ms7, playMsAll: p.msAll,
       loginDays: [...(loginDaysBy[s.id] || [])].sort().reverse().slice(0, 30),
-      units: p.units, weakUnits: weak,
+      units, weakUnits: weak,
+      tags: summarizeTags(tagBy[s.id] || []),
+      medals: { haichi: st.medals?.haichi || {}, practiceN: st.medals?.practiceN || {}, battle: st.medals?.battle || {} },
     };
   });
 
@@ -212,6 +234,23 @@ Deno.serve(async (req: Request) => {
       const full = rows.map((r, i) => ({ ...base[i], template_id: r.templateId ?? null, ms: Math.round(Number(r.ms) || 0) }));
       const { error } = await db.from("third_attempts").insert(full);
       if (error) await db.from("third_attempts").insert(rows.map((r, i) => ({ ...base[i], template_id: r.templateId ?? null })));
+    },
+    // ---- おすすめ用：自分の解答（新しい順に最大 max 件）と、誤答タグ
+    async attemptHistory(uid: string, since: string, max = 6000) {
+      const rows: any[] = [];
+      for (let page = 0; page * 1000 < max; page++) {
+        const { data, error } = await db.from("third_attempts").select("unit_id, difficulty, ok, created_at").eq("student_id", uid)
+          .gte("created_at", since).order("created_at", { ascending: false }).range(page * 1000, page * 1000 + 999);
+        if (error) { console.error("attemptHistory:", error.message); break; }
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      return rows;
+    },
+    async mistakeTagHistory(uid: string, since: string) {
+      const { data, error } = await db.from("third_answer_log").select("unit_id, mistake_tag").eq("student_id", uid).eq("ok", false)
+        .not("mistake_tag", "is", null).gte("created_at", since).order("created_at", { ascending: false }).limit(1000);
+      return error ? [] : data || [];
     },
     // ---- 学習ログ（記録の失敗はゲームを止めない。表が無い環境では何もしないだけ）
     // 解答の中身：同じ問題(seed)は二重に入れない。新しく入った行だけを返す（1日の集計は、その行だけを足す）
