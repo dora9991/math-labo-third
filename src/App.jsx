@@ -110,7 +110,10 @@ export default function App() {
   const [menuConfirm, setMenuConfirm] = useState(false); // 左上のロゴを押した→「トップメニューに戻りますか？」
   useEffect(() => {
     const onReq = () => {
-      if (screen === "home" && (menuPos?.view || "main") === "main") return; // もうトップメニュー
+      if (screen === "home") { // メニューの中（単元えらびなど）＝解いている問題は無いので、確認なしで先頭へ
+        if ((menuPos?.view || "main") !== "main") setMenuPos({ view: "main" });
+        return;
+      }
       setMenuConfirm(true);
     };
     window.addEventListener("ml3:requestMenu", onReq);
