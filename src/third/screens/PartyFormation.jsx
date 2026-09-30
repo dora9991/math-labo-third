@@ -58,6 +58,10 @@ export default function PartyFormation({ nav }) {
     .map((id) => charactersById[id])
     .filter(Boolean);
 
+  // カードの下にレベルを出す（以前はタップして詳細を開かないと分からず、編成を選びにくかった）
+  const lvOf = (c) => (c && save.owned[c.id] ? levelFromExp(expOf(save.owned[c.id], getViewGrade()), c.rarity) : null);
+  const lvLabel = (c) => { const lv = lvOf(c); return lv == null ? null : `Lv.${lv}`; };
+
   const ownedList = (() => {
     switch (sortKey) {
       case "newest":
@@ -185,7 +189,7 @@ export default function PartyFormation({ nav }) {
                 }}
                 onPointerDown={(e) => c && startDrag(e, "party", c.id, slot)}
               >
-                <MonsterPortrait character={c} size="small" />
+                <MonsterPortrait character={c} size="small" footer={lvLabel(c)} />
               </button>
             );
           })}
@@ -209,7 +213,7 @@ export default function PartyFormation({ nav }) {
         <div className="mw-bench-grid">
           {ownedList.map((c) => (
             <button key={c.id} className="mw-portrait-btn mw-bench-item" style={{ position: "relative" }} onPointerDown={(e) => startDrag(e, "bench", c.id, null)}>
-              <MonsterPortrait character={c} size="small" />
+              <MonsterPortrait character={c} size="small" footer={lvLabel(c)} />
               {save.spares?.[c.id] > 0 && <span className="mw-spare-badge">×{save.spares[c.id] + 1}</span>}
             </button>
           ))}

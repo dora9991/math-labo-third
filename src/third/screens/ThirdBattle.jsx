@@ -44,6 +44,7 @@ import MathText from "../../components/MathText.jsx";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
 import { chaptersForGrade } from "../../data/index.js";
 import { gaugeSecondsFor } from "../gaugeTime.js";
+import { VERIFY } from "../gachaConfig.js";
 
 // スキルゲージの満タン値（2026-09-22：スキルの強さ(tier 1〜4)に応じて必要正解数を変える。
 //   弱いスキルほど早く貯まり、強いスキルほど問題数を稼げる＝学習量が増える）。
@@ -227,6 +228,7 @@ export default function Battle({ nav, params }) {
   const [gaugeSec, setGaugeSec] = useState(gaugeMax);
   const gaugeRef = useRef(gaugeMax);
   const [penaltyFlash, setPenaltyFlash] = useState(0);
+  const [tooFast, setTooFast] = useState(0); // 速すぎる解答（サーバーが数えない）を知らせる表示のきっかけ
   const latestRef = useRef({}); // タイマーから「最新の描画時点の関数」を呼ぶための入れ物
   const enemyFxTimersRef = useRef(new Set());
   const [totals, setTotals] = useState({ exp: 0, coins: 0 });
@@ -720,10 +722,14 @@ export default function Battle({ nav, params }) {
 
   // 【リアルタイム化】答えた瞬間に効果を反映し、演出は並行して再生、次の問題をすぐ出す。
   //  ・正解 … 仲間全員が即座に攻撃（弾は即発射）。ダメージは敵HPに即反映。
-  //  ・不正解 … ゲージが10秒進む。
+  //  ・不正解 … ゲージがその波の満タン時間の半分だけ進む。
   //  どちらも演出中にゲージは止まらない。
   function pickChoice(index) {
     if (phase !== "question" || !problem) return;
+    // サーバーは 1問 VERIFY.minMsPerAnswer ミリ秒より速い解答を数えない（連打対策）。以前は画面だけ正解扱いで進み、
+    //  クリアしても「正解がたりない」でごほうび無しになっていた。→ 画面でも数えず、記録もせず、読み直してもらう。
+    //  （記録すると同じ問題の2回目の解答がサーバーで「使い回し」として無視されるので、記録しない）
+    if (Date.now() - shownAtRef.current < VERIFY.minMsPerAnswer) { setTooFast((n) => n + 1); return; }
     const correct = index === problem.correctIndex;
     const diff = problem.level || difficulty; // この問題を出した時の難度（切替は次の問題から）
     attemptsRef.current.push({
@@ -904,25 +910,28 @@ export default function Battle({ nav, params }) {
   //  PC画面ではこれを丸ごと1つの列として扱い、もう一方の列に計算用紙を常設する。
   const battleMain = (
     <>
-      <div className="mw-topbar mw-battle-topbar">
-        <span>
-          {waveIndex + 1} / {encounters.length}戦目
-        </span>
-        <span>{topSubjectLabel}のバトル</span>
-        <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
-        <button className="mw-btn" data-sfx="none" onClick={() => setPaused(true)} style={{ padding: "4px 10px", fontSize: 12 }}>⏸ 一時停止</button>
-      </div>
-
-      {/* 敵の行動ゲージ：0秒で敵が動く。不正解で小単元ごとの満タン時間の半分だけ進む。 */}
-      <div className={`mw-gauge ${gaugeSec / gaugeMax <= .25 ? "mw-gauge-danger" : ""}`}>
-        <div className="mw-gauge-label">敵の行動まで</div>
-        <div className="mw-gauge-track">
-          <div className="mw-gauge-fill" style={{ width: `${Math.max(0, (gaugeSec / gaugeMax) * 100)}%` }} />
+      {/* トップバーとゲージは画面の上に貼りつける（低い画面でスクロールしても、敵の行動までの秒数が見える） */}
+      <div className="mw-battle-head">
+        <div className="mw-topbar mw-battle-topbar">
+          <span>
+            {waveIndex + 1} / {encounters.length}戦目
+          </span>
+          <span>{topSubjectLabel}のバトル</span>
+          <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
+          <button className="mw-btn" data-sfx="none" onClick={() => setPaused(true)} style={{ padding: "4px 10px", fontSize: 12 }}>⏸ 一時停止</button>
         </div>
-        <div className="mw-gauge-sec">{Math.ceil(gaugeSec)}秒</div>
-        {penaltyFlash > 0 && (
-          <div key={penaltyFlash} className="mw-gauge-penalty">−{Math.round(gaugeMax / 2)}秒！</div>
-        )}
+
+        {/* 敵の行動ゲージ：0秒で敵が動く。不正解で小単元ごとの満タン時間の半分だけ進む。 */}
+        <div className={`mw-gauge ${gaugeSec / gaugeMax <= .25 ? "mw-gauge-danger" : ""}`}>
+          <div className="mw-gauge-label">敵の行動まで</div>
+          <div className="mw-gauge-track">
+            <div className="mw-gauge-fill" style={{ width: `${Math.max(0, (gaugeSec / gaugeMax) * 100)}%` }} />
+          </div>
+          <div className="mw-gauge-sec">{Math.ceil(gaugeSec)}秒</div>
+          {penaltyFlash > 0 && (
+            <div key={penaltyFlash} className="mw-gauge-penalty">−{Math.round(gaugeMax / 2)}秒！</div>
+          )}
+        </div>
       </div>
 
       {/* 敵とパーティを1つの舞台にまとめる：たまが「選んだキャラの位置」から
@@ -1034,6 +1043,7 @@ export default function Battle({ nav, params }) {
 
       {(phase === "question" || phase === "enemyAttack" || phase === "skill") && problem && (
         <div className={`mw-panel mw-question-panel ${phase === "enemyAttack" || phase === "skill" ? "mw-choices-locked" : ""} ${phase === "skill" ? "mw-skill-locked" : ""}`}>
+          {tooFast > 0 && <div key={tooFast} className="mw-toofast">⚡ はやすぎ！ 問題をよく読んでから答えよう</div>}
           <div className="mw-question"><QuestionText text={problem.question} /></div>
           <div className="mw-choices">
             {problem.choices.map((choice, i) => (
@@ -1056,7 +1066,7 @@ export default function Battle({ nav, params }) {
               </button>
             ))}
           </div>
-          <div className="mw-sub" style={{ textAlign: "center", marginTop: 4 }}>
+          <div className="mw-sub mw-diff-note" style={{ textAlign: "center" }}>
             ↑ つぎの問題のむずかしさ（今の問題は「{DIFFICULTY_LABEL[problem.level] || ""}」）
           </div>
         </div>

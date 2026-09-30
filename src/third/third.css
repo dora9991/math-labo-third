@@ -1625,5 +1625,41 @@
   .mw-enemy-slot { max-width: 200px; }
 }
 
+/* 2026-09-30：Chromebook(1366×657前後)やiPad横(1024×768)で、答えのボタンが画面の下にはみ出し、
+   スクロールすると「敵の行動まで」のゲージが見えなくなっていた。
+   ①トップバー＋ゲージは上に、問題＋答え＋難しさは下に貼りつける（どんな高さでも常に見える）
+   ②高さが低い画面では、敵・仲間の絵を「画面の高さ」に合わせて小さくし、なるべく1画面に収める */
+.mw-battle-head { position: sticky; top: 0; z-index: 6; padding: 4px 0 2px; background: linear-gradient(180deg, rgba(3, 8, 18, .97), rgba(3, 8, 18, .86)); }
+.mw-battle-head .mw-gauge { margin-bottom: 4px; }
+.mw-battle-topbar { gap: 10px; justify-content: flex-start; }
+.mw-battle-topbar > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.mw-battle-topbar > .mw-btn { width: auto; flex: 0 0 auto; margin-left: auto; }
+.mw-question-panel { position: sticky; bottom: 0; z-index: 6; box-shadow: 0 -8px 18px rgba(0, 0, 0, .45); }
+.mw-diff-note { font-size: 11px; margin-top: 3px; }
+.mw-reward-actions { position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 8px; padding: 10px 0 6px; background: linear-gradient(180deg, rgba(3, 8, 18, 0), rgba(3, 8, 18, .92) 28%); }
+.mw-next-battle { border-color: #dfbd73 !important; color: #ffe4a1 !important; }
+.mw-toofast { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); z-index: 8; white-space: nowrap; padding: 5px 12px; font-size: 13px; font-weight: 800; color: #1b1233; background: linear-gradient(135deg, #fde68a, #fbbf24); border-radius: 999px; box-shadow: 0 4px 14px rgba(0, 0, 0, .45); pointer-events: none; animation: mw-toofast 1.6s ease forwards; }
+@keyframes mw-toofast { 0% { opacity: 0; transform: translate(-50%, 6px); } 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -4px); } }
+@media (max-height: 820px) {
+  .mw-battle-topbar { min-height: 30px; }
+  .mw-battle-head .mw-gauge { padding: 3px 10px; }
+  .mw-battle-stage { padding: 8px 12px; }
+  .mw-screen:has(.calc-split) .mw-battle-stage { margin: 0 0 8px; }
+  .mw-enemy-area { padding: 2px 0 0; }
+  .mw-enemy-slot, .mw-screen .mw-enemy-slot { max-width: clamp(78px, 15vh, 200px); padding: 2px; gap: 2px; }
+  .mw-battle-stage .mw-party-row { max-width: min(100%, 58vh); margin: 0 auto 4px !important; }
+  .mw-question-panel { padding: 8px 12px; }
+  .mw-question-panel .mw-question { padding: 0 0 6px; font-size: 1.05rem; }
+  .mw-question-panel .mw-choices { gap: 8px; }
+  .mw-question-panel .mw-diff-row { margin-top: 8px !important; }
+}
+@media (max-height: 560px) {
+  .mw-battle-stage .mw-party-area .mw-sub { display: none; } /* HPの数字はバーで分かるので、とても低い画面では省く */
+}
+/* スマホ・タブレット縦：右下の🔊ボタンが「鬼」のボタンに重なるので、バトル中は右上（演出切替の横の空き）へ */
+@media (max-width: 899px) {
+  body:has(.mw-battle-stage) .mute-btn { top: 8px; bottom: auto; }
+}
+
 /* 予備(ダブり)の数などの小さなバッジ（2026-09-25） */
 .mw-spare-badge{position:absolute;right:2px;bottom:2px;padding:1px 6px;border-radius:999px;font-size:10.5px;font-weight:900;color:#1b1233;background:linear-gradient(135deg,#fde68a,#fbbf24);box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none}

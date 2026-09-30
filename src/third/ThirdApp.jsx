@@ -97,6 +97,8 @@ export default function ThirdApp({ player, start, onExit }) {
   const [seen, setSeen] = useState(() => loadSeen());
   const pending = isStoryAuto() ? scenesFor(nav, seen) : []; // 設定で「自動で見る」をオフにすると出さない（ものがたり画面からは見られる）
   const finishScene = (key) => setSeen((prev) => { const n = new Set(prev); n.add(key); saveSeen(n); return n; });
+  // 「スキップ」は、いま続けて出る場面（学年の導入→章の扉→小単元の話 など）をまとめて飛ばす（以前は1場面ずつで3回押す必要があった）
+  const skipScenes = () => setSeen((prev) => { const n = new Set(prev); for (const sc of pending) n.add(sc.key); saveSeen(n); return n; });
 
   // 画面ごとのBGM（バトル中の曲＝通常/小単元ボス/章ボス/敗北は ThirdBattle が切り替える）
   useEffect(() => {
@@ -114,7 +116,7 @@ export default function ThirdApp({ player, start, onExit }) {
       <div className="mw-app">
         <div key={nav.navKey} className={`mw-screen-enter mw-screen-enter--${getFxSpeed()}`}>
           {pending.length
-            ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} />
+            ? <StoryPlayer key={pending[0].key} scene={pending[0]} onDone={() => finishScene(pending[0].key)} onSkip={skipScenes} />
             : <BattleLockGate nav={nav}><Screen params={nav.params} nav={nav} /></BattleLockGate>}
         </div>
         <div className="mw-whiteout" style={{ opacity: nav.flashOpacity, pointerEvents: nav.flashOpacity > 0 ? "auto" : "none" }} />

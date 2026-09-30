@@ -22,7 +22,7 @@ function portraitUrl(who, e) {
   return (e && CHARS[`${who}_${e}`]) || CHARS[who] || null;
 }
 
-export default function StoryPlayer({ scene, onDone }) {
+export default function StoryPlayer({ scene, onDone, onSkip }) {
   const beats = scene.beats;
   const [i, setI] = useState(0);
   const [typed, setTyped] = useState({ i: 0, n: 0 }); // どの行の何文字目まで出したか（行が変わった瞬間は 0 文字扱い＝前の行の全文が一瞬出るのを防ぐ）
@@ -101,7 +101,7 @@ export default function StoryPlayer({ scene, onDone }) {
       <div className="st-bg" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined} />
       <div className="st-shade" />
       {scene.title && <div className="st-title">{scene.title}</div>}
-      <button className="st-skip" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); finish(); }}>スキップ ▶▶</button>
+      <button className="st-skip" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); if (onSkip) { if (!doneRef.current) { doneRef.current = true; onSkip(); } } else finish(); }}>スキップ ▶▶</button>
 
       <div className={`st-stage ${showFoe && enemyUrl ? "has-foe" : ""}`}>
         {showFoe && enemyUrl && (

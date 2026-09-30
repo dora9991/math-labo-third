@@ -1,9 +1,36 @@
 // Reward.jsx — バトル勝利画面。表示する報酬は**サーバーが検証して認めた値**（params.res）。
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { playCorrectSound } from "../fx/sound.js";
 import { useGame } from "../ThirdContext.jsx";
 import { expOf } from "../expCurve.js";
 import ExpMeter from "../components/ExpMeter.jsx";
+import { battleOrder, battleOpen, battleUnitIdsOfChapter, chapterBattlesCleared } from "../core.js";
+import { chaptersForGrade } from "../../data/index.js";
+import { labUnitIdForBattle, worldBattleFor } from "../link.js";
+
+/** 勝った小単元の「つぎ」：同じ章の次の小単元のバトル。章の最後なら、章のバトルを全部クリアしていれば章ボス。 */
+function nextBattleAfter(save, params) {
+  if (params?.kind !== "subUnit") return null;
+  const g = Number(params.grade) || 1;
+  const cur = labUnitIdForBattle(params);
+  const chapters = chaptersForGrade(g);
+  const ch = chapters.find((c) => c.id === params.chapterId);
+  if (!cur || !ch) return null;
+  const ids = battleUnitIdsOfChapter(g, ch);
+  const i = ids.indexOf(cur);
+  if (i >= 0 && i < ids.length - 1) {
+    const unit = ch.units.find((u) => u.id === ids[i + 1]);
+    const p = unit && battleOpen(save, g, unit.id) ? worldBattleFor(g, ch, unit) : null;
+    return p ? { params: p, label: `つぎのバトルへ（${unit.name}）` } : null;
+  }
+  if (chapterBattlesCleared(save, g, ch)) return { params: { grade: g, chapterId: ch.id, kind: "chapterBoss", demo: false }, label: "👑 章のボスに挑戦する" };
+  const order = battleOrder(g), k = order.indexOf(cur); // 章をまたぐ（章ボスがまだでも次の章へ進める）
+  const nextId = order[k + 1];
+  const nch = nextId && chapters.find((c) => c.units.some((u) => u.id === nextId));
+  const nunit = nch && nch.units.find((u) => u.id === nextId);
+  const p = nunit && battleOpen(save, g, nextId) ? worldBattleFor(g, nch, nunit) : null;
+  return p ? { params: p, label: `つぎのバトルへ（${nunit.name}）` } : null;
+}
 
 const REASON = {
   "not-enough-correct": "正解がたりなかったので、ごほうびはなかったよ",
@@ -31,6 +58,7 @@ export default function Reward({ nav, params }) {
     playCorrectSound();
   }, []);
   const isFirstClear = !!r?.isFirstClear;
+  const next = useMemo(() => (res?.ok ? nextBattleAfter(save, params) : null), [save, params, res]);
 
   return (
     <div className="mw-fantasy-screen">
@@ -70,12 +98,20 @@ export default function Reward({ nav, params }) {
           </>
         )}
       </div>
+      {/* 行動ボタンは画面の下に貼りつける（経験値のメーターが長く、低い画面では見えなかった） */}
+      <div className="mw-reward-actions">
       {(r?.crystals || 0) + (r?.chapterBonus || 0) + (r?.gradeBonus || 0) + (r?.dailyMission || 0) >= 5 && (
         <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => nav.go("gacha", {}, { replace: true })}>
           <span className="mw-fantasy-icon">🎰</span>ガチャを引く
         </button>
       )}
-      <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => nav.exit()}>つぎへ</button>
+      {next && (
+        <button className="mw-fantasy-item mw-next-battle" style={{ justifyContent: "center" }} onClick={() => nav.go("battle", next.params, { replace: true })}>
+          <span className="mw-fantasy-icon">⚔️</span>{next.label}
+        </button>
+      )}
+      <button className="mw-fantasy-item" style={{ justifyContent: "center" }} onClick={() => nav.exit()}>{next ? "メニューにもどる" : "つぎへ"}</button>
+      </div>
     </div>
   );
 }

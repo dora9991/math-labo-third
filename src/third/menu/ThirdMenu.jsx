@@ -58,15 +58,15 @@ const Title = ({ children, sub }) => (
 );
 
 // 「はいち」「れんしゅう」のメダル2枚の表示（獲得＝金色）
-export function MedalPair({ m, size = 26 }) {
-  const dot = (on, icon) => (
-    <span style={{
-      display: "inline-grid", placeItems: "center", width: size, height: size, borderRadius: "50%", fontSize: size * 0.55,
+export function MedalPair({ m, size = 26, battleLocked = false }) {
+  const dot = (on, icon, locked = false) => (
+    <span title={locked ? "前のバトルをクリアすると開くよ" : undefined} style={{
+      position: "relative", display: "inline-grid", placeItems: "center", width: size, height: size, borderRadius: "50%", fontSize: size * 0.55,
       background: on ? "radial-gradient(circle at 35% 30%,#fff7c2,#fbbf24 55%,#b45309)" : "rgba(255,255,255,.07)",
       border: on ? "2px solid #fde68a" : "2px dashed rgba(255,255,255,.25)", filter: on ? "none" : "grayscale(1) opacity(.5)",
-    }}>{icon}</span>
+    }}>{icon}{locked && <span style={{ position: "absolute", right: -5, bottom: -5, fontSize: size * 0.5, filter: "none" }}>🔒</span>}</span>
   );
-  return <span style={{ display: "inline-flex", gap: 6 }}>{dot(m.haichi, "📺")}{dot(m.practice, "✏️")}{dot(m.battle, "⚔️")}</span>;
+  return <span style={{ display: "inline-flex", gap: 6 }}>{dot(m.haichi, "📺")}{dot(m.practice, "✏️")}{dot(m.battle, "⚔️", battleLocked)}</span>;
 }
 
 export default function ThirdMenu(props) {
@@ -179,8 +179,9 @@ export default function ThirdMenu(props) {
             return (
               <GameButton key={u.id} tone={m.count >= 3 ? "gold" : "violet"} onClick={() => go({ view: "actions", chapterId: chapter.id, unitId: u.id })}>
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%" }}>
-                  <span style={{ textAlign: "left" }}><strong>{!battleOpen(medalState, grade, u.id) ? "🔒 " : ""}{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
-                  <MedalPair m={m} />
+                  <span style={{ textAlign: "left" }}><strong>{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
+                  {/* 🔒 は「バトルだけ」が閉じている印（学ぶ・練習はいつでもできる）。以前は名前の前に付いていて、単元ごと入れないように見えた */}
+                  <MedalPair m={m} battleLocked={!m.battle && !battleOpen(medalState, grade, u.id)} />
                 </span>
               </GameButton>
             );
