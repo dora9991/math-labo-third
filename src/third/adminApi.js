@@ -11,9 +11,13 @@ export const PASS_KEY = "ml3_teacher_pass";
 const RATES_KEY = "ml3_problem_rates";
 const OVERLAY_KEY = "ml3_rate_overlay";
 
-export const adminAvailable = () => AUTH_ENABLED && THIRD_SERVER;
+// 開発サーバーで URL に ?adminMock を付けると、ダミーの生徒データで管理画面を表示する（見た目の確認用・本番では常に false）
+export const ADMIN_MOCK = import.meta.env.DEV && typeof location !== "undefined" && /[?&]adminMock\b/.test(location.search);
+
+export const adminAvailable = () => ADMIN_MOCK || (AUTH_ENABLED && THIRD_SERVER);
 
 async function call(action, pass, body = {}) {
+  if (import.meta.env.DEV && ADMIN_MOCK) { const { mockAdminCall } = await import("./adminMock.js"); return mockAdminCall(action, body); } // 本番のビルドでは消える
   try {
     const { data, error } = await supabase.functions.invoke("third-api", { body: { action, pass, ...body } });
     if (error) {

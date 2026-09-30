@@ -5,10 +5,10 @@
 //                ログイン履歴（開始時刻・滞在時間）／メダル獲得／解答の中身（問題文・正解・生徒の答え・○×・誤答タグ・時間）
 //  記録は数学ラボ3のサーバー（third_daily / third_sessions / third_medals / third_answer_log）。合言葉が必要。
 // ============================================================
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { findUnitById } from "../data/index.js";
 import MathText from "./MathText.jsx";
-import { adminAvailable, adminDaily, adminStudentLog } from "../third/adminApi.js";
+import { ADMIN_MOCK, adminAvailable, adminDaily, adminStudentLog } from "../third/adminApi.js";
 
 const JST = (t) => new Date(new Date(t).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 const md = (d) => { const [, m, dd] = String(d).split("-"); return `${Number(m)}/${Number(dd)}`; };
@@ -23,17 +23,17 @@ const RESULT_JA = { win: "勝ち", lose: "負け", abandon: "途中でやめた"
 const KIND_JA = { haichi: "はいち", practice: "れんしゅう" };
 const LEVEL_JA = { easy: "簡単", standard: "普通", advanced: "難しい", oni: "鬼" };
 
-const dim = { fontSize: 11.5, color: "rgba(255,255,255,.6)" };
-const btn = { fontSize: 12.5, fontWeight: 800, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.1)", color: "#fff", cursor: "pointer", fontFamily: "inherit" };
-const th = { padding: "4px 6px", fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.6)", textAlign: "center", whiteSpace: "nowrap" };
+const dim = { fontSize: 12.5, color: "rgba(214,226,247,.85)" };
+const btn = { fontSize: 13.5, fontWeight: 800, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.1)", color: "#fff", cursor: "pointer", fontFamily: "inherit" };
+const th = { padding: "6px 6px", fontSize: 12, fontWeight: 800, color: "rgba(214,226,247,.9)", textAlign: "center", whiteSpace: "nowrap" };
 const cellBg = (n) => (n <= 0 ? "rgba(255,255,255,.04)" : `rgba(99,102,241,${Math.min(0.85, 0.2 + n / 40)})`);
 const MISSING = "学習ログの表がまだ作られていません。docs/supabase_third_logging_2026-09-25.sql を Supabase の SQL Editor で実行し、third-api を再デプロイしてください。";
 
 function Table({ children }) {
-  return <div style={{ overflowX: "auto" }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>{children}</table></div>;
+  return <div style={{ overflowX: "auto" }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>{children}</table></div>;
 }
 
-function StudentDetail({ pass, student, onClose }) {
+export function StudentDetail({ pass, student, onClose }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState("");
   const [wrongOnly, setWrongOnly] = useState(false);
@@ -116,6 +116,8 @@ export default function AdminLogsPanel({ pass, students = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [openId, setOpenId] = useState(null);
+  // タブを開いたら自動で読み込む（合言葉が入っているとき）
+  useEffect(() => { if (adminAvailable() && (pass.trim() || ADMIN_MOCK)) load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!adminAvailable()) return null;
 
   async function load(n = days) {
@@ -135,7 +137,7 @@ export default function AdminLogsPanel({ pass, students = [] }) {
     <div className="glass" style={{ padding: "14px 16px", marginTop: 12 }}>
       <div className="slbl">🗂 学習ログ（サーバーの記録）</div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-        <button data-sfx="none" style={btn} disabled={busy || !pass.trim()} onClick={() => load()}>{busy ? "…" : rows ? "更新" : "読み込み"}</button>
+        <button data-sfx="none" style={btn} disabled={busy || (!pass.trim() && !ADMIN_MOCK)} onClick={() => load()}>{busy ? "…" : rows ? "更新" : "読み込み"}</button>
         {[7, 14, 30].map((n) => <button key={n} data-sfx="none" style={{ ...btn, opacity: days === n ? 1 : 0.55 }} onClick={() => { setDays(n); if (rows) load(n); }}>{n}日</button>)}
         <span style={dim}>その日に解いた問題数（日本時間）。生徒の名前をタップすると、解答の中身まで見られます。</span>
       </div>
