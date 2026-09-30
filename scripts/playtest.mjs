@@ -8,7 +8,7 @@ import {
   rollEnemyInflictedStatus, applyStatusEffect, tickStatusEffects, cureStatusEffects,
   canActThisRound, canUseSkillThisRound, isConfusedThisRound, isPartyAllPetrified, STATUS_DEFS,
 } from "../src/third/battleEngine.js";
-import { GAUGE, gaugeBaseSeconds as gaugeSecondsFor, WRONG_PENALTY_SECONDS, DIFFICULTIES, capDamageFor, SKILL_CAP_FRAC } from "../src/third/balance.js";
+import { GAUGE, gaugeBaseSeconds as gaugeSecondsFor, wrongPenaltyFrac, DIFFICULTIES, capDamageFor, SKILL_CAP_FRAC } from "../src/third/balance.js";
 
 export const SKILL_GAUGE_MAX = 4;
 const by = Object.fromEntries(SPECIALIST_ROSTER.map((c) => [c.id, c]));
@@ -132,7 +132,7 @@ export function battle({ members, level, tier, name, opts = {} }) {
         for (const [e, raw] of dmgBy) e.hp = Math.max(0, e.hp - Math.min(Math.round(raw), capDamageFor(e.maxHp, d)));
         track(); if (hp <= 0) return res(false);
       } else {
-        gauge -= WRONG_PENALTY_SECONDS;
+        gauge -= gmax * wrongPenaltyFrac(d); // 実際のバトルと同じ：その波のゲージの一定割合が進む（難度ごと）
         while (gauge <= 0) { if (cycle(enemies)) return res(false); gauge += gmax; }
       }
     }

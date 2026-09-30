@@ -29,6 +29,7 @@ import {
   DIFFICULTY_DAMAGE_MULTIPLIER,
   capDamageFor,
   tierOf,
+  wrongPenaltyFrac,
 } from "../balance.js";
 import { levelFromExp, getSubUnitClearExpReward, expOf } from "../expCurve.js";
 import { setViewGrade } from "../gradeView.js";
@@ -228,6 +229,7 @@ export default function Battle({ nav, params }) {
   const [gaugeSec, setGaugeSec] = useState(gaugeMax);
   const gaugeRef = useRef(gaugeMax);
   const [penaltyFlash, setPenaltyFlash] = useState(0);
+  const penaltySecRef = useRef(0); // 直前の不正解で進んだ秒数（ゲージの「−○秒！」表示用）
   const [tooFast, setTooFast] = useState(0); // 速すぎる解答（サーバーが数えない）を知らせる表示のきっかけ
   const latestRef = useRef({}); // タイマーから「最新の描画時点の関数」を呼ぶための入れ物
   const enemyFxTimersRef = useRef(new Set());
@@ -490,8 +492,10 @@ export default function Battle({ nav, params }) {
   // 次の問題を即座には出さず、doEnemyCycleの演出が終わった後に出す（でないと、敵の行動中
   // ロック(phase="enemyAttack")が同じ描画の中で"question"に上書きされてしまい、ロックが
   // 一瞬たりとも見えなくなる不具合になる。2026-09-22 実機確認で発見）。
-  function applyWrongPenalty() {
-    gaugeRef.current -= gaugeMaxRef.current / 2; // 不正解＝その波のゲージの半分が進む
+  function applyWrongPenalty(level) {
+    const sec = gaugeMaxRef.current * wrongPenaltyFrac(level); // 不正解＝その波のゲージの一定割合が進む（簡単は1/4・ほかは半分）
+    penaltySecRef.current = sec;
+    gaugeRef.current -= sec;
     setPenaltyFlash((n) => n + 1);
     if (gaugeRef.current <= 0) {
       doEnemyCycle({ nextQuestionDiff: difficultyRef.current });
@@ -747,7 +751,7 @@ export default function Battle({ nav, params }) {
       const fromPoint = pointOf(portraitRefs.current[partyMembers[0]?.id], stageEl);
       const toPoint = live[0] ? pointOf(enemyRefs.current[live[0].instanceId], stageEl) : null;
       fxRef.current?.playMiss({ subject: subjectFor(partyMembers[0]), from: fromPoint, to: toPoint });
-      const enemyCycleTriggered = applyWrongPenalty();
+      const enemyCycleTriggered = applyWrongPenalty(diff);
       // 敵の反撃が起きた場合は、その演出が終わってから doEnemyCycle 側が次の問題を出す
       // （ここで即座に出すと phase="enemyAttack" のロックが同じ描画内で上書きされてしまう）。
       if (!enemyCycleTriggered && partyHpRef.current > 0) startQuestion(difficultyRef.current);
@@ -929,7 +933,7 @@ export default function Battle({ nav, params }) {
           </div>
           <div className="mw-gauge-sec">{Math.ceil(gaugeSec)}秒</div>
           {penaltyFlash > 0 && (
-            <div key={penaltyFlash} className="mw-gauge-penalty">−{Math.round(gaugeMax / 2)}秒！</div>
+            <div key={penaltyFlash} className="mw-gauge-penalty">−{Math.round(penaltySecRef.current)}秒！</div>
           )}
         </div>
       </div>

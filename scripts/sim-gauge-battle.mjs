@@ -2,7 +2,7 @@
 //  1バトル＝雑魚の波2回(1〜3体)＋ボス。状態異常・スキルは含めない（＝実際よりやや楽な見積り）。
 import { SPECIALIST_ROSTER } from "../src/third/specialistRoster.js";
 import { computePartyMaxHp, resolvePlayerAttack, spawnEnemyGroup, spawnBoss, resolveEnemyAction } from "../src/third/battleEngine.js";
-import { GAUGE_SECONDS, WRONG_PENALTY_SECONDS, DIFFICULTIES, capDamageFor } from "../src/third/balance.js";
+import { GAUGE_SECONDS, WRONG_PENALTY_FRAC, DIFFICULTIES, capDamageFor } from "../src/third/balance.js";
 
 const by = Object.fromEntries(SPECIALIST_ROSTER.map((c) => [c.id, c]));
 const P = (ids) => ids.map((i) => by[i]);
@@ -48,7 +48,7 @@ function battle(members, level, st, tier) {
         });
         for (const [e, raw] of dmgBy) e.hp = Math.max(0, e.hp - Math.min(Math.round(raw), capDamageFor(e.maxHp, d)));
       } else {
-        gauge -= WRONG_PENALTY_SECONDS;
+        gauge -= GAUGE_SECONDS * WRONG_PENALTY_FRAC;
         while (gauge <= 0) { cycle(); gauge += GAUGE_SECONDS; if (hp <= 0) return { win: false, answers, actions, hpLeft: 0 }; }
       }
     }

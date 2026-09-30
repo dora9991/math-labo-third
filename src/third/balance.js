@@ -23,12 +23,17 @@ export const DIFFICULTY_KEYS = ["easy", "standard", "advanced", "oni"];
 export const DIFFICULTY_LABEL = { easy: "簡単", standard: "普通", advanced: "難しい", oni: "鬼" };
 // dmgMult＝ダメージ倍率 / capFrac＝1回の正解で1体の敵から削れる上限（敵最大HPの割合）
 export const DIFFICULTIES = {
-  easy: { dmgMult: 0.7, capFrac: 0.15 },
+  // 簡単だけ、不正解で進むゲージを1/4に（2026-09-30：苦手な子が簡単を選んでも序盤・後半で負け続けていたため。playtest.mjs）
+  easy: { dmgMult: 0.7, capFrac: 0.15, penaltyFrac: 0.25 },
   standard: { dmgMult: 1.0, capFrac: 0.25 },
   advanced: { dmgMult: 1.2, capFrac: 0.35 },
   oni: { dmgMult: 1.5, capFrac: 0.5 },
 };
 export const DIFFICULTY_DAMAGE_MULTIPLIER = Object.fromEntries(DIFFICULTY_KEYS.map((k) => [k, DIFFICULTIES[k].dmgMult]));
+// 不正解のとき、その波のゲージ(満タンの秒数)のこの割合だけ敵の行動が近づく（バトル画面とシミュレーションで共通）
+export const WRONG_PENALTY_FRAC = 0.5;
+/** その難度で不正解したときに進むゲージの割合（難度ごとの penaltyFrac があればそれ） */
+export const wrongPenaltyFrac = (difficulty) => DIFFICULTIES[difficulty]?.penaltyFrac ?? WRONG_PENALTY_FRAC;
 // スキル(全体/単体ダメージ)が1体から削れる上限（敵最大HPの割合）
 export const SKILL_CAP_FRAC = 0.35;
 
@@ -42,8 +47,8 @@ export const ENEMY = {
   mobActionFrac: 0.072, // 雑魚の1波が1回の行動で与える合計ダメージ（REF_HPに対する割合。体数で等分）
   bossActionFrac: 0.11, // ボスの1回の行動ダメージ（REF_HPに対する割合）
   hpPerTier: 2.2, // カリキュラム末尾の敵HPは先頭の 1+この値 倍
-  dmgPerTier: 9, // 同、敵のダメージ
-  earlyDmg: 0.42, // 序盤(tierが小さい)の敵の攻撃を弱める倍率（tier=0で×earlyDmg → earlyUntilで×1）＝最初の戦闘は勝てる
+  dmgPerTier: 5, // 同、敵のダメージ。【2026-09-26】9→5に下げた：学年の後半で敵のダメージが急に上がり、N/R/SR編成が勝てなくなっていた（playtest2.mjs）
+  earlyDmg: 0.32, // 序盤(tierが小さい)の敵の攻撃を弱める倍率（tier=0で×earlyDmg → earlyUntilで×1）＝最初の戦闘は勝てる。2026-09-30 0.42→0.32（苦手な子の最初のバトルの勝率が37%だった）
   earlyUntil: 0.3,
   bossKindMult: { unitSmallBoss: 1, chapterBoss: 1.5, unitBoss: 1.3, finalBoss: 2 },
 };
