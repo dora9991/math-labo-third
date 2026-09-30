@@ -73,7 +73,7 @@
 /* ---- 待機の文言 ---- */
 .gx-idle-text{position:absolute;left:0;right:0;top:calc(44px + env(safe-area-inset-top,0px));z-index:4;text-align:center;padding:8px 16px 18px;pointer-events:none;background:linear-gradient(to bottom,rgba(3,5,22,.7),transparent)}
 .gx-lead{font-weight:900;font-size:clamp(17px,3.6vw,26px);letter-spacing:.12em;text-shadow:0 0 16px #7fd0ff,0 2px 6px #000}
-.gx-sub{margin-top:6px;font-size:clamp(10.5px,1.9vw,13px);line-height:1.7;color:#e7ecff;text-shadow:0 1px 4px #000}
+.gx-sub{display:inline-block;margin-top:6px;padding:5px 14px;border-radius:12px;background:rgba(3,6,24,.62);backdrop-filter:blur(3px);font-size:clamp(12px,1.9vw,14px);line-height:1.7;color:#f3f6ff;text-shadow:0 1px 4px #000} /* 2026-09-30 明るい背景の上で読みにくかったので、うすい黒の下じきを敷いた */
 .gx-skip{position:absolute;right:16px;top:calc(56px + env(safe-area-inset-top,0px));z-index:10;padding:7px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.45);background:rgba(8,10,34,.55);color:#fff;font:700 12px inherit;font-family:inherit;cursor:pointer}
 
 /* ---- あらわれる ---- */
@@ -131,7 +131,7 @@
 .gx-pull:disabled{filter:grayscale(.85) brightness(.6);cursor:default;animation:none;box-shadow:none}
 .gx-pull:disabled::after{display:none}
 .gx-pull-lack{font-size:11px;font-weight:800;color:#ffd2d2}
-.gx-help{width:min(92vw,520px);text-align:center;font-size:10.5px;line-height:1.7;color:rgba(230,236,255,.75)}
+.gx-help{width:min(92vw,560px);text-align:center;font-size:12px;line-height:1.7;color:#eef2ff;padding:6px 12px;border-radius:12px;background:rgba(3,6,24,.62);backdrop-filter:blur(3px);text-shadow:0 1px 3px #000}
 .gx-error{font-weight:800;color:#ffb4b4;font-size:13px}
 .gx-links{display:flex;gap:10px}
 .gx-link,.gx-btn{padding:10px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.4);background:rgba(8,10,34,.7);color:#fff;font:800 13.5px inherit;font-family:inherit;cursor:pointer;backdrop-filter:blur(4px)}

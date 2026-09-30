@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as bgm from "../audio/bgm.js";
 import { getFxSpeed, prefersReducedMotion } from "../engine/fxSpeed.js";
-import { CHANGELOG } from "../data/changelog.js";
+import { CHANGELOG } from "../third/changelog.js";
 
 const GLYPHS = [
   { c: "π", x: "7%", y: "21%", d: 0 }, { c: "∑", x: "89%", y: "27%", d: 1.2 },

@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useGame } from "../ThirdContext.jsx";
-import { GACHA, CRYSTAL } from "../gachaConfig.js";
+import { GACHA, CRYSTAL, DAILY, REWARD } from "../gachaConfig.js";
 import { SPECIALIST_ROSTER } from "../specialistRoster.js";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
 import { playGachaChargeSound, playGachaBurstSound, playGachaCardSound } from "../fx/sound.js";
@@ -188,7 +188,7 @@ export default function ThirdGacha({ nav }) {
               <span className="gx-pull-main">{GACHA.packSize + GACHA.packBonus}連 引く！</span><span className="gx-pull-cost">💎 × {GACHA.costPerPull * GACHA.packSize}　1回おまけ・SR以上かくてい</span>
               {!canTen && <span className="gx-pull-lack">あと💎{GACHA.costPerPull * GACHA.packSize - save.crystals}個</span>}
             </button>
-            <div className="gx-help">クリスタルは、確認問題・れんしゅう・バトル・章のボスを「はじめてクリア」したり、章や学年のクリア、「今日の目標」（5問せいかい）、クリア済みバトルの周回（1日5回まで）でもらえるよ。</div>
+            <div className="gx-help">クリスタルは、確認問題・れんしゅう・バトル・章のボスを「はじめてクリア」したり、章や学年のクリア、「今日の目標」（{DAILY.missionTarget}問せいかい）、クリア済みバトルの周回（1日{REWARD.repeatCrystalMax}個まで）でもらえるよ。</div>
             <button className="gx-link" onClick={() => setShowRates(true)} data-sfx="none">📊 排出率を見る</button>
           </>
         )}
