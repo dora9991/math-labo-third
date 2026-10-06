@@ -102,3 +102,28 @@ export function allUnits() {
 export function allChapters() {
   return [...(GRADES[1] || []), ...(GRADES[2] || []), ...(GRADES[3] || [])];
 }
+
+// ── 章の「部類」ラベル ─────────────────────────────────
+// 章名だけだと「なにをする単元か」が分かりにくい、という生徒のご意見（2026-10-06）への対応。
+// 例：正の数と負の数 →（計算）。章を一覧する画面で、章名の横に出す。
+//  kind＝色分けの種類（calc 計算 / graph 関数・グラフ / figure 図形 / data データ）。
+//  新しい章を足したら、ここに1行足すだけでよい（無い章は何も出さない＝壊れない）。
+const CHAPTER_TAGS = {
+  // 中1
+  c1: ["計算", "calc"], c2: ["計算", "calc"], c3: ["計算・文章題", "calc"],
+  c4: ["関数・グラフ", "graph"], c5: ["図形", "figure"], c6: ["図形", "figure"], c7: ["データ", "data"],
+  // 中2
+  g2c1: ["計算", "calc"], g2c2: ["計算・文章題", "calc"], g2c3: ["関数・グラフ", "graph"],
+  g2c4: ["図形", "figure"], g2c5: ["図形", "figure"], g2c6: ["データ", "data"],
+  // 中3
+  g3c1: ["計算", "calc"], g3c2: ["計算", "calc"], g3c3: ["計算・文章題", "calc"], g3c4: ["関数・グラフ", "graph"],
+  g3c5: ["図形", "figure"], g3c6: ["図形", "figure"], g3c7: ["図形", "figure"], g3c8: ["データ", "data"],
+};
+export const CHAPTER_TAG_COLOR = { calc: "#fbbf24", graph: "#38bdf8", figure: "#f472b6", data: "#34d399" };
+
+/** 章（または章ID）の部類ラベルを返す。{ label, kind, color } / 無ければ null */
+export function chapterTag(chapterOrId) {
+  const id = typeof chapterOrId === "string" ? chapterOrId : chapterOrId?.id;
+  const t = CHAPTER_TAGS[id];
+  return t ? { label: t[0], kind: t[1], color: CHAPTER_TAG_COLOR[t[1]] } : null;
+}

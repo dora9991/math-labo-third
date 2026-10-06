@@ -84,7 +84,7 @@ export default function SkillGachaBox({ player, onPull }) {
       </div>
       <div style={{ fontSize: 11, color: "rgba(255,255,255,.55)", lineHeight: 1.6, marginBottom: 10 }}>
         クリスタル💎<b style={{ color: "#67e8f9" }}>1個</b>で新しいバトルスキルが<b style={{ color: "#fde047" }}>かならず1つ</b>もらえる（被りは出ない）。
-        クリスタルは<b style={{ color: "#a7f3d0" }}>単元のサイクルをクリア</b>するたびに1個たまるよ。
+        クリスタルは<b style={{ color: "#a7f3d0" }}>単元のサイクルをクリア</b>するたびに1個、<b style={{ color: "#a7f3d0" }}>学び直し15問せいかい</b>ごとにも1個たまるよ（学び直しは1日10個まで）。
       </div>
 
       {/* クリスタル残高 */}

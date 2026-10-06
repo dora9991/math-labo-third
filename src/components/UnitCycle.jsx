@@ -9,6 +9,7 @@
 // ============================================================
 import { useState } from "react";
 import { chaptersForGrade } from "../data/index.js";
+import ChapterTag from "./ChapterTag.jsx";
 import { findHaichiLessonForUnit } from "../data/haichiCourse.js";
 import { CYCLE_PRACTICE_TARGET, CYCLE_RELEARN_TARGET } from "../engine/scoring.js";
 import { isChapterMastered } from "../engine/unlock.js";
@@ -60,7 +61,7 @@ export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPass
             padding: "5px 9px", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 800,
             border: i === ci ? `2px solid ${c.color}` : "1px solid rgba(255,255,255,.14)",
             background: i === ci ? `${c.color}33` : "rgba(255,255,255,.05)", color: i === ci ? "#fff" : "rgba(255,255,255,.6)",
-          }}>{c.emoji} {c.name}</button>
+          }}>{c.emoji} {c.name}<ChapterTag chapter={c} /></button>
         ))}
       </div>
 

@@ -30,6 +30,9 @@ import {
 import { chapterSkillTier } from "../data/chapterSkills.js";
 import { findItem, itemSummary } from "../data/items.js";
 import { findUltimate, ultimateMult } from "../data/ultimates.js";
+import { findChapterByUnitId } from "../data/index.js";
+import { pickAttackMove } from "../data/attackMoves.js";
+import { MoveNameFx, SlashFx } from "../components/BattleFx.jsx";
 
 // 敵の通常攻撃・連続攻撃の各発は20%の確率でかわせる（ため攻撃・必殺技は対象外＝必ず当たる）
 const DODGE_CHANCE = 0.2;
@@ -114,6 +117,9 @@ export default function TurnBattle({
   const [shakeAns, setShakeAns] = useState(false);
   const [hurt, setHurt] = useState(false);
   const [heroAtk, setHeroAtk] = useState(false);
+  const [heroCast, setHeroCast] = useState(false);     // スキル・ぼうぎょ・アイテムの小ジャンプ
+  const [moveFx, setMoveFx] = useState(null);           // 技名バナー { name, icon, color, finisher, key }
+  const [slashFx, setSlashFx] = useState(null);         // 斬撃 { key, cross, color }
   const [charging, setCharging] = useState(false);
   const [enemyIntent, setEnemyIntent] = useState(null); // { text, color }
   const [enemyFx, setEnemyFx] = useState(null);         // { icon, label, color }
@@ -136,6 +142,9 @@ export default function TurnBattle({
   const pendingRef = useRef(null);
   const timerRef = useRef(BASE_TIME);
   const tallyRef = useRef({ correct: 0, wrong: 0 });
+  const streakRef = useRef(0);           // 連続正解数（技名が奥義に進化する演出用。ダメージには関与しない）
+  const lastMoveRef = useRef(null);      // 直前の技名（同じ技が続かないように）
+  const moveKeyRef = useRef(0);
   const bpDeltaRef = useRef(0);          // このバトル中の正解-不正解の差分（companion戦のBP増減用）
   const inputRef = useRef(null);
   // プレイヤーの状態異常・バフ
@@ -216,6 +225,15 @@ export default function TurnBattle({
   }
 
   function showEnemyFx(fx) { setEnemyFx(fx); setTimeout(() => setEnemyFx(null), 1100); }
+  // 技名バナーを出す（1.2秒で消える。同じ技が続いてもkeyが変わるので毎回アニメが走る）
+  function showMove(fx) {
+    const key = ++moveKeyRef.current;
+    setMoveFx({ ...fx, key });
+    setTimeout(() => setMoveFx((m) => (m && m.key === key ? null : m)), 1200);
+  }
+  // 自キャラの攻撃の突進／スキル等の小ジャンプ（CSSアニメの長さに合わせて外す）
+  function heroDash() { setHeroAtk(true); setTimeout(() => setHeroAtk(false), 560); }
+  function heroJump() { setHeroCast(true); setTimeout(() => setHeroCast(false), 500); }
 
   // ============ ターンの流れ ============
 
@@ -294,6 +312,7 @@ export default function TurnBattle({
     lockedRef.current = true;
     sfx.wrong();
     tallyRef.current.wrong++;
+    streakRef.current = 0;
     if (isCompanion) bpDeltaRef.current -= 1;
     if (q) { onMistake?.({ q: q.q, ans: q.ans, unitId: q.unitId, level: q.level }); onAttempt?.({ skill: q.skill, unitId: q.unitId, level: q.level, ok: false, q: q.q, ans: q.ans, templateId: q.id, seed: q.seed ?? null, userAnswer: "" }); }
     setShakeAns(true); setTimeout(() => setShakeAns(false), 460);
@@ -310,13 +329,14 @@ export default function TurnBattle({
       sfx.correct();
       tallyRef.current.correct++;
       if (isCompanion) bpDeltaRef.current += 1;
+      streakRef.current += 1;
       changeSp(spRef.current + 1); // 正解でSP+1
       setShowRing(true); setTimeout(() => setShowRing(false), 700);
-      setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340);
       resolvePlayerAction();
     } else {
       sfx.wrong();
       tallyRef.current.wrong++;
+      streakRef.current = 0;
       if (isCompanion) bpDeltaRef.current -= 1;
       onMistake?.({ q: q.q, ans: q.ans, unitId: q.unitId, level: q.level });
       setShakeAns(true); setTimeout(() => setShakeAns(false), 460);
@@ -329,17 +349,20 @@ export default function TurnBattle({
   function resolvePlayerAction() {
     const p = pendingRef.current || { type: "attack" };
     if (p.type === "guard") {
+      heroJump();
       guardActiveRef.current = true;
       setLog("🛡️ ぼうぎょ！ このターンの被ダメージを半分にする");
       setTimeout(() => { if (!endedRef.current) enemyPhase(); }, 700);
       return;
     }
     if (p.type === "skill") {
+      heroJump();
       applySkill(p.skill);
       setTimeout(() => { if (!endedRef.current) enemyPhase(); }, 800);
       return;
     }
     if (p.type === "item") {
+      heroJump();
       applyItem(p.item);
       setTimeout(() => { if (!endedRef.current) enemyPhase(); }, 800);
       return;
@@ -352,6 +375,7 @@ export default function TurnBattle({
     // 敵が「まもり」中なら攻撃を無効化（1回消費）
     if (enemyGuardRef.current > 0) {
       enemyGuardRef.current -= 1;
+      heroDash();
       setMonState("idle"); setAnimKey((k) => k + 1);
       showEnemyFx({ icon: "🛡️", label: "こうげきを防がれた！", color: "#60a5fa" });
       setLog(`${monster.name} は身をまもっている！ こうげきが通らない…`);
@@ -359,9 +383,17 @@ export default function TurnBattle({
       return;
     }
     if (isUlt) { sfx.skill({ ult: true }); setSkillFx({ name: ultimateDef.name, icon: ultimateDef.icon, color: ultimateDef.color || "#f472b6", big: true }); setTimeout(() => setSkillFx(null), 1400); }
+    // 通常こうげきは問題の章の「技名」を出す（連続正解・とどめは奥義）。必殺技は名前の演出がもうある。
+    const mv = isUlt ? null : pickAttackMove({
+      chapterId: findChapterByUnitId(q?.unitId)?.id || monster.chapterId,
+      streak: streakRef.current, kill: monHpRef.current - dmg <= 0, last: lastMoveRef.current,
+    });
+    if (mv) { lastMoveRef.current = mv.name; showMove({ ...mv, color: mv.finisher ? "#fbbf24" : "#7dd3fc" }); }
+    heroDash();
+    setSlashFx({ key: Date.now(), cross: isUlt || !!mv?.finisher, color: isUlt ? (ultimateDef.color || "#f472b6") : (mv.finisher ? "#fbbf24" : "#7dd3fc") });
     setMonState("damage"); setAnimKey((k) => k + 1);
     setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
-    setLog(isUlt ? `${ultimateDef.icon} ${ultimateDef.name}さくれつ！ ${dmg}ダメージ！` : `⚔️ こうげき！ ${dmg}ダメージ！`);
+    setLog(isUlt ? `${ultimateDef.icon} ${ultimateDef.name}さくれつ！ ${dmg}ダメージ！` : `${mv.icon} ${mv.name}！ ${dmg}ダメージ！`);
     const nv = Math.max(0, monHpRef.current - dmg);
     monHpRef.current = nv; setMonsterHp(nv);
     // ドレイン系必殺技：与えたダメージの一部を吸収して自分のHPを回復
@@ -781,13 +813,15 @@ export default function TurnBattle({
         </div>
 
         {/* 舞台 */}
-        <div className="bt-stage">
+        <div className={"bt-stage" + (monState === "damage" ? " punch" : "")}>
+          <MoveNameFx fx={moveFx} />
           {heroImageFor(player.avatar) && (
-            <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (hurt ? " hit" : "")}
+            <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (heroCast ? " cast" : "") + (hurt ? " hit" : "")}
               style={{ position: "absolute", left: 0, bottom: -8, height: 150, width: "auto", maxWidth: "44%", objectFit: "contain", zIndex: 3, pointerEvents: "none" }} />
           )}
           <div className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
+            <SlashFx fx={slashFx} />
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && <div className="bt-enemy-fx" style={{ "--ec": enemyFx.color }}><span className="ic">{enemyFx.icon}</span><span className="nm">{enemyFx.label}</span></div>}
             {showRing && <><div className="correct-ring show" /><div className="correct-flash show" /></>}

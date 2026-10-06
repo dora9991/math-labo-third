@@ -4,6 +4,7 @@
 import { useState } from "react";
 import Header from "../components/Header.jsx";
 import Stars from "../components/Stars.jsx";
+import ChapterTag from "../components/ChapterTag.jsx";
 import { CHAPTERS, LEVEL_KEYS, LEVEL_LABEL, LEVEL_COLOR } from "../data/index.js";
 import { getStars, isUnitUnlocked } from "../engine/progress.js";
 import { videoUrlFor } from "../data/videoLinks.js";
@@ -53,7 +54,7 @@ export default function ChapterSelect({ player, mode, chapters = CHAPTERS, onSta
       <div className="app">
         <Header player={player} back="単元選択" onBack={() => setChapter(null)} />
         <div className="content">
-          <div className="pg-ttl" style={{ color: chapter.color }}>{chapter.emoji} {chapter.name}</div>
+          <div className="pg-ttl" style={{ color: chapter.color }}>{chapter.emoji} {chapter.name}<ChapterTag chapter={chapter} /></div>
           <div className="pg-sub">{modeLabel}</div>
           {chapter.units.map((u, idx) => {
             const unlocked = isUnitUnlocked(player, chapter, idx);
@@ -132,7 +133,7 @@ export default function ChapterSelect({ player, mode, chapters = CHAPTERS, onSta
           <button key={c.id} className="chap-card" style={{ background: `linear-gradient(135deg, ${c.color}cc, ${c.color}88)` }} onClick={() => setChapter(c)}>
             <div className="chap-em">{c.emoji}</div>
             <div style={{ flex: 1 }}>
-              <div className="chap-nm">{c.name}</div>
+              <div className="chap-nm">{c.name}<ChapterTag chapter={c} /></div>
               <div className="chap-sub">中学{c.grade}年 ・ {c.units.length}単元</div>
             </div>
           </button>

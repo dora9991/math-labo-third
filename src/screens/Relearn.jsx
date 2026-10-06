@@ -3,18 +3,20 @@
 //
 //  押すと「自分が間違えた問題の一覧」が単元ごとに出る。
 //  各単元で：
-//    ✏️ 学び直し … その単元を時間制限なしで練習（1問15XP＝1.5倍・学習のコア。クリスタルは出ない）
+//    ✏️ 学び直し … その単元を時間制限なしで練習（1問15XP＝1.5倍・学習のコア。正解15問ごとに💎+1・1日10個まで）
 //    📺 解説     … 葉一さん（19ch）の解説動画ページへ
 //  各問題で：✓ できた … その問題をノートから消す
 //
 //  ※ タイムアタック・バトル・単元テストなど、全モードの誤答が貯まる。
 // ============================================================
 import Header from "../components/Header.jsx";
+import ChapterTag from "../components/ChapterTag.jsx";
 import MathText from "../components/MathText.jsx";
 import { findUnitById, findChapterByUnitId } from "../data/index.js";
 import { videoUrlFor } from "../data/videoLinks.js";
 import { hasHaichiLessonForUnit } from "../data/haichiCourse.js";
 import { MISC as TOKETA_MISC } from "../data/toketa/index.js";
+import { relearnCrystalState, RELEARN_CRYSTAL_EVERY, RELEARN_CRYSTAL_DAILY_CAP } from "../engine/scoring.js";
 
 const GRADE_LABEL = { 1: "中1", 2: "中2", 3: "中3" };
 
@@ -45,6 +47,19 @@ export default function Relearn({ player, mistakes = [], onRelearn, onHaichi, on
       <div className="content">
         <div className="pg-ttl">{focusUnitId ? `📖 学び直し・${focusUnit ? focusUnit.name : "この単元"}` : "🩹 弱点克服モード"}</div>
         <div className="pg-sub">まちがいは<b style={{ color: "#fde047" }}>たからもの</b>。<b style={{ color: "#7dd3fc" }}>2回れんぞく正解</b>でなおせて、<b style={{ color: "#86efac" }}>つぎの日にもう1問</b>とけたらカンペキ（ノートから消える）。1問 +15XP。</div>
+        {/* 💎 学び直しクリスタル：正解15問ごとに+1（1日10個まで） */}
+        {(() => {
+          const st = relearnCrystalState(player?.relearnCrystal, new Date().toLocaleDateString("ja-JP"));
+          return (
+            <div className="glass" style={{ padding: "9px 12px", marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", border: "1px solid rgba(103,232,249,.3)" }}>
+              <span style={{ fontSize: 16 }}>💎</span>
+              <span style={{ fontSize: 12.5, fontWeight: 900, color: "#67e8f9" }}>学び直し{RELEARN_CRYSTAL_EVERY}問せいかいごとに クリスタル+1</span>
+              <span style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 800, color: st.capped ? "#94a3b8" : "rgba(255,255,255,.75)" }}>
+                {st.capped ? `今日は上限（${RELEARN_CRYSTAL_DAILY_CAP}/${RELEARN_CRYSTAL_DAILY_CAP}）` : `あと${st.remaining}問 ・ 今日 ${st.today}/${RELEARN_CRYSTAL_DAILY_CAP}`}
+              </span>
+            </div>
+          );
+        })()}
         {/* よくあるまちがいパターン（誤答タグの累計＝価値づけの分析結果）。全体一覧のときだけ表示 */}
         {!focusUnitId && (() => {
           const stats = player?.mistakeTagStats || {};
@@ -100,7 +115,7 @@ export default function Relearn({ player, mistakes = [], onRelearn, onHaichi, on
                   </span>
                   {chap && (
                     <span style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,.5)" }}>
-                      {GRADE_LABEL[chap.grade] || ""} ・ {chap.name}
+                      {GRADE_LABEL[chap.grade] || ""} ・ {chap.name}<ChapterTag chapter={chap} style={{ marginLeft: 4, fontSize: 9 }} />
                     </span>
                   )}
                   {phase === "pendingToday" && (

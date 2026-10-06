@@ -6,6 +6,7 @@
 // ============================================================
 import { useEffect, useMemo } from "react";
 import Header from "../components/Header.jsx";
+import RankCard from "../components/RankCard.jsx";
 import * as sfx from "../audio/sfx.js";
 import { dayKeyBefore, daySummary, weekSummary, weeklyTier, weeklyMeterPct } from "../engine/studyLog.js";
 
@@ -125,6 +126,9 @@ export default function StudyLog({ player, records, onBack }) {
       <div className="content">
         <div className="pg-ttl">📅 学習記録</div>
         <div className="pg-sub">今日・昨日と、直近7日間の「といた問題」がひと目でわかるよ</div>
+
+        {/* やりこみ段位（努力量の見える化） */}
+        <RankCard player={player} records={records} detail />
 
         <DayCard icon="📆" title="今日の学習記録" dateKey={todayKey} summary={today}
           emptyText="今日はまだ記録がないよ。これから頑張ろう！" playSound />

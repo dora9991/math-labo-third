@@ -3,6 +3,7 @@
 // ============================================================
 import Header from "../components/Header.jsx";
 import { chaptersForGrade } from "../data/index.js";
+import ChapterTag from "../components/ChapterTag.jsx";
 import { unitTestTimeLimit, formatTime } from "../engine/unitTest.js";
 
 const GRADE_LABEL = { 1: "中1", 2: "中2", 3: "中3" };
@@ -33,7 +34,7 @@ export default function UnitTestSelect({ player, grade = 1, onStart, onBack }) {
               >
                 <div className="chap-em">{c.emoji}</div>
                 <div style={{ flex: 1 }}>
-                  <div className="chap-nm">{c.name}</div>
+                  <div className="chap-nm">{c.name}<ChapterTag chapter={c} /></div>
                   <div className="chap-sub">全{c.units.length}単元 ・ ⏳制限 {formatTime(limit)}前後</div>
                 </div>
               </button>

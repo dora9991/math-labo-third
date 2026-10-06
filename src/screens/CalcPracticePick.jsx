@@ -7,6 +7,7 @@
 // ============================================================
 import { useState } from "react";
 import Header from "../components/Header.jsx";
+import ChapterTag from "../components/ChapterTag.jsx";
 import { allChapters } from "../data/index.js";
 import { videoUrlFor } from "../data/videoLinks.js";
 
@@ -45,7 +46,7 @@ export default function CalcPracticePick({ player, onPick, onBack, chapterMode =
                   borderLeft: `4px solid ${c.color}`, border: "1px solid rgba(255,255,255,.1)",
                   borderLeftWidth: 4, borderLeftColor: c.color,
                 }}>
-                <div style={{ fontSize: 15, fontWeight: 900, color: "#fff" }}>{c.emoji} {c.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#fff" }}>{c.emoji} {c.name}<ChapterTag chapter={c} /></div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginTop: 5, lineHeight: 1.6 }}>
                   {c.units.map((u) => u.name).join("・")}
                 </div>
@@ -53,7 +54,7 @@ export default function CalcPracticePick({ player, onPick, onBack, chapterMode =
             ))
           : chapters.filter((c) => c.grade === g).map((c) => (
               <div key={c.id} className="glass" style={{ padding: "10px 12px" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: c.color, marginBottom: 8 }}>{c.emoji} {c.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: c.color, marginBottom: 8 }}>{c.emoji} {c.name}<ChapterTag chapter={c} /></div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                   {c.units.map((u) => {
                     const vurl = videoUrlFor(u.id);

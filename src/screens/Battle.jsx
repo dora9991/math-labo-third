@@ -20,6 +20,9 @@ import { gearSpecials } from "../engine/gear.js";
 import { allyStats, partnerHpLv, partnerAtkLv } from "../engine/partners.js";
 import { findItem } from "../engine/items.js";
 import { isCorrect, playerLevel } from "../engine/scoring.js";
+import { findChapterByUnitId } from "../data/index.js";
+import { pickAttackMove } from "../data/attackMoves.js";
+import { MoveNameFx, SlashFx } from "../components/BattleFx.jsx";
 
 const ENEMY_CHARGE_NEED = 2; // super型が超必殺を撃つまでのチャージ回数（engine ENEMY_AI.super と一致）
 const DODGE_CHANCE = 0.2; // 敵の通常こうげきは20%の確率でかわせる（ため攻撃・超必殺技は対象外＝必ず当たる）
@@ -92,6 +95,10 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   const [shakeAns, setShakeAns] = useState(false);   // 不正解の解答欄ゆれ
   const [hurt, setHurt] = useState(false);           // 被ダメ（赤＋画面ゆれ）
   const [heroAtk, setHeroAtk] = useState(false);     // 自キャラの前のめり（正解時）
+  const [moveFx, setMoveFx] = useState(null);       // 技名バナー { name, icon, color, finisher, key }
+  const [slashFx, setSlashFx] = useState(null);     // 斬撃 { key, cross, color }
+  const lastMoveRef = useRef(null);                 // 直前の技名（同じ技が続かないように）
+  const moveKeyRef = useRef(0);
   const [cheer, setCheer] = useState(null);          // 自キャラの応援吹き出し { text, hurt, key }
   const cheerKey = useRef(0);                         // 吹き出し再生用キー
   const [monDmg, setMonDmg] = useState(null);        // モンスターのダメージ数字
@@ -799,7 +806,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       if (cu) { dmg = Math.max(1, Math.round(dmg * (cu.mult ?? 0.6))); cursed = true; }
       refreshBuffTags();
       setShowRing(true); setTimeout(() => setShowRing(false), 700);
-      setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340); // 自キャラ前のめり
+      setHeroAtk(true); setTimeout(() => setHeroAtk(false), 560); // 自キャラ突進（CSSアニメの長さに合わせる）
       setCheer({ text: pickHitCheer({ streak: newCombo }), hurt: false, key: ++cheerKey.current });
       setMonState("damage"); setAnimKey((k) => k + 1);
       // バリア／みがわり：あればダメージを肩代わりする
@@ -810,6 +817,16 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         toHp -= absorbed;
       }
       setMonDmg(absorbed > 0 && toHp === 0 ? "🔰" : `-${toHp || dmg}`); setDmgKey((k) => k + 1);
+      // 技名と斬撃（見た目だけ）。問題の章の技が出て、コンボ3以上・とどめは奥義になる。
+      const mv = pickAttackMove({
+        chapterId: findChapterByUnitId(q.unitId)?.id || monster.chapterId,
+        streak: newCombo, kill: monsterHpRef.current - toHp <= 0, last: lastMoveRef.current,
+      });
+      lastMoveRef.current = mv.name;
+      const mvKey = ++moveKeyRef.current;
+      setMoveFx({ ...mv, color: mv.finisher ? "#fbbf24" : "#7dd3fc", key: mvKey });
+      setTimeout(() => setMoveFx((m) => (m && m.key === mvKey ? null : m)), 1200);
+      setSlashFx({ key: mvKey, cross: mv.finisher, color: mv.finisher ? "#fbbf24" : "#7dd3fc" });
       // 武器の特殊効果「ドレイン（lifesteal）」：与えたダメージの割合ぶんHP回復
       if (specials.lifesteal > 0 && toHp > 0) {
         const heal = Math.max(1, Math.round(toHp * specials.lifesteal));
@@ -817,7 +834,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       }
       setLog(
         (doubled ? "✌️ダブルアップ！ " : "") + (crit ? "🎯会心！ " : "") + (exposed ? "💥弱点ヒット！ " : "") + (boosted ? "💪パワーアップ！ " : "") + (cursed ? "💀呪いで弱体… " : "") + (absorbed > 0 ? "🔰バリアが防いだ！ " : "") +
-        (newCombo >= 3 ? `正解！🔥${newCombo}コンボ ${dmg}ダメージ！` : `正解！${dmg}ダメージ！`)
+        (newCombo >= 3 ? `正解！🔥${newCombo}コンボ ${mv.icon}${mv.name}！ ${dmg}ダメージ！` : `正解！${mv.icon}${mv.name}！ ${dmg}ダメージ！`)
       );
       // とげ（thorns）：攻撃するたび少し反射ダメージを受ける
       if (monster.thorns) {
@@ -945,7 +962,8 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         </div>
 
         {/* モンスター舞台（自キャラ左・敵モンスター右で向かい合う） */}
-        <div className="bt-stage">
+        <div className={"bt-stage" + (monState === "damage" ? " punch" : "")}>
+          <MoveNameFx fx={moveFx} />
           {/* 応援の吹き出し（自キャラの頭上） */}
           {cheer && (
             <div key={cheer.key} className={"bt-cheer" + (cheer.hurt ? " hurt" : "")}>{cheer.text}</div>
@@ -964,6 +982,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
           {/* 敵モンスター＋戦闘演出（右側にまとめて配置） */}
           <div className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
+            <SlashFx fx={slashFx} />
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && (
               <div className="bt-enemy-fx" style={{ "--ec": enemyFx.color }}>

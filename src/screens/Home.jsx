@@ -10,6 +10,7 @@ import CharBubble, { voice } from "../components/CharBubble.jsx";
 import { MathBackdrop } from "../components/Decorations.jsx";
 import UnitCycle from "../components/UnitCycle.jsx";
 import UpdateNews from "../components/UpdateNews.jsx";
+import RankCard from "../components/RankCard.jsx";
 import { gradesWithChapters } from "../data/index.js";
 
 const GRADE_COLOR = { 1: "#818cf8", 2: "#f43f5e", 3: "#fbbf24" }; // 中1=藍 中2=赤 中3=黄
@@ -81,6 +82,9 @@ export default function Home({
 
         {/* あいさつ吹き出し（アバターを押すとキャラ設定へ） */}
         <CharBubble text={greeting} avatar={player.avatar} onAvatar={onCharacter} />
+
+        {/* やりこみ段位（正解数＋学んだ日数。押すと学習記録へ） */}
+        <RankCard player={player} records={records} onClick={onStudyLog} />
 
         {/* 休憩（日次逓減）バナー */}
         {restActive && (

@@ -100,6 +100,9 @@ export function initialPlayerState(studentId) {
     crystals: 0,       // 所持クリスタル（サイクルを1単元クリアするごとに+1。スキルガチャに使う）
     worldCleared: { 1: 0, 2: 0, 3: 0 }, // ★レベルの素：学年ごとに「サイクルをクリアした単元数」。レベル=1+これ
     relearnSolved: 0,  // 学び直しで解いた問題の累計
+    stepCorrect: 0,    // 記録(records)を残さない場面（ステップアップ・学び直し・確認問題など）の正解数。やりこみ段位の集計用（engine/rank.js）
+    rankSeen: null,    // 最後に祝った（または初回に確認した）やりこみ段位の番号。これを超えたら「昇段」演出を出す
+    relearnCrystal: { date: null, today: 0, progress: 0 }, // 学び直しのクリスタル進捗：正解15問ごとに+1・1日10個まで（engine/scoring.js）
     item: null,        // 所持アイテム（id 文字列。1つだけ持てる。バトルで使うと消費）
     items: {},         // 新アイテムシステム（2026-07-19復活・ガチャ方式）：{ itemId: 個数 }。合計10個までストック
     equippedItems: [], // バトルに持ち込むアイテム（最大2種類、itemIdの配列）
@@ -184,6 +187,11 @@ export function normalizePlayerState(p) {
     ? { swordStones: p.gear.swordStones || 0, armorStones: p.gear.armorStones || 0 }
     : { swordStones: 0, armorStones: 0 };
   out.relearnSolved = Number.isFinite(p.relearnSolved) ? p.relearnSolved : 0;
+  out.stepCorrect = Number.isFinite(p.stepCorrect) ? Math.max(0, p.stepCorrect) : 0;
+  out.rankSeen = Number.isFinite(p.rankSeen) ? p.rankSeen : null;
+  out.relearnCrystal = (p.relearnCrystal && typeof p.relearnCrystal === "object")
+    ? { date: p.relearnCrystal.date || null, today: Number.isFinite(p.relearnCrystal.today) ? p.relearnCrystal.today : 0, progress: Number.isFinite(p.relearnCrystal.progress) ? p.relearnCrystal.progress : 0 }
+    : { date: null, today: 0, progress: 0 };
   out.partners = (p.partners && typeof p.partners === "object") ? p.partners : {};
   // party（ストック最大4）。旧 companion があれば引き継ぐ。所持していない仲間は除外。
   let party = Array.isArray(p.party) ? p.party.slice() : [];

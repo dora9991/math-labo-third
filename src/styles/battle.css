@@ -558,3 +558,133 @@
 }
 /* バトルの応援吹き出し（自キャラの頭上） */
 .bt-cheer { left: 82px; bottom: 150px; }
+
+/* ============================================================
+   2026-10-06 バトルの「動き」強化（生徒のご意見：戦いのときもっと動きが欲しい）
+   ・自キャラ：ふだんは呼吸でゆれ、こうげきは「溜め→突進→もどる」、スキル等は小ジャンプ
+   ・敵：こうげきは自キャラに向かって突進（向かい合う構図に合わせて左向き）
+   ・技名バナー／斬撃エフェクト／ダメージ数字のポップ／ヒット時のステージの揺れ
+   すべて見た目だけ（ダメージ等のルールは変えない）。
+   ============================================================ */
+.bt-hero { --dash: min(30vw, 130px); animation: heroIdle 2.2s ease-in-out infinite; }
+@keyframes heroIdle {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-4px) scaleY(1.018); }
+}
+.bt-hero.attack { animation: heroDash .56s cubic-bezier(.3, .7, .3, 1); z-index: 4; }
+@keyframes heroDash {
+  0% { transform: translateX(0) scale(1) rotate(0); }
+  26% { transform: translateX(-12px) scale(.95, 1.06) rotate(-5deg); }      /* 溜め */
+  54% { transform: translateX(var(--dash)) scale(1.12) rotate(7deg); }       /* 突進（ここで斬撃） */
+  76% { transform: translateX(calc(var(--dash) - 14px)) scale(1.05) rotate(2deg); }
+  100% { transform: translateX(0) scale(1) rotate(0); }
+}
+.bt-hero.cast { animation: heroCast .5s ease-out; }
+@keyframes heroCast {
+  0% { transform: translateY(0) scale(1); filter: drop-shadow(0 6px 8px rgba(0,0,0,.5)); }
+  35% { transform: translateY(-22px) scale(1.08); filter: drop-shadow(0 0 16px rgba(125,211,252,.95)) brightness(1.25); }
+  100% { transform: translateY(0) scale(1); filter: drop-shadow(0 6px 8px rgba(0,0,0,.5)); }
+}
+
+/* 敵のこうげき：自キャラ（左）に向かって突進する */
+.bt-stage .atk-anim { animation-name: atkChargeL; animation-duration: .6s; }
+@keyframes atkChargeL {
+  0% { transform: translateX(0) scaleX(1) scaleY(1); }
+  22% { transform: translateX(22px) scaleX(.74) scaleY(1.26); }
+  52% { transform: translateX(-120px) scaleX(1.32) scaleY(.76); }
+  76% { transform: translateX(-70px) scaleX(.95) scaleY(1.06); }
+  100% { transform: translateX(0) scaleX(1) scaleY(1); }
+}
+
+/* ヒットした瞬間：ステージがドンと弾む */
+.bt-stage.punch { animation: stagePunch .32s ease-out; }
+@keyframes stagePunch {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.045) translateX(-3px); }
+  60% { transform: scale(.992) translateX(2px); }
+  100% { transform: scale(1); }
+}
+
+/* ダメージ数字：大きくポンと出て、上に消える */
+.mon-dmg-num { font-size: 34px; }
+.mon-dmg-num.show { animation: dmgPop .9s ease-out forwards; }
+@keyframes dmgPop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.3) rotate(-8deg); }
+  16% { opacity: 1; transform: translateX(-50%) translateY(-4px) scale(1.7) rotate(5deg); }
+  34% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.15) rotate(0); }
+  72% { opacity: 1; transform: translateX(-50%) translateY(-26px) scale(1.05); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-58px) scale(1); }
+}
+
+/* 戦闘ステージのダメージ数字：上がり幅を控えめにして、上の吹き出し・敵パネルに被らないようにする */
+.bt-stage .mon-dmg-num { top: 14px; z-index: 6; }
+.bt-stage .mon-dmg-num.show { animation: dmgPopBt .9s ease-out forwards; }
+@keyframes dmgPopBt {
+  0% { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.3) rotate(-8deg); }
+  16% { opacity: 1; transform: translateX(-50%) translateY(-2px) scale(1.7) rotate(5deg); }
+  34% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.15) rotate(0); }
+  72% { opacity: 1; transform: translateX(-50%) translateY(-12px) scale(1.05); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-24px) scale(1); }
+}
+
+/* 斬撃：敵に重ねて斜めの光が走る（奥義・必殺技は ✕ 斬り） */
+.bt-slash {
+  position: absolute; left: 50%; top: 46%; width: 190px; height: 190px; z-index: 5; pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-35deg);
+}
+.bt-slash::before, .bt-slash::after {
+  content: ""; position: absolute; left: -8%; right: -8%; top: calc(50% - 4px); height: 8px; border-radius: 99px; opacity: 0;
+  background: linear-gradient(90deg, transparent, #fff 22%, var(--mc, #7dd3fc) 72%, transparent);
+  box-shadow: 0 0 14px var(--mc, #7dd3fc), 0 0 30px #fff;
+  transform: scaleX(0); transform-origin: left center;
+}
+.bt-slash::before { animation: slashSwipe .4s .22s ease-out forwards; } /* 突進の頂点(約54%≒.3秒)に合わせる */
+.bt-slash::after { display: none; }
+.bt-slash.cross::after { display: block; transform: rotate(72deg) scaleX(0); animation: slashSwipeX .4s .34s ease-out forwards; }
+@keyframes slashSwipe {
+  0% { opacity: 1; transform: scaleX(0); }
+  55% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1.06); }
+}
+@keyframes slashSwipeX {
+  0% { opacity: 1; transform: rotate(72deg) scaleX(0); }
+  55% { opacity: 1; transform: rotate(72deg) scaleX(1); }
+  100% { opacity: 0; transform: rotate(72deg) scaleX(1.06); }
+}
+
+/* 技名バナー：ステージ下部（足元）。上には自キャラの応援吹き出し・ダメージ数字が出るので避ける。奥義は金色で大きく */
+.bt-move-name {
+  position: absolute; left: 50%; bottom: 6px; z-index: 8; pointer-events: none; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px; padding: 4px 16px; font-size: 15px; font-weight: 900; color: #fff;
+  letter-spacing: .5px; text-shadow: 0 0 10px var(--mc), 0 2px 0 rgba(0,0,0,.6);
+  background: linear-gradient(90deg, transparent, rgba(8, 10, 40, .72) 14%, rgba(8, 10, 40, .72) 86%, transparent);
+  border-top: 2px solid var(--mc); border-bottom: 2px solid var(--mc);
+  opacity: 0; animation: moveNamePop 1.15s ease-out forwards;
+}
+.bt-move-name .bt-move-ic { font-size: 18px; }
+.bt-move-name .bt-move-tag {
+  font-size: 10px; padding: 1px 7px; border-radius: 99px; color: #4a2c00; text-shadow: none;
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+}
+.bt-move-name.is-finisher { --mc: #fbbf24; font-size: 18px; border-top-width: 3px; border-bottom-width: 3px; }
+@keyframes moveNamePop {
+  0% { opacity: 0; transform: translateX(-50%) translateX(-40px) scale(.7); }
+  14% { opacity: 1; transform: translateX(-50%) translateX(0) scale(1.12); }
+  26% { opacity: 1; transform: translateX(-50%) scale(1); }
+  78% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(1); }
+}
+@media (max-width: 560px) {
+  .bt-move-name { font-size: 13px; padding: 3px 12px; }
+  .bt-move-name.is-finisher { font-size: 15px; }
+  .bt-slash { width: 150px; height: 150px; }
+}
+
+/* 動きが苦手な人向け：OSの「視差効果を減らす」設定ではゆれ・突進を止める */
+@media (prefers-reduced-motion: reduce) {
+  .bt-hero { animation: none; }
+  .bt-hero.attack { animation: taHeroAtk .34s ease; }
+  .bt-hero.cast { animation: none; }
+  .bt-stage.punch { animation: none; }
+  .bt-stage .atk-anim { animation-name: atkCharge; }
+}

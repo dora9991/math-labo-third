@@ -15,7 +15,7 @@ import * as sfx from "../audio/sfx.js";
 import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
-import { isCorrect } from "../engine/scoring.js";
+import { isCorrect, relearnCrystalState, RELEARN_CRYSTAL_EVERY, RELEARN_CRYSTAL_DAILY_CAP } from "../engine/scoring.js";
 import ResultReview from "../components/ResultReview.jsx";
 
 const LEVELS = ["easy", "standard", "advanced"];
@@ -34,7 +34,7 @@ const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
   ? (q.distractors.find((d) => String(d.val) === String(val))?.tag || null)
   : null;
 
-export default function StepUpSimple({ player, units = [], title = "ステップアップ", onAttempt, onHome, roundSize = ROUND_SIZE, passRate = null, onRoundEnd, weakUnits = [], onRelearn, onHaichi, onOpenRelearnList, failAction = null, passActions = null }) {
+export default function StepUpSimple({ player, units = [], title = "ステップアップ", onAttempt, onHome, roundSize = ROUND_SIZE, passRate = null, onRoundEnd, weakUnits = [], onRelearn, onHaichi, onOpenRelearnList, failAction = null, passActions = null, showRelearnCrystal = false }) {
   const ROUND = roundSize > 0 ? roundSize : ROUND_SIZE;
   const recentRef = useRef([]);
   const advanceTimer = useRef(null);
@@ -245,6 +245,9 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
           <span style={{ fontSize: 11, fontWeight: 900, color: "#818cf8" }}>{done}/{ROUND}</span>
         </div>
 
+        {/* 学び直しのクリスタル進捗（15問正解ごとに💎+1・1日10個まで） */}
+        {showRelearnCrystal && <RelearnCrystalMeter player={player} />}
+
         <CharBubble text={msg} avatar={player.avatar} />
 
         <div style={{ margin: "10px 0 6px", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.55)" }}>いま：{unit.name}</div>
@@ -291,6 +294,27 @@ export default function StepUpSimple({ player, units = [], title = "ステップ
         {showPad && <DrawPad key={padKey} height={420} />}
 
         <div style={{ marginTop: 14, fontSize: 12, color: "rgba(255,255,255,.5)", textAlign: "center" }}>このセッション：{seen}問（◯{got}）</div>
+      </div>
+    </div>
+  );
+}
+
+// 学び直しの「💎まであと◯問」メーター。保存値(player.relearnCrystal)から今日の状態を求めて表示する。
+function RelearnCrystalMeter({ player }) {
+  const st = relearnCrystalState(player.relearnCrystal, new Date().toLocaleDateString("ja-JP"));
+  const pct = st.capped ? 100 : Math.round((st.progress / RELEARN_CRYSTAL_EVERY) * 100);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 10px", padding: "7px 10px", borderRadius: 10,
+      background: "rgba(103,232,249,.08)", border: "1px solid rgba(103,232,249,.28)" }}>
+      <span style={{ fontSize: 15 }}>💎</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 6, fontSize: 11, fontWeight: 800 }}>
+          <span style={{ color: "#67e8f9" }}>{st.capped ? "今日の上限に到達！またあした" : `あと${st.remaining}問で +1`}</span>
+          <span style={{ color: "rgba(255,255,255,.55)" }}>今日 {st.today}/{RELEARN_CRYSTAL_DAILY_CAP}</span>
+        </div>
+        <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,.1)", marginTop: 4, overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: st.capped ? "#64748b" : "linear-gradient(90deg,#22d3ee,#67e8f9)", transition: "width .4s ease" }} />
+        </div>
       </div>
     </div>
   );

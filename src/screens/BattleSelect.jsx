@@ -6,6 +6,7 @@
 // ============================================================
 import { useState, useEffect } from "react";
 import Header from "../components/Header.jsx";
+import ChapterTag from "../components/ChapterTag.jsx";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import { MONSTERS } from "../data/monsters.js";
 import { allChapters } from "../data/index.js";
@@ -200,6 +201,7 @@ export default function BattleSelect({ player, clearedIds, onSelect, onBack, onS
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 2px 6px", borderBottom: `1px solid ${ch.color}55`, paddingBottom: 4 }}>
                 <span style={{ fontSize: 18 }}>{ch.emoji}</span>
                 <span style={{ fontSize: 14, fontWeight: 900, color: ch.color }}>{ch.name}</span>
+                <ChapterTag chapter={ch} style={{ marginLeft: 0 }} />
               </div>
               {onClaimSkill && isChapterMastered(player, ch.id) && !player.ownedChapterSkills?.[ch.id] && (
                 <button onClick={() => onClaimSkill(ch.id)} data-sfx="none" style={{

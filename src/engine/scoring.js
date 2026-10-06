@@ -128,8 +128,43 @@ export const XP_PENALTY_PER_WRONG = 3;
 
 // ── 学び直しの報酬（学習のコア）─────────────────────
 // 1問の正解XPは通常じっくり(10)の1.5倍＝15。
-// ※クリスタルは学び直しからは出さない（サイクルクリア＝1単元1個だけに一本化）。
+// クリスタル：学び直しの正解15問ごとに1個（1日10個まで）。2026-10-06、生徒のご意見
+//  「やり直しにもダイヤを付けてほしい。15問ごとで！」で追加。上限は量稼ぎ・連打対策。
 export const RELEARN_XP_PER_CORRECT = 15;
+export const RELEARN_CRYSTAL_EVERY = 15;      // 学び直しの正解がこの数たまるごとにクリスタル+1
+export const RELEARN_CRYSTAL_DAILY_CAP = 10;  // 学び直しで1日にもらえるクリスタルの上限
+
+/**
+ * 学び直しのクリスタル進捗を、保存値(rc)と今日の日付から「今日の状態」に直す。
+ *  rc = { date, today, progress }
+ *    date … today を数えた日 / today … その日に獲得した個数 /
+ *    progress … 次の1個までに数えた正解数（日をまたいで持ち越す）
+ *  日付が変わっていれば today だけ 0 に戻し、progress は引き継ぐ（積み上げた正解を捨てない）。
+ */
+export function relearnCrystalState(rc, today) {
+  const r = rc && typeof rc === "object" ? rc : {};
+  const progress = Number.isFinite(r.progress) ? Math.max(0, Math.min(RELEARN_CRYSTAL_EVERY - 1, r.progress)) : 0;
+  const got = r.date === today && Number.isFinite(r.today) ? Math.max(0, r.today) : 0;
+  const capped = got >= RELEARN_CRYSTAL_DAILY_CAP;
+  return {
+    date: today, today: got, progress, capped,
+    remaining: capped ? null : RELEARN_CRYSTAL_EVERY - progress, // 次の1個まであと何問（上限到達なら null）
+  };
+}
+
+/**
+ * 学び直しで1問正解したときの進み方（不正解のときは呼ばない）。
+ *  ・1日の上限に達していれば何も進めない（上限の日に解いた分を翌日へ持ち越して荒稼ぎさせない）。
+ *  ・正解が RELEARN_CRYSTAL_EVERY たまったらクリスタル+1（gained=1）して数え直す。
+ * @returns {{ rc:{date:string,today:number,progress:number}, gained:number }}
+ */
+export function relearnCrystalOnCorrect(rc, today) {
+  const s = relearnCrystalState(rc, today);
+  if (s.capped) return { rc: { date: today, today: s.today, progress: s.progress }, gained: 0 };
+  const progress = s.progress + 1;
+  if (progress >= RELEARN_CRYSTAL_EVERY) return { rc: { date: today, today: s.today + 1, progress: 0 }, gained: 1 };
+  return { rc: { date: today, today: s.today, progress }, gained: 0 };
+}
 
 // ── 学び直しの合格基準（2段階：その場＝2連続 → 翌日以降＝1問で確定）──
 // 旧「単元5問ぜんぶ正解で即消し」を廃止。理由：1ミスで4問ぶんの成果が消える罰性、
@@ -142,7 +177,7 @@ export const RELEARN_XP_PER_CORRECT = 15;
 //        日をまたいで解けること＝保持の確認（分散効果）。失敗しても仮状態に戻すだけ（罰なし）。
 export const RELEARN_STREAK_TARGET = 2;    // その場の〈仮なおし〉に必要な連続正解数
 export const RELEARN_CONFIRM_CORRECT = 1;  // 翌日以降の確認で完全クリアに必要な正解数
-export const RELEARN_CONFIRM_COIN = 70;    // 翌日確認で完全になおしたときのごほうびコイン（クリスタルは出さない・2026-07-19に8→70へ引き上げ）
+export const RELEARN_CONFIRM_COIN = 70;    // 翌日確認で完全になおしたときのごほうびコイン（2026-07-19に8→70へ引き上げ）
 
 // ── お金の入手条件の統一（2026-07-19）：「1問正解=いくら」をゲーム全体で1本化 ──
 //  設計メモ§8/§10 Step1の発展形。TA・ステップアップ・学び直し・演習バトルなど、問題を解く

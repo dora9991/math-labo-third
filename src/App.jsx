@@ -15,7 +15,7 @@ import { getQuizWeakUnits } from "./data/quizLink.js";
 import { logAnswer } from "./store/answerLog.js";
 import { getRememberedId } from "./auth/loginPrefs.js";
 import { makeRecord, makeMistake } from "./store/recordSchema.js";
-import { levelFromXp, xpForLevel, playerLevel, playerXp, timeAttackCrystal, RELEARN_XP_PER_CORRECT, questionCoin, CYCLE_PRACTICE_TARGET, CYCLE_RELEARN_TARGET, MASTER_CYCLE_COIN, MASTER_CYCLE_CRYSTAL, isUnitCycleCleared, REST_CYCLES_SOFT, restMultiplier, RELEARN_STREAK_TARGET, RELEARN_CONFIRM_COIN } from "./engine/scoring.js";
+import { levelFromXp, xpForLevel, playerLevel, playerXp, timeAttackCrystal, RELEARN_XP_PER_CORRECT, questionCoin, CYCLE_PRACTICE_TARGET, CYCLE_RELEARN_TARGET, MASTER_CYCLE_COIN, MASTER_CYCLE_CRYSTAL, isUnitCycleCleared, REST_CYCLES_SOFT, restMultiplier, RELEARN_STREAK_TARGET, RELEARN_CONFIRM_COIN, relearnCrystalOnCorrect, RELEARN_CRYSTAL_EVERY, RELEARN_CRYSTAL_DAILY_CAP } from "./engine/scoring.js";
 import { genProblem, genProblemSeeded, makeChoices } from "./engine/generator.js";
 import { updateMastery, levelDifficulty, INITIAL_MASTERY } from "./engine/mastery.js";
 import * as bgm from "./audio/bgm.js";
@@ -40,6 +40,8 @@ import TimeAttack from "./screens/TimeAttack.jsx";
 import SlowMode from "./screens/SlowMode.jsx";
 import Notebook from "./screens/Notebook.jsx";
 import Relearn from "./screens/Relearn.jsx";
+import { yarikomiStats, rankFor } from "./engine/rank.js";
+import { RankBadge } from "./components/RankCard.jsx";
 import BattleSelect from "./screens/BattleSelect.jsx";
 import Battle from "./screens/Battle.jsx";
 import TurnBattle from "./screens/TurnBattle.jsx";
@@ -142,6 +144,8 @@ export default function App() {
   const [gearStoneGet, setGearStoneGet] = useState(null); // 剣石・鎧石の入手演出（応用クリア）
   const [relearnMastered, setRelearnMastered] = useState(null); // 学び直し完全クリア演出（翌日確認）{ unitName, count, reward }
   const [relearnPended, setRelearnPended] = useState(null); // 〈仮なおし〉演出（その場2連続正解）{ unitName, count }
+  const [rankUp, setRankUp] = useState(null); // 昇段演出（やりこみ段位が上がった）{ rank }
+  const [relearnCrystalGet, setRelearnCrystalGet] = useState(null); // 学び直し15問ごとのクリスタル獲得トースト { today }
   const [naoshizumi, setNaoshizumi] = useState(null); // #2 バトル中に誤答束の変種を正解した時の軽い演出 { unitName }
   const [recruitResult, setRecruitResult] = useState(null); // 仲間チャレンジの結果演出 { ok, name }
   const baitUsedRef = useRef(null); // 今のバトルで「魔物のエサ」を使った敵のid
@@ -178,6 +182,18 @@ export default function App() {
       return { ...p, mistakeTagStats: stats };
     });
   }
+
+  // ── やりこみ段位（正解数＋学んだ日数。engine/rank.js）：上がったら昇段演出を一度だけ出す ──
+  //  rankSeen が無い（この機能の前から遊んでいる子・新規）の初回は、いまの段位を記録するだけ＝演出なし。
+  const rankNow = rankFor(yarikomiStats(data.player, data.records).points);
+  useEffect(() => {
+    const seen = data.player.rankSeen;
+    if (!Number.isFinite(seen)) { updatePlayer((p) => ({ ...p, rankSeen: rankNow.idx })); return; }
+    if (rankNow.idx > seen) {
+      updatePlayer((p) => ({ ...p, rankSeen: rankNow.idx }));
+      setTimeout(() => setRankUp({ rank: rankNow }), 900); // 他の演出（レベルアップ等）と重ならないよう少し待つ
+    }
+  }, [rankNow.idx]); // eslint-disable-line
 
   // ログイン制でニックネーム未設定（新規登録直後など）なら、ログインIDを初期値として入れる。
   //  ＝「最初はIDが名前として認識」。あとは設定（キャラクター画面）でいつでも変更可能。
@@ -739,7 +755,7 @@ export default function App() {
     }
   }
 
-  function recordStepAttempt({ skill, unitId, level, templateId, seed, userAnswer, ok, q, ans, mNew, relearn = false, cycleSkip = false, mistakeTag = null }) {
+  function recordStepAttempt({ skill, unitId, level, templateId, seed, userAnswer, ok, q, ans, mNew, relearn = false, cycleSkip = false, mistakeTag = null, noCount = false }) {
     const sid = data.player.studentId;
     const stepMode = relearn ? "relearn" : cycleSkip ? "confirm" : "practice";
     shadowSubmit({ unitId, level, templateId, seed, userAnswer, mode: stepMode });
@@ -761,6 +777,8 @@ export default function App() {
     }
     // 小単元の習得確認も更新（1問ずつ）
     bumpUnitMastery(unitId, [!!ok]);
+    // やりこみ段位の元になる正解数。記録(records)を別に残す場面（演習バトル＝noCount）は二重に数えない。
+    if (ok && !noCount) updatePlayer((p) => ({ ...p, stepCorrect: (p.stepCorrect || 0) + 1 }));
     // 学び直しへの追加：不正解は全件記録（学び直し中(relearn)は新たな間違いを足さない＝直している最中なので）。
     if (!relearn && !ok) {
       const m = makeMistake({ studentId: sid, chapterId: skill ? "c1" : null, unitId, level, q, ans, skill, templateId, mistakeTag });
@@ -769,13 +787,24 @@ export default function App() {
       bumpMistakeTag(mistakeTag, unitId);
     }
     // 学び直しは「学習のコア」：XP1.5倍（1問15）＋コイン（questionCoin()で他モードと統一）。
-    //  ※クリスタルは「サイクルクリア（1単元）＝1個」だけに一本化（ドリップ廃止）。
+    //  クリスタルは学び直しの正解15問ごとに+1（1日10個まで・2026-10-06追加。engine/scoring.js）。
     if (relearn) {
-      updatePlayer((p) => ({
-        ...p,
-        relearnSolved: (p.relearnSolved || 0) + 1,
-        coins: (p.coins ?? 0) + (ok ? questionCoin(level) : 0), // 学び直しもコイン源に（王道サイクルの要）
-      }));
+      const today = todayStr();
+      // 獲得の有無は保存済みの値から純関数で判定（updater内で演出stateを触らないため、先に求める）
+      const rcNow = ok ? relearnCrystalOnCorrect(data.player.relearnCrystal, today) : null;
+      updatePlayer((p) => {
+        const rcNext = ok ? relearnCrystalOnCorrect(p.relearnCrystal, today) : null;
+        return {
+          ...p,
+          relearnSolved: (p.relearnSolved || 0) + 1,
+          coins: (p.coins ?? 0) + (ok ? questionCoin(level) : 0), // 学び直しもコイン源に（王道サイクルの要）
+          ...(rcNext ? { relearnCrystal: rcNext.rc, crystals: (p.crystals ?? 0) + rcNext.gained } : {}),
+        };
+      });
+      if (rcNow && rcNow.gained > 0) {
+        sfx.levelUp();
+        setRelearnCrystalGet({ today: rcNow.rc.today, key: Date.now() });
+      }
       addXp(ok ? Math.round(RELEARN_XP_PER_CORRECT * eventRelearnMult()) : 0); // 火曜=学び直しデーは2倍
     } else {
       // ステップアップ(背骨)／じっくり：正解で1問10XP＋コイン（questionCoin()で他モードと統一）
@@ -1485,7 +1514,7 @@ export default function App() {
   // 演習バトルの解答1問ごと：難易度ナビを更新し、出題が誤答束由来なら学び直しの段階も進める。
   function recordBattlePracticeAttempt(a) {
     battleDiffRef.current = nextDifficulty(battleDiffRef.current, !!a.ok);
-    recordStepAttempt(a);
+    recordStepAttempt({ ...a, noCount: true }); // バトル終了時に records へ正解数を残すので、ここでは数えない
     const src = battleMistakeSourceRef.current;
     if (src && src.q === a.q) {
       advanceRelearnPhase(src.unitId, a.ok);
@@ -1931,7 +1960,7 @@ export default function App() {
     );
   }
 
-  // 学び直しの練習（時間制限なし・1問15XP＝1.5倍・クリスタルは出ない・StepUpSimpleを流用）
+  // 学び直しの練習（時間制限なし・1問15XP＝1.5倍・正解15問ごとにクリスタル+1（1日10個まで）・StepUpSimpleを流用）
   if (screen === "relearnPractice" && practiceUnit) {
     const rlPhase = relearnPhase(practiceUnit.id);
     // 翌日確認（confirm）は「あと1問」なので短く、その場（fresh）は2連続正解を狙うので少し長め。
@@ -1943,6 +1972,7 @@ export default function App() {
         units={[practiceUnit]}
         title={`学び直し：${practiceUnit.name}`}
         roundSize={rlRound}
+        showRelearnCrystal
         onAttempt={handleRelearnAttempt}
         onHome={() => setScreen("relearn")}
       />
@@ -2328,12 +2358,14 @@ export default function App() {
           onDone={() => setLoginBonus(null)}
         />
       )}
+      {rankUp && <RankUpOverlay info={rankUp} onDone={() => setRankUp(null)} />}
       {skillGet && <SkillGetOverlay skill={skillGet} onDone={() => setSkillGet(null)} />}
       {crystalGet && <CrystalGetOverlay amount={crystalGet.amount} onDone={() => setCrystalGet(null)} />}
       {gearStoneGet && <GearStoneGetOverlay sword={gearStoneGet.sword} armor={gearStoneGet.armor} reason={gearStoneGet.reason} onDone={() => setGearStoneGet(null)} />}
       {relearnMastered && <RelearnMasteredOverlay info={relearnMastered} onDone={() => setRelearnMastered(null)} />}
       {relearnPended && <RelearnPendedOverlay info={relearnPended} onDone={() => setRelearnPended(null)} />}
       {naoshizumi && <NaoshizumiToast info={naoshizumi} onDone={() => setNaoshizumi(null)} />}
+      {relearnCrystalGet && <RelearnCrystalToast key={relearnCrystalGet.key} info={relearnCrystalGet} onDone={() => setRelearnCrystalGet(null)} />}
       {recruitResult && <RecruitResultOverlay result={recruitResult} onDone={() => setRecruitResult(null)} />}
       {calcKingClear && (
         <CalcKingClearOverlay
@@ -2479,6 +2511,52 @@ function RelearnPendedOverlay({ info, onDone }) {
           2回れんぞく正解！この単元の「なおす」はクリア。<br /><b style={{ color: "#fde047" }}>⏳ あした、もう1問といたらカンペキ</b>だよ。
         </div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginTop: 12 }}>タップで閉じる</div>
+      </div>
+    </div>
+  );
+}
+
+// 昇段演出：やりこみ段位（10級→…→初段→…→名人）が上がった瞬間。
+function RankUpOverlay({ info, onDone }) {
+  const r = info.rank;
+  return (
+    <div onClick={onDone} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div className="glass" style={{ maxWidth: 320, padding: "26px 24px", textAlign: "center", border: `2px solid ${r.color}`, background: "#171536", animation: "rankUpPop .5s cubic-bezier(.2,1.4,.4,1) both" }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: r.color, letterSpacing: 2 }}>🎊 昇段！ 🎊</div>
+        <div style={{ display: "flex", justifyContent: "center", margin: "14px 0 10px" }}><RankBadge rank={r} size={84} /></div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: r.color }}>{r.name} になった！</div>
+        <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.72)", margin: "8px 0 4px", lineHeight: 1.6 }}>
+          コツコツ解いた分が、ちゃんと段位になったよ。{r.next ? `次は「${r.next.name}」をめざそう！` : "ついに最高位だ！"}
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", marginTop: 12 }}>タップで閉じる</div>
+      </div>
+    </div>
+  );
+}
+
+// 学び直しの正解15問ごとに出るクリスタル獲得トースト。練習の流れ（0.75秒で自動で次の問題）を
+//  止めないよう、全画面ではなく上部の小さな通知にして自動で消える。
+function RelearnCrystalToast({ info, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const capped = info.today >= RELEARN_CRYSTAL_DAILY_CAP;
+  // 外枠を全幅にして中身を中央寄せ（left:50%+translateXだと幅が半分に制限され、スマホで文字が縦に折り返す）
+  return (
+    <div style={{ position: "fixed", top: 14, left: 0, right: 0, zIndex: 210, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "9px 18px", borderRadius: 18, maxWidth: "100%",
+        background: "rgba(23,21,54,.94)", border: "1px solid rgba(103,232,249,.7)", boxShadow: "0 0 18px rgba(103,232,249,.35)", animation: "fadeUp .3s both",
+      }}>
+        <span style={{ fontSize: 24 }}>💎</span>
+        <div style={{ lineHeight: 1.3 }}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: "#67e8f9" }}>クリスタル +1</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.75)" }}>
+            {capped ? "今日の上限に到達！" : `学び直し${RELEARN_CRYSTAL_EVERY}問クリア（今日 ${info.today}/${RELEARN_CRYSTAL_DAILY_CAP}）`}
+          </div>
+        </div>
       </div>
     </div>
   );
