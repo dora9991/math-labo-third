@@ -41,6 +41,7 @@ import SlowMode from "./screens/SlowMode.jsx";
 import Notebook from "./screens/Notebook.jsx";
 import Relearn from "./screens/Relearn.jsx";
 import { yarikomiStats, rankFor } from "./engine/rank.js";
+import { DIAL_KEYS, dialFor, scaleReward, heartsForDial, dialOfRecord, suggestDial } from "./engine/dial.js";
 import { RankBadge } from "./components/RankCard.jsx";
 import BattleSelect from "./screens/BattleSelect.jsx";
 import Battle from "./screens/Battle.jsx";
@@ -1284,6 +1285,11 @@ export default function App() {
   }
 
   // バトルの結果。true=勝利, false=敗北, "retry"=やり直し。stats={correct,wrong}（学習記録用）
+  // バトルの強さダイヤル（サクサク／ふつう／激ムズ）を変える。全バトル共通で保存（engine/dial.js）。
+  function setBattleDial(key) {
+    updatePlayer((p) => ({ ...p, battleDial: DIAL_KEYS.includes(key) ? key : "normal" }));
+  }
+
   function handleBattleResult(outcome, stats = {}) {
     if (outcome === "retry") { setBattleKey((k) => k + 1); return; }
     if (!battleMonster) return;
@@ -1297,14 +1303,16 @@ export default function App() {
     const alreadyCleared = (data.records || []).some(
       (r) => r.mode === "battle" && r.extra && r.extra.result === "win" && r.extra.monsterId === battleMonster.id && (r.extra.prestige || 0) === curPrestige
     );
-    // 撃破済み（同じ周回内）なら報酬は半分（切り上げ）
-    const gained = win ? (alreadyCleared ? Math.ceil(battleMonster.reward / 2) : battleMonster.reward) : 0;
+    // 撃破済み（同じ周回内）なら報酬は半分（切り上げ）。さらにダイヤル（サクサク×0.5／激ムズ×2）をかける。
+    const dial = dialFor(data.player.battleDial);
+    const baseGain = win ? (alreadyCleared ? Math.ceil(battleMonster.reward / 2) : battleMonster.reward) : 0;
+    const gained = scaleReward(baseGain, dial);
     store.addRecord(makeRecord({
       studentId: data.player.studentId, mode: "battle",
       chapterId: battleMonster.chapterId ?? null, unitId: battleMonster.unitId ?? null,
       correct, wrong, // ★学習記録（日々の解答数・正解数）にバトルも反映
       xp: 0, // 経験値の概念は廃止（レベル＝サイクルクリア数）。報酬はお金で渡す。
-      extra: { monsterId: battleMonster.id, result: win ? "win" : "lose", prestige: curPrestige },
+      extra: { monsterId: battleMonster.id, result: win ? "win" : "lose", prestige: curPrestige, dial: dial.key },
     }));
     setData((d) => ({ ...d, records: store.load().records }));
     // 経験値ではなくお金（コイン）を付与。addXp(0)は連続学習日数の更新だけ行う（XPは増えない）。
@@ -2131,10 +2139,20 @@ export default function App() {
           .filter((r) => r.mode === "battle" && r.extra && r.extra.result === "win")
           .map((r) => r.extra.monsterId)
       );
+      // 激ムズでたおした敵（🔥バッジ）と、連敗・連勝からのダイヤル変更の提案（どちらも記録から計算＝保存項目は増やさない）
+      const hardClearedIds = new Set(
+        (data.records || [])
+          .filter((r) => r.mode === "battle" && r.extra?.result === "win" && dialOfRecord(r) === "hard")
+          .map((r) => r.extra.monsterId)
+      );
       return (
         <BattleSelect
           player={data.player}
           clearedIds={clearedIds}
+          dial={data.player.battleDial}
+          onSetDial={setBattleDial}
+          dialSuggestion={suggestDial(data.player.battleDial, data.records)}
+          hardClearedIds={hardClearedIds}
           onSelect={(m) => { battleGeneralDiffRef.current = initDifficulty("standard"); battleMistakeSourceRef.current = null; setBattleMonster(m); setBattlePractice(null); setBattleKey((k) => k + 1); }}
           onSeen={markMonstersSeen}
           onClaimSkill={claimChapterSkillGacha}
@@ -2144,7 +2162,8 @@ export default function App() {
       );
     }
     // 正の数・負の数(c1)のモンスターは「行動選択型バトル(v2)」で試作。他は従来バトル。
-    const maxHearts = Math.min(13, 5 + new Set((data.records || []).filter((r) => r.mode === "battle" && r.extra?.result === "win" && /^boss_/.test(r.extra?.monsterId || "")).map((r) => r.extra.monsterId)).size);
+    //  ハート制（敵の1撃＝1ハート）のバトルは、ダイヤルを「ハートの数」に換算（サクサク＝増える／激ムズ＝減る）。
+    const maxHearts = heartsForDial(Math.min(13, 5 + new Set((data.records || []).filter((r) => r.mode === "battle" && r.extra?.result === "win" && /^boss_/.test(r.extra?.monsterId || "")).map((r) => r.extra.monsterId)).size), data.player.battleDial);
     const useTurnBattle = battleMonster && (battleMonster.grade ?? 1) === 1; // 中1は全章 行動選択型バトルへ
     // その章の最大BP上限（現在はBASE_BP_CAP=BP_MAXのため常に350。段階解放を再有効化する時のために残置）
     const battleChapterCap = (() => {
@@ -2159,6 +2178,7 @@ export default function App() {
           key={battleKey}
           player={data.player}
           monster={battleMonster}
+          dial={data.player.battleDial}
           maxHearts={maxHearts}
           chapterCap={battleChapterCap}
           onUseItem={useBattleItem}
@@ -2189,6 +2209,7 @@ export default function App() {
         key={battleKey}
         player={data.player}
         monster={battleMonster}
+        dial={data.player.battleDial}
         maxHearts={maxHearts}
         problemSource={battlePractice ? battleProblemSource(battlePractice) : generalBattleProblemSource(battleMonster)}
         onAttempt={battlePractice ? recordBattlePracticeAttempt : recordBattleGeneralAttempt}
@@ -2246,6 +2267,8 @@ export default function App() {
   const restActive = _cyclesToday >= REST_CYCLES_SOFT;
   return (
     <Home
+      dial={data.player.battleDial}
+      onSetDial={setBattleDial}
       cycle={homeCycle}
       restActive={restActive}
       player={data.player}

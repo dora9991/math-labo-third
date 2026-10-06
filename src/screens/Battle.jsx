@@ -23,6 +23,7 @@ import { isCorrect, playerLevel } from "../engine/scoring.js";
 import { findChapterByUnitId } from "../data/index.js";
 import { pickAttackMove } from "../data/attackMoves.js";
 import { MoveNameFx, SlashFx } from "../components/BattleFx.jsx";
+import { dialFor, scaleDealt } from "../engine/dial.js";
 
 const ENEMY_CHARGE_NEED = 2; // super型が超必殺を撃つまでのチャージ回数（engine ENEMY_AI.super と一致）
 const DODGE_CHANCE = 0.2; // 敵の通常こうげきは20%の確率でかわせる（ため攻撃・超必殺技は対象外＝必ず当たる）
@@ -52,10 +53,13 @@ function questionTime(q, baseTimer = 0) {
   return Math.min(99, Math.round(t));
 }
 
-export default function Battle({ player, monster, ally = null, onResult, onSpChange, onItemUse, onUseBait, onHpChange, onWinBonus, onExit, onMistake, problemSource = null, onAttempt = null, maxHearts = 5 }) {
+export default function Battle({ player, monster, ally = null, onResult, onSpChange, onItemUse, onUseBait, onHpChange, onWinBonus, onExit, onMistake, problemSource = null, onAttempt = null, maxHearts = 5, dial = "normal" }) {
   // problemSource: あれば出題をこの関数(lastId)→problemに差し替える＝「演習バトル」（仕様はStepUpと同一）
   // onAttempt: あれば1問ごとに {skill,unitId,level,ok,...} を通知＝習熟(Elo)＋サイクル進捗を更新
   const lv = playerLevel(player); // 現在ワールド（学年）のレベルでバトル能力が決まる
+  //  バトルの強さダイヤル（サクサク／ふつう／激ムズ。ふつうは倍率1で既存と同じ）。
+  //  与えるダメージはここでスケール。うける被害は、ハート制なので App 側で最大ハート数(maxHearts)に換算済み。
+  const dialDef = dialFor(dial);
   const specials = useRef(gearSpecials(player)).current; // 装備の特殊効果（lifesteal/regenPct/startSp/critPct）
   // 制限時間 = 基本の制限時間 × (自分のレベル+10) ÷ (敵の適正レベル+10)（切り上げ）
   //  +10で格差をマイルドに。自分が強いほど長く、格上の敵だと短くなる。最低1秒。
@@ -226,7 +230,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
     // 毒（ポイズン）：1問ごとに敵へ継続ダメージ
     const ps = poisonRef.current;
     if (ps && ps.turns > 0) {
-      const dmg = ps.dmg;
+      const dmg = scaleDealt(ps.dmg, dialDef);
       setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
       setMonsterHp((hp) => {
         const nv = Math.max(0, hp - dmg);
@@ -373,7 +377,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         if (skill.regenPct) setRegenBoth({ turns: skill.regenTurns ?? 5, pct: skill.regenPct });
         refreshBuffTags();
       }
-      const dmg = (skill.mult ?? 0) > 0 ? ultimateDamage(stats.atk, skill.mult) : 0;
+      const dmg = (skill.mult ?? 0) > 0 ? scaleDealt(ultimateDamage(stats.atk, skill.mult), dialDef) : 0;
       if (dmg <= 0) {
         // ダメージなし（ゼロカウント／オーバーロード等）はバフのみ
         setLog(`${skill.icon} ${skill.name}発動！ 力がみなぎる！`);
@@ -568,13 +572,14 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
     if (ct && ct.turns > 0 && dmg > 0) {
       counterRef.current = ct.turns - 1 > 0 ? { ...ct, turns: ct.turns - 1 } : null;
       refreshBuffTags();
+      const cdmg = scaleDealt(ct.dmg, dialDef);
       setTimeout(() => {
         if (endedRef.current) return;
-        setMonDmg(`-${ct.dmg}`); setDmgKey((k) => k + 1);
+        setMonDmg(`-${cdmg}`); setDmgKey((k) => k + 1);
         setMonState("damage"); setAnimKey((k) => k + 1);
-        setLog(`🪃 カウンター！ ${ct.dmg}ダメージ！`);
+        setLog(`🪃 カウンター！ ${cdmg}ダメージ！`);
         setMonsterHp((hp) => {
-          const nv = Math.max(0, hp - ct.dmg);
+          const nv = Math.max(0, hp - cdmg);
           if (nv <= 0 && !endedRef.current) setTimeout(triggerWin, 400);
           else setTimeout(() => setMonState("idle"), 500);
           return nv;
@@ -746,7 +751,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   function allyFollowUp() {
     if (endedRef.current) return;
     if (!allyBase || allyOutRef.current) { nextQuestion(); return; }
-    const dmg = allyBase.atk;
+    const dmg = scaleDealt(allyBase.atk, dialDef);
     setAllyAct(true); setTimeout(() => setAllyAct(false), 360);
     showEnemyFx({ icon: "🐾", label: `${allyDef.monster.name}の追撃！`, color: "#fbbf24" });
     setMonState("damage"); setAnimKey((k) => k + 1);
@@ -804,6 +809,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       // 呪い：与ダメージ低下
       const cu = curseRef.current;
       if (cu) { dmg = Math.max(1, Math.round(dmg * (cu.mult ?? 0.6))); cursed = true; }
+      dmg = scaleDealt(dmg, dialDef); // バトルの強さダイヤル（ふつうは変化なし）
       refreshBuffTags();
       setShowRing(true); setTimeout(() => setShowRing(false), 700);
       setHeroAtk(true); setTimeout(() => setHeroAtk(false), 560); // 自キャラ突進（CSSアニメの長さに合わせる）
@@ -946,6 +952,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         <div className="bt-panel">
           <span className="bt-enemy-name" style={{ color: monster.color }}>{monster.name}</span>
           <span className="bt-enemy-theme">【{monster.unit}】</span>
+          {dialDef.key !== "normal" && <span className="bt-enemy-theme" style={{ color: dialDef.color, fontWeight: 900 }}>{dialDef.icon}{dialDef.label}</span>}
           {enemyIntent && (
             <span className="bt-intent" style={{ "--ic": enemyIntent.color }}>{enemyIntent.text}</span>
           )}

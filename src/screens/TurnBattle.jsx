@@ -33,6 +33,7 @@ import { findUltimate, ultimateMult } from "../data/ultimates.js";
 import { findChapterByUnitId } from "../data/index.js";
 import { pickAttackMove } from "../data/attackMoves.js";
 import { MoveNameFx, SlashFx } from "../components/BattleFx.jsx";
+import { dialFor, scaleDealt, scaleTaken } from "../engine/dial.js";
 
 // 敵の通常攻撃・連続攻撃の各発は20%の確率でかわせる（ため攻撃・必殺技は対象外＝必ず当たる）
 const DODGE_CHANCE = 0.2;
@@ -66,9 +67,10 @@ function skillSummary(s) {
 export default function TurnBattle({
   player, monster, onResult, onSpChange, onHpChange, onMistake, onExit, onDex = null,
   problemSource = null, onAttempt = null, maxHearts = 5, onBPChange = null, chapterCap = BP_MAX,
-  onUseItem = null,
+  onUseItem = null, dial = "normal",
 }) {
   const lv = playerLevel(player);
+  const dialDef = dialFor(dial); // バトルの強さダイヤル（サクサク／ふつう／激ムズ。ふつうは倍率1で既存と同じ）
   // ── 単元別「戦闘力」＝BP制（中1全章：ザコ/れんしゅう/ボスの梯子） ──
   const isCompanion = isCompanionBattle(monster);
   const myBP = player.chapterBP?.[monster.chapterId] || BP_MIN;
@@ -78,7 +80,7 @@ export default function TurnBattle({
   const patternRef = useRef(patternForMonster(monster)); // ボスは変身/技プールで書き換わる
   const [patKey, setPatKey] = useState(0);               // パターン表示の再描画用
   const patInfo = TURN_ENEMY_PATTERNS[patternRef.current] || TURN_ENEMY_PATTERNS.attack;
-  const baseDmg = useRef(isCompanion ? bpDamage(myBP, enemyBP) : baseAttackDamage(monster)).current;
+  const baseDmg = useRef(scaleDealt(isCompanion ? bpDamage(myBP, enemyBP) : baseAttackDamage(monster), dialDef)).current;
   const bossPhaseRef = useRef(1);                          // 章ボスの段階(1→2)
   const dexMovesRef = useRef({});                          // この戦闘で見た敵の技（図鑑記録用）
 
@@ -490,7 +492,7 @@ export default function TurnBattle({
     if (endedRef.current) return;
     // 敵の毒（必殺技で付与）：敵ターンの頭にダメージを与える
     if (monsterPoisonRef.current) {
-      const pd = monsterPoisonRef.current.dmg;
+      const pd = scaleDealt(monsterPoisonRef.current.dmg, dialDef);
       const nvPoison = Math.max(0, monHpRef.current - pd);
       monHpRef.current = nvPoison; setMonsterHp(nvPoison);
       setLog(`☠️ どくで ${monster.name} に ${pd}ダメージ！`);
@@ -657,7 +659,7 @@ export default function TurnBattle({
     }
     // BP制（中1・単元別戦闘力）：ダメージ = 相手BP÷自分BP×100 を基準ダメージとし、
     //  ため技/連続攻撃は旧スケールの倍率(raw)をそのままかけて大技らしさを出す。
-    let dmg = isCompanion ? bpDamage(enemyBP, myBP) * (raw || 1) : raw;
+    let dmg = isCompanion ? scaleTaken(bpDamage(enemyBP, myBP) * (raw || 1), dialDef) : raw;
     let note = "";
     if (opts.kind === "burst" && burstGuardRef.current) { dmg = Math.round(dmg * (1 - burstGuardRef.current.reduce)); note += "（👁️みやぶり軽減）"; }
     if (opts.kind === "multi" && multiGuardRef.current) { dmg = Math.round(dmg * (1 - multiGuardRef.current.reduce)); note += "（🥋みきり軽減）"; }
@@ -678,7 +680,7 @@ export default function TurnBattle({
       if (endedRef.current) return;
       // 毒：ターン末に1ポイントぶんダメージ＋残ターン減
       if (poisonRef.current > 0) {
-        const poisonDmg = isCompanion ? bpDamage(enemyBP, myBP) : 1;
+        const poisonDmg = isCompanion ? scaleTaken(bpDamage(enemyBP, myBP), dialDef) : 1;
         const nv = Math.max(0, hpRef.current - poisonDmg);
         hpRef.current = nv; setPlayerHp(nv);
         poisonRef.current -= 1;
@@ -789,6 +791,7 @@ export default function TurnBattle({
           <span className="bt-enemy-name" style={{ color: monster.color }}>{monster.name}</span>
           <span className="bt-enemy-theme">【{monster.unit}】{patInfo.icon}{patInfo.name}</span>
           {isCompanion && <span className="bt-enemy-theme">🔷 BP{enemyBP}</span>}
+          {dialDef.key !== "normal" && <span className="bt-enemy-theme" style={{ color: dialDef.color, fontWeight: 900 }}>{dialDef.icon}{dialDef.label}</span>}
           {enemyIntent && <span className="bt-intent" style={{ "--ic": enemyIntent.color }}>{enemyIntent.text}</span>}
           <div className="bt-hp-row">
             <span className="bt-hp-label">HP</span>

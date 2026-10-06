@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { chaptersForGrade } from "../data/index.js";
 import ChapterTag from "./ChapterTag.jsx";
+import BattleDialPicker from "./BattleDialPicker.jsx";
 import { findHaichiLessonForUnit } from "../data/haichiCourse.js";
 import { CYCLE_PRACTICE_TARGET, CYCLE_RELEARN_TARGET } from "../engine/scoring.js";
 import { isChapterMastered } from "../engine/unlock.js";
@@ -27,7 +28,7 @@ function lectureCleared(unitId, haichiPassed, noVideoLecturePassed) {
 
 const CALC_KING_CLEAR_STREAK = 5; // 計算王＝5問連続正解でその章クリア（engine/battle.js と一致）
 
-export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPassed = {}, noVideoLecturePassed = {}, calcKing = {}, mistakeUnitIds = [], onHaichi, onTeacher, onPractice, onBattle, onRelearn, onChallenge, onDiagnose, onBossChallenge, onUnitBoss }) {
+export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPassed = {}, noVideoLecturePassed = {}, calcKing = {}, mistakeUnitIds = [], onHaichi, onTeacher, onPractice, onBattle, onRelearn, onChallenge, onDiagnose, onBossChallenge, onUnitBoss, dial = "normal", onSetDial = null }) {
   const chapters = chaptersForGrade(grade);
   const [ci, setCi] = useState(0);
   const [tame, setTame] = useState(null); // ためす選択中の unitId
@@ -140,11 +141,15 @@ export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPass
             ) : null}
 
             {tame === u.id ? (
-              <div style={{ display: "flex", gap: 6 }}>
-                {stepBtn(() => onPractice?.(ch, u), "✏️ れんしゅう", "linear-gradient(135deg,#22c55e,#10b981)", tameC, "じっくり計算して、確実にレベルアップしよう！")}
-                {stepBtn(() => onBattle?.(u), "⚔️ バトル", "linear-gradient(135deg,#ef4444,#b91c1c)", false, "制限時間内にモンスターを倒せるか！？")}
-                {stepBtn(() => setTame(null), "← もどる", "rgba(255,255,255,.12)")}
-              </div>
+              <>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {stepBtn(() => onPractice?.(ch, u), "✏️ れんしゅう", "linear-gradient(135deg,#22c55e,#10b981)", tameC, "じっくり計算して、確実にレベルアップしよう！")}
+                  {stepBtn(() => onBattle?.(u), "⚔️ バトル", "linear-gradient(135deg,#ef4444,#b91c1c)", false, "制限時間内にモンスターを倒せるか！？")}
+                  {stepBtn(() => setTame(null), "← もどる", "rgba(255,255,255,.12)")}
+                </div>
+                {/* バトルの強さ（サクサク／ふつう／激ムズ）。バトルを選ぶ前にここでも変えられる */}
+                {onSetDial && <div style={{ marginTop: 6 }}><BattleDialPicker dial={dial} onChange={onSetDial} compact /></div>}
+              </>
             ) : (
               <>
                 <div style={{ display: "flex", gap: 6 }}>

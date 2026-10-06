@@ -21,6 +21,7 @@ export default function Home({
   onBossChallenge, onStatusMeter, onUnitBoss, onLoadout, onItems, onUltimates, onStudyLog,
   onDetail, onCharacter, onFeedback,
   quizWeakUnits = [], onQuizWeakUnitClick,
+  dial = "normal", onSetDial = null,
 }) {
   const availGrades = gradesWithChapters();
   const [msg] = useState(() => voice("open"));
@@ -122,7 +123,7 @@ export default function Home({
           </span>
         </button>
         {cycleOpen && (
-          <UnitCycle player={player} grade={grade} cycleMap={player.cycle || {}} haichiPassed={player.haichiPassed || {}} noVideoLecturePassed={player.noVideoLecturePassed || {}} calcKing={player.calcKing || {}} mistakeUnitIds={mistakeUnitIds} onHaichi={onUnitHaichi} onTeacher={onUnitTeacher} onPractice={onUnitPractice} onBattle={onUnitBattle} onRelearn={onRelearn} onChallenge={onChallenge} onDiagnose={onDiagnose} onBossChallenge={onBossChallenge} onUnitBoss={onUnitBoss} />
+          <UnitCycle player={player} grade={grade} cycleMap={player.cycle || {}} haichiPassed={player.haichiPassed || {}} noVideoLecturePassed={player.noVideoLecturePassed || {}} calcKing={player.calcKing || {}} mistakeUnitIds={mistakeUnitIds} onHaichi={onUnitHaichi} onTeacher={onUnitTeacher} onPractice={onUnitPractice} onBattle={onUnitBattle} onRelearn={onRelearn} onChallenge={onChallenge} onDiagnose={onDiagnose} onBossChallenge={onBossChallenge} onUnitBoss={onUnitBoss} dial={dial} onSetDial={onSetDial} />
         )}
 
         {/* メニュー（学習サイクル以外）は2列表記でスッキリ並べる */}

@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import Header from "../components/Header.jsx";
 import ChapterTag from "../components/ChapterTag.jsx";
+import BattleDialPicker from "../components/BattleDialPicker.jsx";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import { MONSTERS } from "../data/monsters.js";
 import { allChapters } from "../data/index.js";
@@ -34,8 +35,9 @@ function Stars() {
   return <div className="battle-stars">{stars}</div>;
 }
 
-export default function BattleSelect({ player, clearedIds, onSelect, onBack, onSeen, onClaimSkill = null, onOpenLoadout = null }) {
+export default function BattleSelect({ player, clearedIds, onSelect, onBack, onSeen, onClaimSkill = null, onOpenLoadout = null, dial = "normal", onSetDial = null, dialSuggestion = null, hardClearedIds = null }) {
   const cleared = clearedIds || new Set();
+  const hardCleared = hardClearedIds || new Set(); // 激ムズでたおした敵（🔥バッジ用）
   const lv = playerLevel(player);            // 現在ワールド（学年）のレベル
   const bonuses = battleBonuses(player);     // 装備＋計算王の上昇率
   const stats = getPlayerBattleStats(lv, bonuses);
@@ -123,6 +125,7 @@ export default function BattleSelect({ player, clearedIds, onSelect, onBack, onS
             {m.name}
             {veryTough && <span style={{ fontSize: 10, color: "#ff6b6b", marginLeft: 6 }}>☠ かなり手強い</span>}
             {tough && !veryTough && <span style={{ fontSize: 10, color: "#fbbf24", marginLeft: 6 }}>⚠ 手強い</span>}
+            {hardCleared.has(m.id) && <span title="激ムズでたおした！" style={{ fontSize: 10, fontWeight: 900, color: "#fca5a5", marginLeft: 6, border: "1px solid rgba(248,113,113,.6)", borderRadius: 8, padding: "0 6px" }}>🔥激ムズ撃破</span>}
           </div>
           <div style={{ fontSize: 11, color: "#88aa88" }}>テーマ：{m.unit} ・ 推奨Lv.{m.minLv}</div>
           <div className="bt-select-stats">
@@ -171,6 +174,9 @@ export default function BattleSelect({ player, clearedIds, onSelect, onBack, onS
             ワールド（学年）ごとに Lv1 から冒険！タイムアタックで難易度を1つ★1にすると単元の敵が出現。全単元を3難易度すべて★1（計算マスター）で章ボスへ！学年は「ホーム」で切り替えできるよ。
           </div>
         </div>
+
+        {/* バトルの強さ（サクサク／ふつう／激ムズ）。連敗・連勝のときは変更の提案も出す */}
+        {onSetDial && <BattleDialPicker dial={dial} onChange={onSetDial} suggestion={dialSuggestion} />}
 
         {/* 新しく解放された敵のお知らせ */}
         {newly.size > 0 && (
