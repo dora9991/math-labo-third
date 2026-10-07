@@ -1,0 +1,153 @@
+/* ============================================================
+   hypeFx.css — 新バトルの「派手さ」(HypeFx.jsx)と激ムズモードの見た目（2026-10-07）
+   色は既存のデザイン言語（黒曜石・淡い金・淡いシアン・明朝）に合わせ、激ムズだけ熾火（おきび）の赤。
+   すべて pointer-events:none の重ね層なので、答えるボタンの邪魔をしない。
+   演出の長さは JS 側(animationDuration)で速さ設定に合わせて決まる。
+   ============================================================ */
+
+.mw-hype {
+  position: absolute; inset: 0; z-index: 9; pointer-events: none; overflow: hidden;
+  font-family: 'Noto Serif JP', serif;
+}
+
+/* ---- フラッシュ ---- */
+.mw-hype-flash { position: absolute; inset: 0; opacity: 0; animation: mwHypeFlash 300ms ease-out forwards; }
+.mw-hype-flash.is-soft { background: radial-gradient(circle at 50% 38%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%); }
+.mw-hype-flash.is-gold { background: radial-gradient(circle at 50% 38%, rgba(255,240,180,.95), rgba(255,200,90,.35) 45%, rgba(255,200,90,0) 78%); }
+.mw-hype-flash.is-red  { background: radial-gradient(circle at 50% 45%, rgba(255,90,50,.85), rgba(160,20,10,.35) 55%, rgba(160,20,10,0) 85%); }
+/* 光りすぎないよう、ピークの明るさを種類ごとに抑える（短時間に何度も強く光らせない） */
+.mw-hype-flash.is-soft { --flash-peak: .5; }
+.mw-hype-flash.is-gold { --flash-peak: .5; }
+.mw-hype-flash.is-red  { --flash-peak: .7; }
+@keyframes mwHypeFlash { 0% { opacity: 0; } 14% { opacity: var(--flash-peak, .6); } 100% { opacity: 0; } }
+
+/* ---- 斜めの斬撃線（奥義） ---- */
+.mw-hype-slash { position: absolute; inset: 0; opacity: 0; animation: mwHypeSlashWrap 520ms linear forwards; }
+.mw-hype-slash i {
+  position: absolute; left: -10%; top: 50%; width: 120%; height: 3px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), #fff 40%, #ffe3a2 60%, rgba(255,255,255,0));
+  box-shadow: 0 0 12px 2px rgba(255,227,162,.9);
+  transform-origin: center; transform: rotate(-24deg) scaleX(0);
+  animation: mwHypeSlash 360ms cubic-bezier(.2,.9,.3,1) forwards;
+}
+.mw-hype-slash i + i { top: 56%; transform: rotate(-24deg) scaleX(0); animation-delay: 90ms; opacity: .8; background: linear-gradient(90deg, rgba(155,231,239,0), #cffaff 45%, #9be7ef 60%, rgba(155,231,239,0)); box-shadow: 0 0 12px 2px rgba(155,231,239,.9); }
+@keyframes mwHypeSlashWrap { 0% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mwHypeSlash { 0% { transform: rotate(-24deg) scaleX(0); } 55% { transform: rotate(-24deg) scaleX(1); } 100% { transform: rotate(-24deg) scaleX(1.05); } }
+
+/* ---- 技名 ----
+   ふつうの技は舞台の下端（パーティのHPバーの下）にさっと出す＝敵のダメージ数字や体力バーを隠さない。
+   奥義だけは舞台の中ほどに大きく出す。 */
+.mw-hype-move {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; white-space: nowrap; max-width: 96%;
+  padding: 4px 16px 4px 14px;
+  color: #eaffff; font-weight: 900; font-size: clamp(13px, 3.9vw, 18px); letter-spacing: .06em; line-height: 1.15;
+  background: linear-gradient(90deg, rgba(4,12,26,0), rgba(4,12,26,.86) 14%, rgba(4,12,26,.86) 86%, rgba(4,12,26,0));
+  border-top: 1px solid rgba(155,231,239,.55); border-bottom: 1px solid rgba(155,231,239,.55);
+  text-shadow: 0 2px 0 #08203a, 0 0 12px rgba(155,231,239,.9);
+  opacity: 0; animation: mwHypeMove 760ms cubic-bezier(.2,.9,.3,1) forwards;
+}
+.mw-hype-name { overflow: hidden; text-overflow: ellipsis; }
+.mw-hype-move.is-finisher {
+  bottom: auto; top: 46%; transform: translate(-50%, -50%);
+  padding: 6px 18px 6px 14px; font-size: clamp(17px, 5.4vw, 27px);
+  color: #fff6d6;
+  background: linear-gradient(90deg, rgba(20,12,4,0), rgba(24,14,4,.9) 12%, rgba(24,14,4,.9) 88%, rgba(24,14,4,0));
+  border-color: rgba(255,214,120,.9);
+  text-shadow: 0 2px 0 #5d3515, 0 0 14px #ffbb55, 0 0 26px rgba(255,170,60,.8);
+  animation-name: mwHypeFinisher;
+}
+.mw-hype-tag {
+  flex: 0 0 auto; padding: 1px 7px; font-size: .62em; letter-spacing: .18em;
+  color: #2a1604; background: linear-gradient(135deg, #ffe9a8, #ffb347); text-shadow: none;
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+@keyframes mwHypeMove {
+  0%   { opacity: 0; transform: translateX(-72%) skewX(-14deg); }
+  18%  { opacity: 1; transform: translateX(-50%) skewX(0); }
+  78%  { opacity: 1; transform: translateX(-48%); }
+  100% { opacity: 0; transform: translateX(-40%); }
+}
+@keyframes mwHypeFinisher {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(2.1); }
+  16%  { opacity: 1; transform: translate(-50%, -50%) scale(.94); }
+  26%  { transform: translate(-50%, -50%) scale(1.04); }
+  34%  { transform: translate(-50%, -50%) scale(1); }
+  82%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -54%) scale(1.06); }
+}
+
+/* ---- 撃破 ---- */
+.mw-hype-kill {
+  position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%);
+  font-weight: 900; font-size: clamp(22px, 7vw, 36px); letter-spacing: .14em; white-space: nowrap;
+  color: #fff7d1; text-shadow: 0 3px 0 #5d3515, 0 0 18px #ffbb55, 0 0 34px rgba(255,170,60,.85);
+  opacity: 0; animation: mwHypeKill 900ms cubic-bezier(.2,1.4,.4,1) forwards;
+}
+.mw-hype-kill.is-boss { font-size: clamp(26px, 9vw, 46px); color: #fff; text-shadow: 0 3px 0 #45206e, 0 0 16px #6effff, 0 0 32px #ffd166; animation-name: mwHypeKillBoss; }
+@keyframes mwHypeKill {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  22% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+  38% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -66%) scale(1); }
+}
+@keyframes mwHypeKillBoss {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); letter-spacing: .5em; }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(.96); letter-spacing: .16em; }
+  32% { transform: translate(-50%, -50%) scale(1.05); }
+  42% { transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1.04); }
+}
+
+/* ---- 激ムズ突入 ---- */
+.mw-hype-hard { position: absolute; inset: 0; opacity: 0; animation: mwHypeHardWrap 1700ms linear forwards; }
+.mw-hype-hard-vignette { position: absolute; inset: 0; box-shadow: inset 0 0 46px 10px rgba(255,60,30,.75); animation: mwHypeVignette 1700ms ease-out forwards; }
+.mw-hype-hard-banner {
+  position: absolute; left: 0; right: 0; top: 44%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px;
+  background: linear-gradient(90deg, rgba(40,6,2,0), rgba(40,6,2,.9) 12%, rgba(40,6,2,.9) 88%, rgba(40,6,2,0));
+  border-top: 2px solid #ff5a3a; border-bottom: 2px solid #ff5a3a; box-shadow: 0 0 22px rgba(255,80,50,.55);
+  animation: mwHypeHardBanner 1700ms cubic-bezier(.2,.9,.3,1) forwards;
+}
+.mw-hype-hard-title { font-weight: 900; font-size: clamp(22px, 7vw, 34px); letter-spacing: .12em; color: #fff0e0; text-shadow: 0 3px 0 #6a1408, 0 0 16px #ff6a3a, 0 0 30px rgba(255,90,40,.9); }
+.mw-hype-hard-sub { font-weight: 700; font-size: clamp(11px, 3vw, 14px); letter-spacing: .08em; color: #ffd9c4; }
+@keyframes mwHypeHardWrap { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mwHypeVignette { 0% { opacity: 0; } 12% { opacity: 1; } 55% { opacity: .55; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mwHypeHardBanner {
+  0% { opacity: 0; transform: translateY(-50%) scaleY(0) scaleX(1.5); }
+  14% { opacity: 1; transform: translateY(-50%) scaleY(1.12) scaleX(1); }
+  22% { transform: translateY(-50%) scaleY(1); }
+  82% { opacity: 1; transform: translateY(-50%); }
+  100% { opacity: 0; transform: translateY(-50%) scaleY(.8); }
+}
+
+/* ---- 激ムズ中の舞台（縁に熾火の光を常時うっすら） ---- */
+/* 舞台自身の animation（着弾のズームパルス）とぶつからないよう、光は ::after に持たせる */
+.mw-battle-stage.is-hard { border-color: rgba(255,106,58,.7) !important; }
+.mw-battle-stage.is-hard::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  box-shadow: inset 0 0 26px rgba(255,70,40,.32); animation: mwHardGlow 2.6s ease-in-out infinite;
+}
+@keyframes mwHardGlow { 0%, 100% { box-shadow: inset 0 0 22px rgba(255,70,40,.26); } 50% { box-shadow: inset 0 0 34px rgba(255,70,40,.46); } }
+
+/* ---- 舞台の左上のボタン／バッジ ---- */
+.mw-hard-chip {
+  position: absolute; top: 8px; left: 8px; z-index: 10;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 12px 3px 9px;
+  font: 900 12px/1 'Noto Serif JP', serif; letter-spacing: .06em; white-space: nowrap;
+  color: #e9eff0; background: rgba(4,12,26,.88); border: 1px solid rgba(223,189,115,.6); border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  cursor: pointer;
+}
+.mw-hard-chip:focus-visible { outline: 2px solid #9be7ef; outline-offset: 1px; }
+.mw-hard-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(233,239,240,.35); }
+.mw-hard-chip.is-on { color: #fff0e0; background: linear-gradient(135deg, rgba(120,24,8,.95), rgba(60,8,4,.95)); border-color: #ff6a3a; box-shadow: 0 0 12px rgba(255,90,50,.55); }
+.mw-hard-chip.is-on .mw-hard-chip-dot { background: #ff6a3a; box-shadow: 0 0 8px #ff6a3a; }
+.mw-hard-chip.is-locked { cursor: default; pointer-events: none; padding-left: 12px; animation: mwHardChipPulse 2.2s ease-in-out infinite; }
+@keyframes mwHardChipPulse { 0%, 100% { box-shadow: 0 0 8px rgba(255,90,50,.4); } 50% { box-shadow: 0 0 16px rgba(255,90,50,.85); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mw-battle-stage.is-hard::after, .mw-hard-chip.is-locked { animation: none; }
+}

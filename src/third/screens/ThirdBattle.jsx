@@ -41,6 +41,9 @@ import { mobSpecialty, mobAttack, isBossKind, nextBossMove, peekBossMove } from 
 import { newEnemyFx, newPartyFx, applySkip, applyPoison, applyCurse, applyPanic, tickEnemyTurn, enemyFxTags, absorbDamage, partyFxChips } from "../enemyFx.js";
 import { NEW_SKILL_KEYS } from "../skillDefs.js";
 import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
+import HypeFx, { HardModeChip } from "../fx/HypeFx.jsx"; // 技名・フラッシュ・撃破・激ムズ突入の演出（見た目だけ）
+import { pickAttackMove } from "../fx/attackMoves.js";
+import { loadHardMode, saveHardMode, scaleDealt, scaleCap, scaleTaken } from "../hardMode.js"; // 激ムズモード（与ダメ×½・被ダメ×1.25。ごほうびは変えない）
 import { playCorrectSound, playIncorrectSound, playEnemyAttackStartSound, playSkillActivateSound } from "../fx/sound.js";
 import UltimateCutIn from "../../components/UltimateCutIn.jsx";
 import FxSpeedToggle from "../../components/FxSpeedToggle.jsx";
@@ -282,6 +285,27 @@ export default function Battle({ nav, params }) {
     partyStatusRef.current = partyStatus;
   }, [partyStatus]);
   const fxRef = useRef(null);
+  const hypeRef = useRef(null); // 派手さの層（HypeFx）。見た目だけで、ダメージや進行には渡さない
+  // 激ムズモード：バトルが始まる前（最初の解答・スキル・敵の行動まで）だけ切り替えられる。
+  //  お試し戦（ごほうび無し）と裏ボス（もともと推奨Lvで勝率45%の設計。激ムズだと推奨Lvでは勝てなくなる）では使えない。
+  const hardAllowed = !params.demo && kind !== "secretBoss";
+  const [hardMode, setHardMode] = useState(() => hardAllowed && loadHardMode());
+  const hardRef = useRef(hardMode); // 戦闘ロジック（setTimeout越し）からは必ずこちらを読む
+  const [hardLocked, setHardLocked] = useState(false);
+  const hardLockedRef = useRef(false);
+  const lastMoveRef = useRef(null); // 直前に出した技名（同じ技が続かないように）
+  function lockHardMode() {
+    if (hardLockedRef.current) return;
+    hardLockedRef.current = true;
+    setHardLocked(true);
+  }
+  function toggleHardMode(on) {
+    if (hardLockedRef.current) return;
+    hardRef.current = !!on;
+    setHardMode(!!on);
+    saveHardMode(!!on);
+    if (on) hypeRef.current?.hardIntro();
+  }
   const [shakingIds, setShakingIds] = useState(() => new Set());
   const [partyShake, setPartyShake] = useState(false);
   // V3演出専用。HP・報酬・出題・敵行動には渡さない連続正解カウント。
@@ -532,6 +556,7 @@ export default function Battle({ nav, params }) {
   function doEnemyCycle({ nextQuestionDiff } = {}) {
     const pool = enemiesRef.current.filter((en) => en.hp > 0);
     if (!pool.length) return;
+    lockHardMode(); // 敵が動き出したら、もう激ムズの切り替えはできない
     setPhase("enemyAttack");
     const guardMult = partyBuffsRef.current.guard?.multiplier ?? 1;
     const variantOrder = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
@@ -566,7 +591,7 @@ export default function Battle({ nav, params }) {
         const ma = mobAttack(attacker);
         if (ma.statusAttack) { statusCount = 1; statusKeyFixed = ma.statusKey; statusBonus = ma.bonus; notice = `${attacker.name}の状態異常攻撃！`; }
       }
-      let dmg = isCharge ? 0 : Math.round(resolveEnemyAction(attacker) * mul * tk.atkMul * guardMult);
+      let dmg = isCharge ? 0 : scaleTaken(Math.round(resolveEnemyAction(attacker) * mul * tk.atkMul * guardMult), hardRef.current); // 激ムズ：敵のこうげき ×1.25
       let acted = !isCharge;
       if (tk.skip) { dmg = 0; acted = false; notice = `${attacker.name}は、${ticks[attacker.instanceId].skipKind === "stun" ? "しびれて" : "ねむって"}動けない！`; }
       else if (tk.miss && dmg > 0) { dmg = 0; acted = false; notice = `${attacker.name}の攻撃は空振りした！`; }
@@ -680,6 +705,7 @@ export default function Battle({ nav, params }) {
     if (!canActThisRound(effects, () => 1) || !canUseSkillThisRound(effects)) return; // 麻痺は攻撃だけに影響（スキルは使える）
     if ((gauge[characterId] || 0) < skillGaugeMaxFor(c)) return;
 
+    lockHardMode();
     setGauge((g) => ({ ...g, [characterId]: 0 }));
     setPoppedOut((p) => ({ ...p, [characterId]: true }));
     setTimeout(() => setPoppedOut((p) => ({ ...p, [characterId]: false })), fxDelay(POPUP_LEAD_MS + 260));
@@ -713,7 +739,8 @@ export default function Battle({ nav, params }) {
         });
         // スキルも1回で1体から削れる量に上限（敵最大HPの割合）＝1パン防止
         const enT = live.find((e) => e.instanceId === tid);
-        rawAttack.damage = Math.min(rawAttack.damage, Math.max(1, Math.round((enT?.maxHp ?? Infinity) * SKILL_CAP_FRAC)));
+        //  激ムズ：スキルの与ダメージと、その上限(＝1回で削れる量)にも同じ倍率（×½）をかける。
+        rawAttack.damage = Math.min(scaleDealt(rawAttack.damage, hardRef.current), scaleCap(Math.max(1, Math.round((enT?.maxHp ?? Infinity) * SKILL_CAP_FRAC)), hardRef.current));
         damageByTarget[tid] = (damageByTarget[tid] || 0) + rawAttack.damage;
         if (rawAttack.isCrit) anyCrit = true;
       });
@@ -731,6 +758,8 @@ export default function Battle({ nav, params }) {
         if (fxSpeed !== "off") triggerImpactPulse();
         triggerEnemyShakeFor(hitIds, anyCrit ? 450 : 220);
         defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave }));
+        if (defeatedPoints.length) hypeRef.current?.kill({ boss: isBossWave && updatedEnemies.every((en) => en.hp <= 0) });
+        else hypeRef.current?.shake("small");
       }, fxDelay(PROJECTILE_MS.normal));
       if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
       if (updatedEnemies.every((en) => en.hp <= 0)) onWaveCleared();
@@ -788,7 +817,7 @@ export default function Battle({ nav, params }) {
       const capFrac = cat === "pierceHit" ? skill.capFrac : SKILL_CAP_FRAC;
       let total = 0, anyCrit = false;
       for (let i = 0; i < hits; i++) { const r = resolvePlayerAttack(c, level, charSubject, true, { skillMultiplier: skill.multiplier, atkBuffMultiplier }); total += r.damage; if (r.isCrit) anyCrit = true; }
-      total = Math.min(total, Math.max(1, Math.round(target.maxHp * capFrac)));
+      total = Math.min(scaleDealt(total, hardRef.current), scaleCap(Math.max(1, Math.round(target.maxHp * capFrac)), hardRef.current)); // 激ムズ：与ダメ・上限とも×½
       let label = null;
       if (cat === "stunHit") { applySkip(ef, target, skill.turns, "stun"); label = "しびれた！"; }
       if (cat === "curseHit") { applyCurse(ef, target, skill.atkMul, skill.cycles); label = "攻撃力ダウン！"; }
@@ -799,7 +828,7 @@ export default function Battle({ nav, params }) {
       sayAt(target, label, total, anyCrit);
       const { next: updated, hitIds, gainedExp, gainedCoins, defeatedPoints } = applyDamageToEnemies({ [target.instanceId]: total });
       commitEnemies(updated); bumpFx();
-      setTimeout(() => { if (fxSpeed !== "off") triggerImpactPulse(); triggerEnemyShakeFor(hitIds, anyCrit ? 450 : 220); defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave })); }, fxDelay(PROJECTILE_MS.normal));
+      setTimeout(() => { if (fxSpeed !== "off") triggerImpactPulse(); triggerEnemyShakeFor(hitIds, anyCrit ? 450 : 220); defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave })); if (defeatedPoints.length) hypeRef.current?.kill({ boss: isBossWave && updated.every((en) => en.hp <= 0) }); else hypeRef.current?.shake("small"); }, fxDelay(PROJECTILE_MS.normal));
       if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
       if (updated.every((en) => en.hp <= 0)) onWaveCleared(); else setPhase("question");
       return;
@@ -851,6 +880,7 @@ export default function Battle({ nav, params }) {
     //  クリアしても「正解がたりない」でごほうび無しになっていた。→ 画面でも数えず、記録もせず、読み直してもらう。
     //  （記録すると同じ問題の2回目の解答がサーバーで「使い回し」として無視されるので、記録しない）
     if (Date.now() - shownAtRef.current < VERIFY.minMsPerAnswer) { setTooFast((n) => n + 1); return; }
+    lockHardMode(); // 最初の解答を送った時点で、激ムズの切り替えは固定
     const correct = index === problem.correctIndex;
     const diff = problem.level || difficulty; // この問題を出した時の難度（切替は次の問題から）
     attemptsRef.current.push({
@@ -908,7 +938,7 @@ export default function Battle({ nav, params }) {
       }
 
       const rawAttack = resolvePlayerAttack(c, level, charSubject, true, { atkBuffMultiplier });
-      const damage = Math.max(1, Math.round(rawAttack.damage * DIFFICULTY_DAMAGE_MULTIPLIER[diff] * partyFxRef.current.nextMul)); // スキル「ためて大技」の次の一撃
+      const damage = scaleDealt(rawAttack.damage * DIFFICULTY_DAMAGE_MULTIPLIER[diff] * partyFxRef.current.nextMul, hardRef.current); // スキル「ためて大技」の次の一撃。激ムズは×½（ふつうは従来と同じ値）
       const targetId = resolveTarget(c.id, i);
       hitEntries.push({ character: c, attack: { ...rawAttack, damage }, subject: charSubject, targetId, charIndex: i, from, to: targetId ? pointOf(enemyRefs.current[targetId], stageEl) : null });
     });
@@ -925,7 +955,7 @@ export default function Battle({ nav, params }) {
         if (h.targetId === "PARTY_SELF") return;
         const en = live.find((e) => e.instanceId === h.targetId);
         if (!en) return;
-        const cap = capDamageFor(en.maxHp, diff);
+        const cap = scaleCap(capDamageFor(en.maxHp, diff), hardRef.current); // 激ムズ：上限も×½＝必要な正解数が約2倍
         const sum = sumBy[h.targetId];
         if (sum > cap) h.attack = { ...h.attack, damage: Math.max(1, Math.round((h.attack.damage * cap) / sum)) };
       });
@@ -956,10 +986,17 @@ export default function Battle({ nav, params }) {
     }
     const { next: updatedEnemies, hitIds, gainedExp, gainedCoins, defeatedPoints } = applyDamageToEnemies(damageByTarget);
     commitEnemies(updatedEnemies);
+    // 派手さ（見た目だけ）：章ごとの技名。連続正解が5の倍数・とどめの一撃は「奥義」。着弾に合わせてフラッシュ／シェイク／撃破の演出。
+    const anyCritHit = hitEntries.some((h) => h.attack.isCrit);
+    const hitEnemy = hitEntries.some((h) => h.targetId !== "PARTY_SELF");
+    const move = hitEnemy ? pickAttackMove({ chapterId, streak: nextCombo, kill: defeatedPoints.length > 0, last: lastMoveRef.current }) : null;
+    if (move) { lastMoveRef.current = move.name; hypeRef.current?.move(move); }
     setTimeout(() => {
       if (fxSpeed !== "off") triggerImpactPulse();
-      triggerEnemyShakeFor(hitIds, hitEntries.some((h) => h.attack.isCrit) ? 450 : 220);
+      triggerEnemyShakeFor(hitIds, anyCritHit ? 450 : 220);
       defeatedPoints.forEach((to) => fxRef.current?.playDefeat({ to, boss: isBossWave }));
+      if (defeatedPoints.length) hypeRef.current?.kill({ boss: isBossWave && updatedEnemies.every((en) => en.hp <= 0) });
+      else if (move?.finisher) { hypeRef.current?.shake("big"); } // 奥義だけ大きくゆらす（会心は既存のCRITICAL!表示があるので、重ねて光らせない）
     }, fxDelay(PROJECTILE_MS.normal + 40));
     if (gainedExp || gainedCoins) addTotals(gainedExp, gainedCoins);
 
@@ -991,7 +1028,10 @@ export default function Battle({ nav, params }) {
   // このuseEffectより先に走るので、マウント直後でもfxRef.currentは使える。
   useEffect(() => {
     fxRef.current?.playStartBanner();
-    const t = setTimeout(() => startQuestion(difficultyRef.current), 1100); // START!のあと最初の問題
+    const t = setTimeout(() => {
+      startQuestion(difficultyRef.current); // START!のあと最初の問題
+      if (hardRef.current) hypeRef.current?.hardIntro(); // 前回から激ムズONのままなら、ここで突入演出
+    }, 1100);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1067,8 +1107,10 @@ export default function Battle({ nav, params }) {
       {/* 敵とパーティを1つの舞台にまとめる：たまが「選んだキャラの位置」から
           飛べるように、敵の攻撃がパーティの上に出せるように、両方が同じ
           座標系の上にいる必要があるため。FXのCanvasはこの舞台全体に1枚だけ重ねる。 */}
-      <div className={`mw-panel mw-battle-stage mw-impact-pulse-${impactPulse % 2}`} ref={stageRef}>
+      <div className={`mw-panel mw-battle-stage mw-impact-pulse-${impactPulse % 2}${hardMode ? " is-hard" : ""}`} ref={stageRef}>
         <BattleFX ref={fxRef} speed={fxSpeed} />
+        <HypeFx ref={hypeRef} speed={fxSpeed} targetRef={stageRef} />
+        {hardAllowed && <HardModeChip on={hardMode} locked={hardLocked} onToggle={toggleHardMode} />}
 
         {combo >= 3 && <div className={`mw-combo mw-combo-${combo >= 10 ? "max" : combo >= 5 ? "high" : "mid"}`}>COMBO ×{combo}</div>}
 
