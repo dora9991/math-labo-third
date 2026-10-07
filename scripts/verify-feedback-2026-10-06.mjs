@@ -103,7 +103,7 @@ import {
   assert.equal(chapterTag("__none__"), null);
 }
 
-// ── ⑤ 難易度ダイヤル：倍率・ハート換算・提案 ─────────────────────────
+// ── ⑤ 難易度ダイヤル（ふつう／激ムズ）：倍率・ハート換算・提案 ──────────────
 {
   // ふつうは何も変えない（既存のバトルと同じ）
   const N = DIALS.normal;
@@ -111,45 +111,46 @@ import {
     assert.equal(scaleDealt(v, N), v); assert.equal(scaleTaken(v, N), v); assert.equal(scaleReward(v, N), v);
   }
   assert.equal(heartsForDial(5, N), 5); assert.equal(heartsForDial(13, "normal"), 13);
-  // 不正・未設定は「ふつう」
-  assert.equal(dialFor(undefined).key, "normal"); assert.equal(dialFor("zzz").key, "normal");
-  assert.equal(scaleDealt(100, "zzz"), 100);
-  // 方向：サクサクは与ダメ増・被害減・ごほうび半分／激ムズは逆（ごほうび2倍）
-  assert.equal(scaleDealt(100, "easy"), 150); assert.equal(scaleDealt(100, "hard"), 50);
-  assert.equal(scaleTaken(100, "easy"), 75);  assert.equal(scaleTaken(100, "hard"), 125);
-  assert.equal(scaleReward(40, "easy"), 20);  assert.equal(scaleReward(40, "hard"), 80);
-  // 最低1・0は0のまま
-  assert.equal(scaleDealt(1, "hard"), 1); assert.equal(scaleTaken(1, "easy"), 1); assert.equal(scaleTaken(0, "hard"), 0);
-  assert.equal(scaleReward(1, "easy"), 1); assert.equal(scaleReward(0, "hard"), 0);
-  // 必要な正解数（＝敵HP÷1発）が、サクサクで約2/3・激ムズで約2倍になる
-  const hits = (dial) => Math.ceil(1000 / scaleDealt(100, dial));
-  assert.deepEqual([hits("easy"), hits("normal"), hits("hard")], [7, 10, 20]);
-  // ハート制：サクサクは増え、激ムズは減る（範囲は3〜16）
-  assert.ok(heartsForDial(5, "easy") > 5 && heartsForDial(5, "hard") < 5);
-  assert.equal(heartsForDial(5, "hard"), 4);
-  for (const k of ["easy", "hard"]) for (const h of [1, 5, 9, 13, 99]) {
-    const v = heartsForDial(h, k); assert.ok(v >= 3 && v <= 16, `${k}/${h} → ${v}`);
+  // 選べるのは「ふつう」「激ムズ」だけ。サクサク（easy）は無し＝未知のキーはふつうに倒れる
+  assert.deepEqual(DIAL_KEYS, ["normal", "hard"]);
+  assert.deepEqual(Object.keys(DIALS), ["normal", "hard"]);
+  for (const bad of [undefined, null, "easy", "zzz", 5]) {
+    assert.equal(dialFor(bad).key, "normal");
+    assert.equal(scaleDealt(100, bad), 100); assert.equal(heartsForDial(5, bad), 5);
   }
-  assert.deepEqual(DIAL_KEYS, ["easy", "normal", "hard"]);
-  // 記録→ダイヤル（導入前の記録は「ふつう」）
-  assert.equal(dialOfRecord({ extra: { dial: "hard" } }), "hard"); assert.equal(dialOfRecord({ extra: {} }), "normal"); assert.equal(dialOfRecord(null), "normal");
+  // 激ムズ：与ダメ半分・被害1.25倍・ごほうび2倍
+  assert.equal(scaleDealt(100, "hard"), 50);
+  assert.equal(scaleTaken(100, "hard"), 125);
+  assert.equal(scaleReward(40, "hard"), 80);
+  // 最低1・0は0のまま
+  assert.equal(scaleDealt(1, "hard"), 1); assert.equal(scaleTaken(0, "hard"), 0); assert.equal(scaleTaken(1, "hard"), 1);
+  assert.equal(scaleReward(1, "hard"), 2); assert.equal(scaleReward(0, "hard"), 0);
+  // 必要な正解数（＝敵HP÷1発）が、激ムズでふつうの2倍になる
+  const hits = (dial) => Math.ceil(1000 / scaleDealt(100, dial));
+  assert.deepEqual([hits("normal"), hits("hard")], [10, 20]);
+  // ハート制：激ムズはハートが減る（範囲は3〜16）
+  assert.equal(heartsForDial(5, "hard"), 4);
+  for (const h of [1, 5, 9, 13, 99]) { const v = heartsForDial(h, "hard"); assert.ok(v >= 3 && v <= 16, `hard/${h} → ${v}`); }
+  // 記録→ダイヤル（導入前・不明なキーの記録は「ふつう」）
+  assert.equal(dialOfRecord({ extra: { dial: "hard" } }), "hard"); assert.equal(dialOfRecord({ extra: {} }), "normal");
+  assert.equal(dialOfRecord({ extra: { dial: "easy" } }), "normal"); assert.equal(dialOfRecord(null), "normal");
   // 提案：記録は古い→新しい順。いまのダイヤルで戦った直近だけを見る
   const rec = (result, dial) => ({ mode: "battle", extra: { result, ...(dial ? { dial } : {}) } });
-  assert.deepEqual(suggestDial("normal", [rec("lose"), rec("lose")]), { to: "easy", kind: "down", streak: 2 });
   assert.deepEqual(suggestDial("hard", [rec("lose", "hard"), rec("lose", "hard")]), { to: "normal", kind: "down", streak: 2 });
-  assert.equal(suggestDial("easy", [rec("lose", "easy"), rec("lose", "easy")]), null);       // これ以上やさしくできない
+  assert.equal(suggestDial("normal", [rec("lose"), rec("lose")]), null);                       // ふつうより易しい段階は無い
   assert.deepEqual(suggestDial("normal", [rec("win"), rec("win"), rec("win")]), { to: "hard", kind: "up", streak: 3 });
-  assert.deepEqual(suggestDial("easy", [rec("win", "easy"), rec("win", "easy"), rec("win", "easy")]), { to: "normal", kind: "up", streak: 3 });
   assert.equal(suggestDial("hard", [rec("win", "hard"), rec("win", "hard"), rec("win", "hard")]), null); // これ以上むずかしくできない
-  assert.equal(suggestDial("normal", [rec("lose"), rec("win")]), null);                       // 直近が勝ちなら提案しない
-  assert.equal(suggestDial("normal", [rec("win"), rec("win")]), null);                        // 2連勝ではまだ
-  assert.equal(suggestDial("normal", [rec("lose"), rec("lose"), rec("win")]), null);          // 古い負けは数えない（直近は勝ち）
-  // ダイヤルを変えたら数え直し：激ムズで2連敗→ふつうに変更した直後は提案しない
+  assert.equal(suggestDial("normal", [rec("win"), rec("win")]), null);                         // 2連勝ではまだ
+  assert.deepEqual(suggestDial("normal", [rec("lose"), rec("win"), rec("win"), rec("win")]), { to: "hard", kind: "up", streak: 3 }); // 古い負けは関係ない
+  assert.equal(suggestDial("normal", [rec("win"), rec("win"), rec("lose")]), null);            // 直近が負けなら上げない
+  assert.equal(suggestDial("normal", [rec("lose"), rec("win"), rec("win")]), null);            // 古い負けのあと2連勝＝3連勝ではない
+  // ダイヤルを変えたら数え直し：ふつうで3連勝→激ムズに変えた直後は提案しない／激ムズで2連敗→ふつうに戻した直後も
+  assert.equal(suggestDial("hard", [rec("win"), rec("win"), rec("win")]), null);
   assert.equal(suggestDial("normal", [rec("lose", "hard"), rec("lose", "hard")]), null);
   // バトル以外の記録・結果の無い記録は無視
   assert.deepEqual(
-    suggestDial("normal", [{ mode: "timeAttack", extra: {} }, rec("lose"), { mode: "battle", extra: {} }, rec("lose")]),
-    { to: "easy", kind: "down", streak: 2 },
+    suggestDial("hard", [{ mode: "timeAttack", extra: {} }, rec("lose", "hard"), { mode: "battle", extra: {} }, rec("lose", "hard")]),
+    { to: "normal", kind: "down", streak: 2 },
   );
   assert.equal(suggestDial("normal", undefined), null);
 }

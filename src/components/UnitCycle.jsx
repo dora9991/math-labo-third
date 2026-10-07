@@ -147,7 +147,7 @@ export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPass
                   {stepBtn(() => onBattle?.(u), "⚔️ バトル", "linear-gradient(135deg,#ef4444,#b91c1c)", false, "制限時間内にモンスターを倒せるか！？")}
                   {stepBtn(() => setTame(null), "← もどる", "rgba(255,255,255,.12)")}
                 </div>
-                {/* バトルの強さ（サクサク／ふつう／激ムズ）。バトルを選ぶ前にここでも変えられる */}
+                {/* バトルの強さ（ふつう／激ムズ）。バトルを選ぶ前にここでも変えられる */}
                 {onSetDial && <div style={{ marginTop: 6 }}><BattleDialPicker dial={dial} onChange={onSetDial} compact /></div>}
               </>
             ) : (

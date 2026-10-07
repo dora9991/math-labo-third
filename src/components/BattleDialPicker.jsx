@@ -1,5 +1,5 @@
 // ============================================================
-// BattleDialPicker.jsx — バトルの強さダイヤル（🌱サクサク／⚖️ふつう／🔥激ムズ）の選択UI
+// BattleDialPicker.jsx — バトルの強さダイヤル（⚖️ふつう／🔥激ムズ）の選択UI
 //  ・バトル選択画面（suggestion つき・説明つき）と、「ためす」パネル（compact）で共通に使う。
 //  ・倍率の中身は engine/dial.js。ここは見た目と選択だけ。
 //  ・suggestion（連敗・連勝からの提案）は押すとそのダイヤルに切り替える。「このまま」で今回は閉じる。
@@ -22,7 +22,7 @@ export default function BattleDialPicker({ dial = "normal", onChange, suggestion
         <span style={{ fontSize: compact ? 9.5 : 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)" }}>いつでも変えられるよ</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${DIAL_KEYS.length}, 1fr)`, gap: 6 }}>
         {DIAL_KEYS.map((k) => {
           const d = DIALS[k];
           const on = k === cur.key;
@@ -49,7 +49,7 @@ export default function BattleDialPicker({ dial = "normal", onChange, suggestion
         <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 10, background: `${sug.to.color}1f`, border: `1px solid ${sug.to.color}77` }}>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: "#fff", lineHeight: 1.5 }}>
             💡 {sug.kind === "down"
-              ? `つづけて負けちゃったね。「${sug.to.label}」にしてみる？（いつでも戻せるよ）`
+              ? `つづけて負けちゃったね。「${sug.to.label}」にしてみる？（いつでも変えられるよ）`
               : `${sug.streak}れんしょう！ 「${sug.to.label}」に挑戦してみる？`}
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 6 }}>

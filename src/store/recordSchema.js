@@ -101,7 +101,7 @@ export function initialPlayerState(studentId) {
     crystals: 0,       // 所持クリスタル（サイクルを1単元クリアするごとに+1。スキルガチャに使う）
     worldCleared: { 1: 0, 2: 0, 3: 0 }, // ★レベルの素：学年ごとに「サイクルをクリアした単元数」。レベル=1+これ
     relearnSolved: 0,  // 学び直しで解いた問題の累計
-    battleDial: "normal", // バトルの強さダイヤル "easy"(サクサク) / "normal"(ふつう) / "hard"(激ムズ)。全バトル共通（engine/dial.js）
+    battleDial: "normal", // バトルの強さダイヤル "normal"(ふつう) / "hard"(激ムズ)。全バトル共通（engine/dial.js）
     stepCorrect: 0,    // 記録(records)を残さない場面（ステップアップ・学び直し・確認問題など）の正解数。やりこみ段位の集計用（engine/rank.js）
     rankSeen: null,    // 最後に祝った（または初回に確認した）やりこみ段位の番号。これを超えたら「昇段」演出を出す
     relearnCrystal: { date: null, today: 0, progress: 0 }, // 学び直しのクリスタル進捗：正解15問ごとに+1・1日10個まで（engine/scoring.js）

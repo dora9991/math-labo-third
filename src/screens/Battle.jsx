@@ -57,7 +57,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   // problemSource: あれば出題をこの関数(lastId)→problemに差し替える＝「演習バトル」（仕様はStepUpと同一）
   // onAttempt: あれば1問ごとに {skill,unitId,level,ok,...} を通知＝習熟(Elo)＋サイクル進捗を更新
   const lv = playerLevel(player); // 現在ワールド（学年）のレベルでバトル能力が決まる
-  //  バトルの強さダイヤル（サクサク／ふつう／激ムズ。ふつうは倍率1で既存と同じ）。
+  //  バトルの強さダイヤル（ふつう／激ムズ。ふつうは倍率1で既存と同じ）。
   //  与えるダメージはここでスケール。うける被害は、ハート制なので App 側で最大ハート数(maxHearts)に換算済み。
   const dialDef = dialFor(dial);
   const specials = useRef(gearSpecials(player)).current; // 装備の特殊効果（lifesteal/regenPct/startSp/critPct）

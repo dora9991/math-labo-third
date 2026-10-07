@@ -1285,7 +1285,7 @@ export default function App() {
   }
 
   // バトルの結果。true=勝利, false=敗北, "retry"=やり直し。stats={correct,wrong}（学習記録用）
-  // バトルの強さダイヤル（サクサク／ふつう／激ムズ）を変える。全バトル共通で保存（engine/dial.js）。
+  // バトルの強さダイヤル（ふつう／激ムズ）を変える。全バトル共通で保存（engine/dial.js）。
   function setBattleDial(key) {
     updatePlayer((p) => ({ ...p, battleDial: DIAL_KEYS.includes(key) ? key : "normal" }));
   }
@@ -1303,7 +1303,7 @@ export default function App() {
     const alreadyCleared = (data.records || []).some(
       (r) => r.mode === "battle" && r.extra && r.extra.result === "win" && r.extra.monsterId === battleMonster.id && (r.extra.prestige || 0) === curPrestige
     );
-    // 撃破済み（同じ周回内）なら報酬は半分（切り上げ）。さらにダイヤル（サクサク×0.5／激ムズ×2）をかける。
+    // 撃破済み（同じ周回内）なら報酬は半分（切り上げ）。さらにダイヤル（激ムズ×2）をかける。
     const dial = dialFor(data.player.battleDial);
     const baseGain = win ? (alreadyCleared ? Math.ceil(battleMonster.reward / 2) : battleMonster.reward) : 0;
     const gained = scaleReward(baseGain, dial);
@@ -2162,7 +2162,7 @@ export default function App() {
       );
     }
     // 正の数・負の数(c1)のモンスターは「行動選択型バトル(v2)」で試作。他は従来バトル。
-    //  ハート制（敵の1撃＝1ハート）のバトルは、ダイヤルを「ハートの数」に換算（サクサク＝増える／激ムズ＝減る）。
+    //  ハート制（敵の1撃＝1ハート）のバトルは、ダイヤルを「ハートの数」に換算（激ムズ＝減る）。
     const maxHearts = heartsForDial(Math.min(13, 5 + new Set((data.records || []).filter((r) => r.mode === "battle" && r.extra?.result === "win" && /^boss_/.test(r.extra?.monsterId || "")).map((r) => r.extra.monsterId)).size), data.player.battleDial);
     const useTurnBattle = battleMonster && (battleMonster.grade ?? 1) === 1; // 中1は全章 行動選択型バトルへ
     // その章の最大BP上限（現在はBASE_BP_CAP=BP_MAXのため常に350。段階解放を再有効化する時のために残置）

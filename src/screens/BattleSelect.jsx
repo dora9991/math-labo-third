@@ -175,7 +175,7 @@ export default function BattleSelect({ player, clearedIds, onSelect, onBack, onS
           </div>
         </div>
 
-        {/* バトルの強さ（サクサク／ふつう／激ムズ）。連敗・連勝のときは変更の提案も出す */}
+        {/* バトルの強さ（ふつう／激ムズ）。連敗・連勝のときは変更の提案も出す */}
         {onSetDial && <BattleDialPicker dial={dial} onChange={onSetDial} suggestion={dialSuggestion} />}
 
         {/* 新しく解放された敵のお知らせ */}

@@ -1,25 +1,21 @@
 // ============================================================
-// dial.js — バトルの「難易度ダイヤル」（サクサク／ふつう／激ムズ）
-//  生徒のご意見「バトルの問題数を減らせる（攻撃力アップ）ように」「反対に一撃の攻撃が少なく
-//  相手のダメージが多い激ムズモードを」（2026-10-06）への対応。ひとつのつまみの両端。
+// dial.js — バトルの「難易度ダイヤル」（ふつう／激ムズ）
+//  生徒のご意見「一撃の攻撃が少なく相手のダメージが多い激ムズモードを」（2026-10-06）への対応。
+//  ダイヤル（つまみ）の形にしてあるのは、あとから段階を足せるようにするため。
+//  ※「サクサク」（こうげき×1.5・被害×0.75・ごほうび×0.5）も一度作ったが、2026-10-07の判断で
+//    「とりあえず無し」にした。復活させるときは、下の DIALS に easy を足して DIAL_KEYS の先頭に
+//    "easy" を入れ、suggestDial の対応表に easy を足す（git履歴の 33cd3d8 に元の定義がある）。
 //
 //  ★動かすのは3つだけ★（問題そのものの難しさは変えない＝学習の中身は同じ）
 //    dealt  … こうげき力（自分が与えるダメージの倍率）。1/dealt が「必要な正解数」の倍率になる。
 //    taken  … うける被害の倍率。
 //    reward … 勝ったときのごほうびコインの倍率。
-//  サクサクは「少ない正解でたおせる」＝解く量が減るので、ごほうびは半分。
 //  激ムズは「たくさん正解が要り、被害も大きい」＝解く量が増えるので、ごほうびは2倍。
 //
 //  倍率の調整はこのファイルの DIALS だけでよい。React・保存に依存しない純関数のみ。
 // ============================================================
 
 export const DIALS = {
-  easy: {
-    key: "easy", label: "サクサク", icon: "🌱", color: "#4ade80",
-    dealt: 1.5, taken: 0.75, reward: 0.5,
-    short: "必要な正解 約2/3",
-    desc: "こうげきが強く、ふつうの約2/3の正解数でたおせる。うける被害も少なめ。ごほうびコインは半分。",
-  },
   normal: {
     key: "normal", label: "ふつう", icon: "⚖️", color: "#7dd3fc",
     dealt: 1, taken: 1, reward: 1,
@@ -34,7 +30,7 @@ export const DIALS = {
   },
 };
 
-export const DIAL_KEYS = ["easy", "normal", "hard"];
+export const DIAL_KEYS = ["normal", "hard"]; // 選べる順（画面の左から）
 export const DEFAULT_DIAL = "normal";
 
 /** キー（不正な値・未設定は "normal"）から設定を引く */
@@ -62,7 +58,7 @@ export function scaleReward(coins, dial) {
 /**
  * ハート制（敵の1撃が常に1ハート）のバトルで「うける被害」を表すため、最大ハート数を 1/taken 倍にする。
  *  BP制（中1の単元モンスター）は HP1000 のまま scaleTaken でダメージ側を動かす。
- *  サクサク＝ハートが増える／激ムズ＝減る。ふつうは元のまま。範囲は 3〜16。
+ *  激ムズ＝ハートが減る（5→4）。ふつうは元のまま。範囲は 3〜16（段階を足したときのため、増える側も扱える）。
  */
 export function heartsForDial(maxHearts, dial) {
   const base = Number(maxHearts) || 5;
@@ -80,8 +76,9 @@ export function dialOfRecord(r) {
 /**
  * 「ダイヤルを変えてみる？」の提案（記録から計算。保存する状態は増やさない）。
  *  いまのダイヤルで戦った直近の結果だけを見る（ダイヤルを変えたら数え直し）。
- *   ・2連敗 … ひとつ易しい方へ（激ムズ→ふつう→サクサク）
- *   ・3連勝 … ひとつ難しい方へ（サクサク→ふつう→激ムズ）
+ *   ・激ムズで2連敗 … ふつうへ戻すことを提案
+ *   ・ふつうで3連勝   … 激ムズへの挑戦を提案
+ *   （ふつうで2連敗しても、いまは易しい段階が無いので提案しない）
  * @param {string} current いまのダイヤルのキー
  * @param {Array} records  makeRecord の配列（古い→新しい順）
  * @returns {{ to:string, kind:"down"|"up", streak:number } | null}
@@ -97,11 +94,11 @@ export function suggestDial(current, records) {
     results.push(res);
   }
   if (results.length >= 2 && results[0] === "lose" && results[1] === "lose") {
-    const to = { hard: "normal", normal: "easy", easy: null }[cur];
+    const to = { hard: "normal" }[cur];
     if (to) return { to, kind: "down", streak: 2 };
   }
   if (results.length >= 3 && results.every((x) => x === "win")) {
-    const to = { easy: "normal", normal: "hard", hard: null }[cur];
+    const to = { normal: "hard" }[cur];
     if (to) return { to, kind: "up", streak: 3 };
   }
   return null;

@@ -70,7 +70,7 @@ export default function TurnBattle({
   onUseItem = null, dial = "normal",
 }) {
   const lv = playerLevel(player);
-  const dialDef = dialFor(dial); // バトルの強さダイヤル（サクサク／ふつう／激ムズ。ふつうは倍率1で既存と同じ）
+  const dialDef = dialFor(dial); // バトルの強さダイヤル（ふつう／激ムズ。ふつうは倍率1で既存と同じ）
   // ── 単元別「戦闘力」＝BP制（中1全章：ザコ/れんしゅう/ボスの梯子） ──
   const isCompanion = isCompanionBattle(monster);
   const myBP = player.chapterBP?.[monster.chapterId] || BP_MIN;
