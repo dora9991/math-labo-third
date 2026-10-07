@@ -6,7 +6,7 @@
 //    PixiのBattleFXとは別物。ダメージ・HP・出題・報酬・敵の行動には一切さわらない。
 //  ・ref から呼ぶ：
 //      move({ name, icon, finisher })   通常こうげきの技名（連続正解・とどめは「奥義」）
-//      hardIntro()                      激ムズ突入の演出（暗赤の縁取り＋「激ムズ突入！」）
+//      hardIntro()                      ハードモード突入の演出（暗赤の縁取り＋「ハードモード突入！」）
 //      kill({ boss })                   撃破フィニッシュ（金のフラッシュ＋「撃破！」）
 //      flash(kind)                      フラッシュだけ（"soft" | "gold" | "red"）
 //      shake(strength)                  舞台をゆらす（"small" | "big"）
@@ -106,7 +106,7 @@ const HypeFx = forwardRef(function HypeFx({ speed = "normal", targetRef }, ref) 
             <div key={it.id} className="mw-hype-hard" style={style}>
               <div className="mw-hype-hard-vignette" />
               <div className="mw-hype-hard-banner">
-                <span className="mw-hype-hard-title">🔥 激ムズ突入！</span>
+                <span className="mw-hype-hard-title">🔥 ハードモード突入！</span>
                 <span className="mw-hype-hard-sub">こうげき ½ ／ 敵のこうげき ×1.25</span>
               </div>
             </div>
@@ -124,12 +124,12 @@ const HypeFx = forwardRef(function HypeFx({ speed = "normal", targetRef }, ref) 
 export default HypeFx;
 
 /**
- * 舞台の左上の「🔥 激ムズ」ボタン。
+ * 舞台の左上の「🔥 ハードモード」ボタン。
  *  locked=false … ON/OFFをタップで切り替え（バトルが始まる前だけ）。
  *  locked=true  … ONなら🔥バッジだけ表示（切り替え不可）。OFFなら何も出さない。
  */
 export function HardModeChip({ on, locked, onToggle }) {
-  if (locked) return on ? <div className="mw-hard-chip is-on is-locked" title="激ムズモード中">🔥 激ムズ</div> : null;
+  if (locked) return on ? <div className="mw-hard-chip is-on is-locked" title="ハードモード中">🔥 ハードモード</div> : null;
   return (
     <button
       type="button"
@@ -139,7 +139,7 @@ export function HardModeChip({ on, locked, onToggle }) {
       title="こうげき½・敵のこうげき×1.25（最初の解答まで切りかえできます）"
     >
       <span className="mw-hard-chip-dot" />
-      🔥 激ムズ {on ? "ON" : "OFF"}
+      🔥 ハードモード {on ? "ON" : "OFF"}
     </button>
   );
 }

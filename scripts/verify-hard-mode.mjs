@@ -1,11 +1,11 @@
 // ============================================================
-// verify-hard-mode.mjs — 激ムズモード（src/third/hardMode.js）と技名（src/third/fx/attackMoves.js）の確認（2026-10-07）
+// verify-hard-mode.mjs — ハードモード（src/third/hardMode.js）と技名（src/third/fx/attackMoves.js）の確認（2026-10-07）
 //  使い方: node scripts/verify-hard-mode.mjs
 //  確かめること：
 //   1. ふつうモードは「今までと完全に同じ」値になる（倍率1）。
-//   2. 激ムズは 与ダメ×½・上限×½（＝必要な正解数が約2倍）・敵のこうげき×1.25。小さい値でも0にならない／0は0のまま。
-//   3. 激ムズでも、小単元・章ボスのバトルに要る正解数は、サーバーの検証の上限（VERIFY.maxAttempts=300）に余裕で収まる。
-//   4. ThirdBattle.jsx で倍率をかけている場所と、ごほうびの申請(finishBattle)に激ムズが入り込んでいないこと。
+//   2. ハードモードは 与ダメ×½・上限×½（＝必要な正解数が約2倍）・敵のこうげき×1.25。小さい値でも0にならない／0は0のまま。
+//   3. ハードモードでも、小単元・章ボスのバトルに要る正解数は、サーバーの検証の上限（VERIFY.maxAttempts=300）に余裕で収まる。
+//   4. ThirdBattle.jsx で倍率をかけている場所と、ごほうびの申請(finishBattle)にハードモードが入り込んでいないこと。
 //   5. 全章に技名がある／奥義になる条件／同じ技が続かない。
 // ============================================================
 import { readFileSync } from "node:fs";
@@ -32,19 +32,19 @@ for (const d of [1, 2, 7, 33, 100, 999, 12345]) {
 }
 eq(scaleTaken(0, false), 0, "ふつう：被ダメ0は0");
 
-// ---- 2. 激ムズの倍率 ----
-eq(HARD_MODE.dealt, 0.5, "激ムズの与ダメ倍率は0.5");
-eq(HARD_MODE.taken, 1.25, "激ムズの被ダメ倍率は1.25");
-eq(scaleDealt(100, true), 50, "激ムズ：与ダメ100→50");
-eq(scaleDealt(1, true), 1, "激ムズ：与ダメは最低1");
-eq(scaleDealt(0, true), 1, "激ムズ：与ダメ0でも最低1（ふつうと同じ扱い）");
-eq(scaleCap(100, true), 50, "激ムズ：上限100→50");
-eq(scaleCap(1, true), 1, "激ムズ：上限は最低1");
-eq(scaleCap(Infinity, true), Infinity, "激ムズ：上限が無限ならそのまま");
-eq(scaleTaken(100, true), 125, "激ムズ：被ダメ100→125");
-eq(scaleTaken(1, true), 1, "激ムズ：被ダメ1→1（小さい値は最低1）");
-eq(scaleTaken(0, true), 0, "激ムズ：被ダメ0は0のまま（ため・空振り・ねむりは0のまま）");
-eq(scaleTaken(-5, true), 0, "激ムズ：負の値は0");
+// ---- 2. ハードモードの倍率 ----
+eq(HARD_MODE.dealt, 0.5, "ハードモードの与ダメ倍率は0.5");
+eq(HARD_MODE.taken, 1.25, "ハードモードの被ダメ倍率は1.25");
+eq(scaleDealt(100, true), 50, "ハードモード：与ダメ100→50");
+eq(scaleDealt(1, true), 1, "ハードモード：与ダメは最低1");
+eq(scaleDealt(0, true), 1, "ハードモード：与ダメ0でも最低1（ふつうと同じ扱い）");
+eq(scaleCap(100, true), 50, "ハードモード：上限100→50");
+eq(scaleCap(1, true), 1, "ハードモード：上限は最低1");
+eq(scaleCap(Infinity, true), Infinity, "ハードモード：上限が無限ならそのまま");
+eq(scaleTaken(100, true), 125, "ハードモード：被ダメ100→125");
+eq(scaleTaken(1, true), 1, "ハードモード：被ダメ1→1（小さい値は最低1）");
+eq(scaleTaken(0, true), 0, "ハードモード：被ダメ0は0のまま（ため・空振り・ねむりは0のまま）");
+eq(scaleTaken(-5, true), 0, "ハードモード：負の値は0");
 
 // ---- 3. 必要な正解数（学習量のフロア）はおよそ2倍。サーバーの上限に収まる ----
 const minCorrect = (hp, diff, on) => Math.ceil(hp / scaleCap(capDamageFor(hp, diff), on));
@@ -74,8 +74,8 @@ for (const hp of [500, 3000, 20000, 73800, 381306]) {
       if (m > worst) { worst = m; worstWhere = `${g}年 ${c.chapterId} 章ボス`; }
     }
   }
-  ok(worst * 2 < VERIFY.maxAttempts, `激ムズの最小正解数の最大 ${worst}（${worstWhere}）の2倍がmaxAttempts(${VERIFY.maxAttempts})に収まる`);
-  console.log(`  ・激ムズで要る最小の正解数の最大：${worst}問（${worstWhere}）／サーバー上限 ${VERIFY.maxAttempts}問`);
+  ok(worst * 2 < VERIFY.maxAttempts, `ハードモードの最小正解数の最大 ${worst}（${worstWhere}）の2倍がmaxAttempts(${VERIFY.maxAttempts})に収まる`);
+  console.log(`  ・ハードモードで要る最小の正解数の最大：${worst}問（${worstWhere}）／サーバー上限 ${VERIFY.maxAttempts}問`);
 }
 
 // ---- 4. ThirdBattle.jsx の配線 ----
@@ -86,10 +86,10 @@ for (const hp of [500, 3000, 20000, 73800, 381306]) {
   ok(count(/scaleDealt\(/g) >= 3, "与ダメ倍率は通常こうげき・スキル(2種)の3か所以上");
   ok(count(/scaleCap\(/g) >= 3, "上限倍率は通常こうげき・スキル(2種)の3か所以上");
   ok(count(/lockHardMode\(\)/g) >= 3, "切り替えの固定は 解答・敵の行動・スキル の3か所以上（定義を除く）");
-  ok(/hardAllowed\s*=\s*!params\.demo\s*&&\s*kind\s*!==\s*"secretBoss"/.test(src), "お試し戦と裏ボスでは激ムズを使えない");
-  // ごほうびの申請に激ムズが入り込んでいない（報酬はサーバーが解答記録から決める）
+  ok(/hardAllowed\s*=\s*!params\.demo\s*&&\s*kind\s*!==\s*"secretBoss"/.test(src), "お試し戦と裏ボスではハードモードを使えない");
+  // ごほうびの申請にハードモードが入り込んでいない（報酬はサーバーが解答記録から決める）
   const fin = src.slice(src.indexOf("async function finishBattle"), src.indexOf("if (!enemies.length) return null;"));
-  ok(fin.length > 200 && !/hard/i.test(fin), "finishBattle（ごほうびの申請）に激ムズの値は渡さない");
+  ok(fin.length > 200 && !/hard/i.test(fin), "finishBattle（ごほうびの申請）にハードモードの値は渡さない");
 }
 
 // ---- 5. 技名 ----
