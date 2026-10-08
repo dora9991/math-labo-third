@@ -36,7 +36,7 @@ import {
 } from "../balance.js";
 import { levelFromExp, getSubUnitClearExpReward, expOf } from "../expCurve.js";
 import { setViewGrade } from "../gradeView.js";
-import { secretBoss } from "../secretBoss.js";
+import { secretBoss, SECRET } from "../secretBoss.js";
 import { mobSpecialty, mobAttack, isBossKind, nextBossMove, peekBossMove } from "../enemyMoves.js";
 import { newEnemyFx, newPartyFx, applySkip, applyPoison, applyCurse, applyPanic, tickEnemyTurn, enemyFxTags, absorbDamage, partyFxChips } from "../enemyFx.js";
 import { NEW_SKILL_KEYS } from "../skillDefs.js";
@@ -238,6 +238,16 @@ export default function Battle({ nav, params }) {
   const difficultyRef = useRef("standard"); // 「次の問題」に使う難度（いつでも切替可）
   // サーバーへ送る「解答の記録」。正誤の自己申告は入れない（サーバーが seed から問題を作り直して採点する）。
   const attemptsRef = useRef([]);
+  // 「倒した」とサーバーが認める最低の正解数（章ボス VERIFY.minCorrect＝6、裏ボス SECRET.minCorrect＝15。小単元は3戦あるので必ず6に届く）。
+  //  【2026-10-09 修正】強いパーティだと、ボス1体だけの戦いをこれより少ない正解で倒せてしまい、サーバーに「正解がたりない」と
+  //  断られて、ごほうびもクリアの記録も付かなかった（章ボスが記録されないと、学年クリアにも裏ボスにも進めない）。
+  //  → ボス1体の戦い（章ボス・裏ボス）は、1回の正解・スキルで削れる量を「最大HP÷必要な正解数」までにする。
+  //    さらに、必要な正解数がそろうまでは最後の敵がHP1で踏みとどまる（スキルで先に削り切ったときの保険）。
+  const claimsReward = !params.demo && (kind === "subUnit" || kind === "chapterBoss" || kind === "secretBoss"); // finishBattle と同じ条件
+  const needCorrect = !claimsReward ? 0 : kind === "secretBoss" ? SECRET.minCorrect : VERIFY.minCorrect;
+  const soloBossNeed = kind === "chapterBoss" || kind === "secretBoss" ? needCorrect : 0;
+  const correctCountRef = useRef(0); // この戦いで記録した正解の数（サーバーが数えるのと同じもの）
+  const bossHitCap = (en) => (soloBossNeed && en ? Math.max(1, Math.ceil(en.maxHp / soloBossNeed)) : Infinity);
   const battleStartRef = useRef(actions.serverNow());
   const shownAtRef = useRef(Date.now());
   // 敵の行動ゲージ（秒）。問題に答えている間(question)だけ減り、演出中は止まる。0で敵が行動→小単元の満タン値に戻る。
@@ -740,7 +750,7 @@ export default function Battle({ nav, params }) {
         // スキルも1回で1体から削れる量に上限（敵最大HPの割合）＝1パン防止
         const enT = live.find((e) => e.instanceId === tid);
         //  ハードモード：スキルの与ダメージと、その上限(＝1回で削れる量)にも同じ倍率（×½）をかける。
-        rawAttack.damage = Math.min(scaleDealt(rawAttack.damage, hardRef.current), scaleCap(Math.max(1, Math.round((enT?.maxHp ?? Infinity) * SKILL_CAP_FRAC)), hardRef.current));
+        rawAttack.damage = Math.min(scaleDealt(rawAttack.damage, hardRef.current), scaleCap(Math.max(1, Math.round((enT?.maxHp ?? Infinity) * SKILL_CAP_FRAC)), hardRef.current), bossHitCap(enT));
         damageByTarget[tid] = (damageByTarget[tid] || 0) + rawAttack.damage;
         if (rawAttack.isCrit) anyCrit = true;
       });
@@ -817,7 +827,7 @@ export default function Battle({ nav, params }) {
       const capFrac = cat === "pierceHit" ? skill.capFrac : SKILL_CAP_FRAC;
       let total = 0, anyCrit = false;
       for (let i = 0; i < hits; i++) { const r = resolvePlayerAttack(c, level, charSubject, true, { skillMultiplier: skill.multiplier, atkBuffMultiplier }); total += r.damage; if (r.isCrit) anyCrit = true; }
-      total = Math.min(scaleDealt(total, hardRef.current), scaleCap(Math.max(1, Math.round(target.maxHp * capFrac)), hardRef.current)); // ハードモード：与ダメ・上限とも×½
+      total = Math.min(scaleDealt(total, hardRef.current), scaleCap(Math.max(1, Math.round(target.maxHp * capFrac)), hardRef.current), bossHitCap(target)); // ハードモード：与ダメ・上限とも×½／ボス1体の戦いは最大HP÷必要な正解数まで
       let label = null;
       if (cat === "stunHit") { applySkip(ef, target, skill.turns, "stun"); label = "しびれた！"; }
       if (cat === "curseHit") { applyCurse(ef, target, skill.atkMul, skill.cycles); label = "攻撃力ダウン！"; }
@@ -854,11 +864,15 @@ export default function Battle({ nav, params }) {
     let gainedCoins = 0;
     const hitIds = [];
     const defeatedPoints = [];
+    // 必要な正解数（needCorrect）がそろう前に、最後の波が全滅しそうなら、いちばんHPの多い1体だけHP1で踏みとどまらせる。
+    const short = needCorrect - correctCountRef.current;
+    const wipes = short > 0 && isBossWave && enemiesRef.current.every((en) => en.hp <= 0 || (damageByTarget[en.instanceId] || 0) >= en.hp);
+    const holdId = wipes ? enemiesRef.current.filter((en) => en.hp > 0).sort((a, b) => b.maxHp - a.maxHp)[0]?.instanceId : null;
     const next = enemiesRef.current.map((en) => {
       const dmg = damageByTarget[en.instanceId] || 0;
       if (dmg <= 0) return en;
       hitIds.push(en.instanceId);
-      const hp = Math.max(0, en.hp - dmg);
+      const hp = Math.max(en.instanceId === holdId ? 1 : 0, en.hp - dmg);
       if (en.hp > 0 && hp <= 0) {
         gainedExp += expPlan ? (isBossWave ? expPlan.bossKill : expPlan.perTrashKill) : isBossWave ? REWARD_EXP_BOSS : REWARD_EXP_GROUP;
         gainedCoins += isBossWave ? REWARD_COIN_BOSS : REWARD_COIN_GROUP;
@@ -867,6 +881,7 @@ export default function Battle({ nav, params }) {
       }
       return { ...en, hp };
     });
+    if (holdId) setBossNotice(`まだ倒れない！ あと${short}問 正解で とどめ！`);
     return { next, hitIds, gainedExp, gainedCoins, defeatedPoints };
   }
 
@@ -883,10 +898,13 @@ export default function Battle({ nav, params }) {
     lockHardMode(); // 最初の解答を送った時点で、ハードモードの切り替えは固定
     const correct = index === problem.correctIndex;
     const diff = problem.level || difficulty; // この問題を出した時の難度（切替は次の問題から）
+    const answerMs = Math.max(0, Date.now() - shownAtRef.current);
     attemptsRef.current.push({
       unitId: problem.unitId, level: problem.level, seed: problem.seed,
-      answer: String(problem.choices[index]), ms: Math.max(0, Date.now() - shownAtRef.current),
+      answer: String(problem.choices[index]), ms: answerMs,
     });
+    // サーバーが数える「検証済みの正解」と同じ数え方（速すぎる解答は上で除外済み。10分を超えた解答はサーバーが数えないので、ここでも数えない）
+    if (correct && answerMs <= 10 * 60 * 1000) correctCountRef.current += 1;
     const statusSnapshot = partyStatusRef.current;
     const stageEl = stageRef.current;
     const live = enemiesRef.current.filter((en) => en.hp > 0);
@@ -955,7 +973,7 @@ export default function Battle({ nav, params }) {
         if (h.targetId === "PARTY_SELF") return;
         const en = live.find((e) => e.instanceId === h.targetId);
         if (!en) return;
-        const cap = scaleCap(capDamageFor(en.maxHp, diff), hardRef.current); // ハードモード：上限も×½＝必要な正解数が約2倍
+        const cap = Math.min(scaleCap(capDamageFor(en.maxHp, diff), hardRef.current), bossHitCap(en)); // ハードモード：上限も×½＝必要な正解数が約2倍／ボス1体の戦いは最大HP÷必要な正解数まで
         const sum = sumBy[h.targetId];
         if (sum > cap) h.attack = { ...h.attack, damage: Math.max(1, Math.round((h.attack.damage * cap) / sum)) };
       });
