@@ -192,7 +192,8 @@ export default function Battle({ nav, params }) {
   }, [chapter, chapterId, grade, params.subUnitId]);
   // 敵の強さ・ゲージの序盤補正に使う「カリキュラム上の位置」(0〜1)
   const tierNow = kind === "finalBoss" || kind === "secretBoss" ? 1 : tierOf(grade, chapterId, kind === "subUnit" ? params.subUnitId : null);
-  const gaugeMaxFor = (isBoss) => gaugeSecondsFor(unitId, isBoss, tierNow); // 雑魚の波／ボスの波でゲージの長さが変わる
+  // 雑魚の波／ボスの波でゲージの長さが変わる。裏ボスは専用の短いゲージ（secretBoss.js の SECRET.gaugeSeconds）。
+  const gaugeMaxFor = (isBoss) => (kind === "secretBoss" ? SECRET.gaugeSeconds : gaugeSecondsFor(unitId, isBoss, tierNow));
 
   const encounters = useMemo(() => buildEncounters(params, chapter, gradeData), []); // eslint-disable-line react-hooks/exhaustive-deps
 
