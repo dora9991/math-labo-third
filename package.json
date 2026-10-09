@@ -16,6 +16,7 @@
     "build:story": "node scripts/build-story.mjs",
     "test:third-api": "node scripts/test-third-api.mjs",
     "test:third-room": "node scripts/test-third-room.mjs",
+    "test:third-raid": "node scripts/test-third-raid.mjs",
     "test:third-logging": "node scripts/test-third-logging.mjs",
     "test:recommend": "node scripts/test-recommend.mjs",
     "release": "node scripts/release.mjs"
