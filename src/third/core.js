@@ -17,7 +17,7 @@ import { findHaichiLessonForUnit, HAICHI_COURSE } from "../data/haichiCourse.js"
 import { getSubUnitClearExpReward, expOf, addExp } from "./expCurve.js";
 import { SECRET, SECRET_COUNT, secretOpen, secretKey, secretFirstExp, secretRepeatExp } from "./secretBoss.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
-import { RAID, RAID_LADDER, raidBoss } from "./raid.js";
+import { RAID, RAID_LADDER, raidBoss, COOP, coopExpPerChar } from "./raid.js";
 
 export { PROBLEM_VERSION };
 
@@ -60,6 +60,7 @@ export function initialThirdState() {
     gradeDone: {}, // 学年クリアボーナスを受け取った学年 { "1": ms }
     secret: { cleared: {}, daily: { date: null, n: 0 } }, // 裏ボス（やり込み）：倒した裏ボス { "学年:番号": ms }・周回の1日カウント
     raid: { cleared: {}, gradeDone: {}, allDone: 0, daily: { date: null, n: 0 } }, // 協力プレイ「裏ボス連戦」：倒した裏ボス { "grade:chapter": ms }・学年/全制覇ボーナス受取・周回の1日カウント
+    coop: { medals: {}, daily: { date: null, n: 0 } }, // マルチ専用ストーリー：ステージごとのメダル { "番号": 1銅|2銀|3金 }・経験値が付く周回の1日カウント
     medals: { practiceN: {}, haichi: {}, pracLv: {}, battle: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
   };
@@ -104,6 +105,8 @@ export function normalizeThirdState(s) {
   out.secret = { cleared: { ...(sc.cleared || {}) }, daily: { date: sc.daily?.date || null, n: Number(sc.daily?.n) || 0 } };
   const rd = s.raid && typeof s.raid === "object" ? s.raid : {};
   out.raid = { cleared: { ...(rd.cleared || {}) }, gradeDone: { ...(rd.gradeDone || {}) }, allDone: Number(rd.allDone) || 0, daily: { date: rd.daily?.date || null, n: Number(rd.daily?.n) || 0 } };
+  const cp = s.coop && typeof s.coop === "object" ? s.coop : {};
+  out.coop = { medals: Object.fromEntries(Object.entries(cp.medals || {}).filter(([k, v]) => /^\d+$/.test(k) && [1, 2, 3].includes(Number(v))).map(([k, v]) => [k, Number(v)])), daily: { date: cp.daily?.date || null, n: Number(cp.daily?.n) || 0 } };
   out.seenSeeds = Array.isArray(s.seenSeeds) ? s.seenSeeds.slice(-VERIFY.seenSeedsKeep) : [];
   out.claimIds = Array.isArray(s.claimIds) ? s.claimIds.slice(-VERIFY.claimIdsKeep) : [];
   out.daily = { ...base.daily, ...(s.daily || {}) };
@@ -192,6 +195,33 @@ export function applyRaidWin(state, index, now) {
   }
   s.crystals += crystals + gradeBonus + allBonus;
   return { ok: true, state: s, rewards: { crystals, gradeBonus, allBonus, first, title: first ? b.title : null, boss: b.name } };
+}
+
+/**
+ * マルチ専用ストーリー「みんなの冒険」で、ステージ index をクリアした時のごほうびを、1人ぶんの状態に付ける（raidBattle.js の rewardEligibility を通ったときだけ呼ぶ）。
+ *  ① 称号・クリスタル・学年／全制覇ボーナス：applyRaidWin（これまでの仕組み）
+ *  ② メダル：tier(1銅・2銀・3金)。いちばん良い色を記録し、色が上がった分だけクリスタル
+ *  ③ 経験値：その人の「いまのパーティ」5体に1体ずつ、低め（raid.js の COOP）。2回目以降は1日 repeatExpDailyMax 回まで
+ */
+export function applyCoopWin(state, index, tier, now) {
+  const r = applyRaidWin(state, index, now);
+  if (!r.ok) return r;
+  const s = r.state;
+  const b = raidBoss(index);
+  const t = [1, 2, 3].includes(Number(tier)) ? Number(tier) : 1;
+  const key = String(index);
+  const prevTier = s.coop.medals[key] || 0;
+  let medalCrystals = 0;
+  if (t > prevTier) { for (let k = prevTier + 1; k <= t; k++) medalCrystals += COOP.tierCrystals[k - 1] || 0; s.coop.medals[key] = t; }
+  const today = dayKey(now);
+  if (s.coop.daily.date !== today) s.coop.daily = { date: today, n: 0 };
+  let perChar = 0;
+  if (r.rewards.first) perChar = coopExpPerChar(index, true);
+  else if (s.coop.daily.n < COOP.repeatExpDailyMax) { perChar = coopExpPerChar(index, false); s.coop.daily.n += 1; }
+  const members = s.party.filter((id) => id && s.owned[id]);
+  if (perChar > 0) for (const id of members) addExp(s.owned[id], b.grade, perChar);
+  s.crystals += medalCrystals;
+  return { ok: true, state: s, rewards: { ...r.rewards, tier: t, prevTier, medalUp: t > prevTier, medalCrystals, exp: perChar * members.length, perMember: perChar, expLimited: !r.rewards.first && perChar === 0 } };
 }
 
 // ---------------- 合成・限界突破 ----------------

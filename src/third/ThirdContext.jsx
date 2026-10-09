@@ -85,6 +85,15 @@ export function ThirdProvider({ children }) {
       }
       return { ok: false, error: r.body?.error || "failed" };
     },
+    // 協力バトル：サーバーの返した時刻で、端末の時計とのずれを直す（解答の制限時間の表示用）
+    noteServerNow(now) { if (Number.isFinite(now)) offsetRef.current = now - Date.now(); },
+    // 協力バトルに勝ったあとのごほうび（サーバーが決める）。受け取ったあとの状態に置き換える。
+    async claimCoop(code) {
+      let r = await thirdApi.roomBattleClaim(code);
+      if (r.status === 409) { await new Promise((res) => setTimeout(res, 500)); r = await thirdApi.roomBattleClaim(code); }
+      if (r.status === 200) { setSave(r.body.state); return { ok: true, rewards: r.body.rewards }; }
+      return { ok: false, error: r.body?.error || "failed", needed: r.body?.needed, correct: r.body?.correct };
+    },
     reload: load,
   }), [load]);
 

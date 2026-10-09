@@ -8,7 +8,9 @@
 import { useEffect, useRef, useState } from "react";
 import * as bgm from "../audio/bgm.js";
 import { getFxSpeed, prefersReducedMotion } from "../engine/fxSpeed.js";
-import { CHANGELOG } from "../third/changelog.js";
+import { CHANGELOG, LATEST_MARK, loadChangelogSeen, saveChangelogSeen, unseenChangelogDays } from "../third/changelog.js";
+
+const md = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`; // "2026-10-09" → "10/9"
 
 const GLYPHS = [
   { c: "π", x: "7%", y: "21%", d: 0 }, { c: "∑", x: "89%", y: "27%", d: 1.2 },
@@ -21,6 +23,10 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
   const speedRef = useRef(getFxSpeed());
   const [complete, setComplete] = useState(() => speedRef.current === "off" || prefersReducedMotion());
   const [showLog, setShowLog] = useState(false); // 更新情報
+  const [seenAtLoad] = useState(loadChangelogSeen); // 開く前に見ていた所（NEW の印を、読んでいる間は残す）
+  const [seen, setSeen] = useState(seenAtLoad);
+  const unseen = unseenChangelogDays(seen); // まだ見ていない更新（新しい順）
+  const newDates = new Set(unseenChangelogDays(seenAtLoad).map((d) => d.date));
   const finishRef = useRef(null);
   useEffect(() => {
     bgm.play("op");
@@ -40,8 +46,13 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
 
   function beginHold() { holdRef.current = setTimeout(() => { tapRef.current.n = 0; onAdmin?.(); }, 1100); }
   function endHold() { clearTimeout(holdRef.current); holdRef.current = null; }
+  function openLog() { // 更新情報を開く＝最新まで見た、という印を残す
+    setShowLog(true);
+    saveChangelogSeen();
+    setSeen(LATEST_MARK);
+  }
   function skipIntro(e) {
-    if (complete || e.target.closest("button, .title-lockup")) return;
+    if (complete || e.target.closest("button, .title-lockup, .title-news")) return;
     clearTimeout(finishRef.current);
     setComplete(true);
   }
@@ -55,7 +66,20 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
         <div className="title-overline">THE ASTRAL ACADEMY PRESENTS</div><h1>MATH LABO</h1>
         <div className="title-jp"><span />数学ラボ３<span /></div><p>THE CHRONICLES OF NUMBERS</p>
       </div>
-      <nav className="title-menu" aria-label="タイトルメニュー">
+      {unseen.length > 0 && (
+        <div className="title-news" role="button" tabIndex={0} data-sfx="none" aria-label="新しい更新があります。タップして更新情報を見る"
+          onClick={(e) => { e.stopPropagation(); openLog(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLog(); } }}>
+          <span className="title-news-badge" aria-hidden>NEW</span>
+          <span className="title-news-main">
+            <b>新しい更新があるよ！</b>
+            {unseen.slice(0, 2).map((d) => <span className="title-news-line" key={d.date}><em>{md(d.date)}</em>{d.headline || d.items[0]}</span>)}
+            {unseen.length > 2 && <small>ほか {unseen.length - 2} 件</small>}
+          </span>
+          <span className="title-news-go" aria-hidden>見る ▶</span>
+        </div>
+      )}
+      <nav className={`title-menu${unseen.length > 0 ? " has-news" : ""}`} aria-label="タイトルメニュー">
         <button onClick={onEnter}><span>◇</span> はじめる <span>◇</span></button>
         {onHowTo && (
           <span className="title-howto-wrap">
@@ -64,8 +88,8 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
           </span>
         )}
       </nav><div className="title-audio-note">SOUND ON　·　音楽が流れます</div>
-      {complete && (
-        <button className="title-changelog-btn" onClick={(e) => { e.stopPropagation(); setShowLog(true); }} data-sfx="none">
+      {complete && unseen.length === 0 && ( // まだ見ていない更新がある間は、上の大きなお知らせが同じ役目をする
+        <button className="title-changelog-btn" onClick={(e) => { e.stopPropagation(); openLog(); }} data-sfx="none">
           📜 更新情報
         </button>
       )}
@@ -80,8 +104,9 @@ export default function TitleScreen({ onEnter, onAdmin, onHowTo, onCharacter }) 
           </div>
           <div className="title-changelog-body">
             {CHANGELOG.map((day) => (
-              <div className="title-changelog-day" key={day.date}>
-                <div className="title-changelog-date">{day.date}</div>
+              <div className={`title-changelog-day${newDates.has(day.date) ? " is-new" : ""}`} key={day.date}>
+                <div className="title-changelog-date">{day.date}{newDates.has(day.date) && <span className="title-changelog-new">NEW</span>}</div>
+                {day.headline && <div className="title-changelog-headline">{day.headline}</div>}
                 <ul>{day.items.map((t, i) => <li key={i}>{t}</li>)}</ul>
               </div>
             ))}

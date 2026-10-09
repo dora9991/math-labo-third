@@ -132,7 +132,7 @@ export default function ThirdMenu(props) {
           <GameButton tone="danger" icon="🎰" onClick={props.onGacha}><strong>ガチャ</strong><small>💎 {medalState?.crystals ?? 0}個　{(medalState?.crystals ?? 0) >= 5 ? "いま引ける！" : `あと${5 - ((medalState?.crystals ?? 0) % 5 || 0)}個で1回`}</small></GameButton>
           <GameButton tone="blue" icon="📔" onClick={props.onDex}><strong>図鑑</strong><small>{Object.keys(medalState?.dex || {}).length} / {DEX_TOTAL}体　であった仲間をコレクション</small></GameButton>
           {props.onSecret && medalState?.gradeDone?.[grade] && <GameButton tone="danger" icon="👹" onClick={props.onSecret}><strong>裏ボス（中{grade}）</strong><small>中{grade}を クリアした ごほうび！ 推奨Lv30〜90 の強敵が7体</small></GameButton>}
-          {props.onRoom && <GameButton tone="blue" icon="🤝" onClick={props.onRoom}><strong>みんなで戦う</strong><small>2〜5人で協力（部屋コードで集まる）</small></GameButton>}
+          {props.onRoom && <GameButton tone="blue" icon="🤝" onClick={props.onRoom}><strong>みんなで戦う</strong><small>2〜5人で同時に答えて、回廊のボスへ（部屋コードで集まる）</small></GameButton>}
           <GameButton tone="mint" icon="⚙️" onClick={() => go({ view: "settings" })}><strong>設定</strong><small>学年の変更・アラーム</small></GameButton>
         </div>
       </Shell>

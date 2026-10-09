@@ -531,7 +531,27 @@ html, body { min-height:100%; background:var(--lab-night); } body { color:var(--
 .title-changelog-day { margin-top:14px; }
 .title-changelog-date { font:700 12px Cinzel,serif; color:#f3d88a; letter-spacing:.06em; margin-bottom:6px; }
 .title-changelog-day ul { margin:0; padding-left:18px; }
-.title-changelog-day li { font-size:12.5px; line-height:1.7; color:rgba(238,244,243,.82); }
+.title-changelog-day li { font-size:13px; line-height:1.75; color:rgba(238,244,243,.9); margin-top:4px; }
+.title-changelog-day.is-new { padding:10px 12px 12px; border:1px solid rgba(255,217,120,.7); border-radius:12px; background:linear-gradient(135deg,rgba(255,206,100,.13),rgba(255,110,130,.08)); box-shadow:0 0 14px rgba(255,205,96,.2); }
+.title-changelog-new { margin-left:8px; padding:2px 7px; border-radius:6px; background:linear-gradient(180deg,#ff6b6b,#d92b4b); color:#fff; font:800 10px/1.2 Cinzel,serif; letter-spacing:.08em; vertical-align:1px; }
+.title-changelog-headline { margin:2px 0 6px; font:800 15px/1.5 'Shippori Mincho',serif; color:#ffe9a8; letter-spacing:.02em; }
+/* 更新のお知らせ（まだ見ていない更新があるときだけ、「はじめる」の上に出す） */
+.title-news { position:relative; display:flex; align-items:center; gap:10px; width:min(100%,340px); margin-top:clamp(26px,7vh,60px); padding:11px 11px 11px 10px; border-radius:14px; border:2px solid #ffd978; background:linear-gradient(135deg,rgba(78,20,36,.95),rgba(20,26,64,.95)); color:#fff6dc; text-align:left; cursor:pointer; box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 18px rgba(255,205,96,.55),0 8px 22px rgba(0,0,0,.5); animation:titleNewsGlow 1.9s ease-in-out infinite; -webkit-tap-highlight-color:transparent; }
+.title-news:hover,.title-news:focus-visible { border-color:#fff1b8; outline:none; }
+.title-news-badge { flex:0 0 auto; padding:5px 8px; border-radius:8px; background:linear-gradient(180deg,#ff6b6b,#d92b4b); color:#fff; font:800 12px/1 Cinzel,serif; letter-spacing:.08em; box-shadow:0 2px 6px rgba(0,0,0,.45); animation:titleNewsBadge 1.2s ease-in-out infinite; }
+.title-news-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.title-news-main b { font:800 15px/1.35 'Shippori Mincho',serif; color:#ffe9a8; letter-spacing:.02em; text-shadow:0 1px 4px #000; }
+.title-news-line { font:600 12px/1.45 'Shippori Mincho',serif; color:#fff; }
+.title-news-line em { font-style:normal; font-weight:800; color:#ffd978; margin-right:5px; }
+.title-news-main small { font:600 11px/1.3 'Shippori Mincho',serif; color:rgba(255,246,220,.72); }
+.title-news-go { flex:0 0 auto; align-self:center; padding:8px 10px; border-radius:999px; background:linear-gradient(180deg,#ffe9a8,#f2b948); color:#161015; font:800 12px/1 'Shippori Mincho',serif; white-space:nowrap; }
+.title-menu.has-news { margin-top:10px; }
+.title-entering .title-news { opacity:0; animation:titleMenuRise .48s 1.7s cubic-bezier(.2,.86,.25,1) forwards; }
+.title-speed-fast.title-entering .title-news { animation-delay:.8s; }
+@keyframes titleNewsGlow { 50% { box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 30px rgba(255,214,120,.95),0 8px 22px rgba(0,0,0,.5); } }
+@keyframes titleNewsBadge { 50% { transform:scale(1.12); } }
+@media (max-width:380px) { .title-news { gap:8px; padding:9px 10px 9px 8px; }.title-news-go { display:none; }.title-news-badge { padding:4px 6px; font-size:11px; }.title-news-main b { font-size:14px; }.title-news-main b::after { content:' ▶'; color:#f2b948; } }
+@media (prefers-reduced-motion:reduce) { .title-news,.title-news-badge { animation:none!important; }.title-entering .title-news { opacity:1; } }
 .title-menu { display:grid; gap:6px; width:min(100%,290px); margin-top:clamp(64px,13vh,132px); }.title-menu button { min-height:47px; border:0; background:transparent; color:#c7f4ff; cursor:pointer; font:600 clamp(15px,3.5vw,18px)/1 'Shippori Mincho',serif; letter-spacing:.3em; padding-left:.3em; text-shadow:0 0 10px rgba(104,229,255,.64),0 2px 4px #000; transition:color .18s,letter-spacing .18s,text-shadow .18s; }.title-menu button span { opacity:0; padding:0 9px; color:#f7df9e; transition:opacity .18s; }.title-menu button:hover,.title-menu button:focus-visible { color:#fff; letter-spacing:.36em; text-shadow:0 0 18px #71e9ff,0 0 34px rgba(104,211,255,.7); }.title-menu button:hover span,.title-menu button:focus-visible span { opacity:1; }.title-audio-note { margin-top:22px; color:rgba(220,244,255,.63); font:500 9px Cinzel,serif; letter-spacing:.16em; }
 @keyframes titleSigilTurn { to { transform:translate(-50%,-50%) rotate(360deg); } } @keyframes titleGlyphDrift { 50% { transform:translateY(-12px); opacity:.78; } } @keyframes titleLockupFloat { 50% { transform:translateY(-5px); } }
 
