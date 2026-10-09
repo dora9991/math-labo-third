@@ -29,7 +29,7 @@ import { VERIFY } from "./gachaConfig.js";
 export const RB = {
   levelSec: { easy: 13, standard: 17, advanced: 23, oni: 29 }, // 答える制限時間（秒）。ラウンドの期限は、いま選んでいる中で一番長い難しさのもの
   startDelayMs: 3500, // ラウンドの結果を見せてから次の問題が出るまで（最初のラウンドは「みんなの準備ができてから」）
-  introWaitMs: 150000, // 開始前の場面を、全員が読み終えるのを待つ最長の時間
+  introWaitMs: 90000, // 開始前の場面を、全員が読み終えるのを待つ最長の時間（場面は「スキップ」できる）
   graceMs: 1200, // 通信の遅れの猶予（期限をこれだけ過ぎた解答までは受け付ける）
   idleAfter: 2, // 2ラウンド続けて答えなかった人は「離席」＝他の人は待たない（答えれば戻る）
   abortAfterIdleRounds: 3, // 全員が離席のまま3ラウンドたったら戦闘をやめる
@@ -234,7 +234,7 @@ function resolveRound(room, now, rand) {
 export function tickBattle(room, now, rand = Math.random) {
   const b = room?.battle;
   if (!b || b.status !== "fighting") return room;
-  if (b.phase === "intro") return now >= b.introDeadline ? beginFight(room, now, rand) : room;
+  if (b.phase === "intro") return now >= b.introDeadline || room.members.every((m) => b.ready.includes(m.id)) ? beginFight(room, now, rand) : room; // 読んでいない人が部屋を出たときも、残りが全員読み終えていれば始まる
   if (!b.round) return room;
   if (now < b.round.deadline + RB.graceMs) return room;
   return resolveRound(room, now, rand);

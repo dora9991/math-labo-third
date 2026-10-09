@@ -1,9 +1,10 @@
 // マルチ専用ストーリー「みんなの冒険」（協力バトル）の自動テスト。メモリ上のストアで、本番と同じ handler を動かす。  実行: npm run test:third-raid
 import { build } from "esbuild";
 import { execSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export * from "./src/third/room.js"; export * from "./src/third/raidBattle.js"; export * from "./src/third/raid.js"; export * from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { expOf } from "./src/third/expCurve.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export * from "./src/third/room.js"; export * from "./src/third/raidBattle.js"; export * from "./src/third/raid.js"; export * from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { expOf } from "./src/third/expCurve.js"; export { coopScene, COOP_STAGE_COUNT, COOP_STAGE_TITLES } from "./src/third/story/coopStory.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_raid.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_raid.mjs");
@@ -63,6 +64,25 @@ async function playRound(s, code, ids, okMap) {
 t("ステージ: 全21（中1が7・中2が6・中3が8）で、雑魚2波→ボス", T.RAID_LADDER.length === 21 && T.stageWaves(0).map((w) => w.kind).join() === "mob,mob,boss" && T.stageWaves(20).length === 3);
 t("敵の強さ: 後半のステージほどHPが多い／雑魚はボスより弱い", T.stageWaves(20)[2].maxHp > T.stageWaves(0)[2].maxHp && T.stageWaves(5)[0].maxHp < T.stageWaves(5)[2].maxHp);
 t("ごほうびの設計: メダル3色・経験値は小単元の初回より低い", T.COOP.tierCrystals.length === 3 && T.coopExpPerChar(0, true) * 5 < 390 && T.coopExpPerChar(0, false) < T.coopExpPerChar(0, true));
+
+// ---- ストーリー（coopStory.js）：全ステージに、はじまる前と終わったあとの場面がある
+{ const bgs = new Set(readdirSync("src/third/assets/story/backgrounds").map((f) => f.replace(".webp", "")));
+  const chars = new Set(readdirSync("src/third/assets/story/characters").map((f) => f.replace(".webp", "").replace(/_(angry|happy|sad|surprised)$/, "")));
+  let allOk = true, bad = "";
+  for (let i = 0; i < 21; i++) {
+    for (const kind of ["pre", "post"]) {
+      const sc = T.coopScene(i, kind); const min = kind === "pre" ? 6 : 4;
+      const okBeats = sc && sc.beats.length >= min && sc.beats.every((b) => (b.k === "nar" || (b.k === "say" && b.n)) && typeof b.t === "string" && b.t.length > 0);
+      const okBg = sc && bgs.has(sc.bg) && sc.beats.every((b) => !b.bg || bgs.has(b.bg));
+      const okWho = sc && sc.beats.every((b) => b.k !== "say" || b.who === "foe" || chars.has(b.who) || b.who === "sp093");
+      const okFoe = sc && (kind === "post" || sc.beats.some((b) => b.who === "foe")) && sc.enemyId === T.RAID_LADDER[i].id;
+      if (!(okBeats && okBg && okWho && okFoe)) { allOk = false; bad += ` ${i + 1}${kind}`; }
+    }
+  }
+  t("ストーリー: 全21ステージに、はじまる前と終わったあとの場面（セリフ・背景・立ち絵・ボスの台詞がそろっている）", allOk && T.COOP_STAGE_COUNT === 21 && T.COOP_STAGE_TITLES.length === 21, bad);
+  t("ストーリー: 場面のキーはステージごとに別（見たかどうかを覚えられる）", new Set([...Array(21).keys()].flatMap((i) => [T.coopScene(i, "pre").key, T.coopScene(i, "post").key])).size === 42);
+  t("ストーリー: 数学の計算式を語らない（一人用のストーリーの方針：数学の説明・計算はセリフに入れない）", [...Array(21).keys()].every((i) => ["pre", "post"].every((k) => T.coopScene(i, k).beats.every((b) => !/[0-9０-９]+\s*[+\-×÷=＝]/.test(b.t)))));
+}
 
 // ---- 開始の条件
 { const { s, code } = await setupRoom(["h", "a"]);
