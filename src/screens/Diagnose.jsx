@@ -11,14 +11,14 @@ import CharBubble from "../components/CharBubble.jsx";
 import MathText from "../components/MathText.jsx";
 import QuestionText from "../components/QuestionText.jsx";
 import * as sfx from "../audio/sfx.js";
-import { genProblem, makeChoices } from "../engine/generator.js";
+import { genProblem, makeChoices, choiceMode } from "../engine/generator.js";
 import { isCorrect } from "../engine/scoring.js";
 
 // その単元の1問（標準→易→発展でフォールバック）＋4択を作る
 function makeItem(unit) {
   const p = genProblem(unit, "standard") || genProblem(unit, "easy") || genProblem(unit, "advanced");
   if (!p) return null;
-  return { unit, problem: p, choices: makeChoices(p.ans) };
+  return { unit, problem: p, choices: makeChoices(p.ans, { mode: choiceMode(p.id) }) };
 }
 
 export default function Diagnose({ player, chapter, onApply, onStartUnit, onBack }) {

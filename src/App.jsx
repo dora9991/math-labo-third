@@ -30,7 +30,7 @@ import { logAnswer } from "./store/answerLog.js";
 import { getRememberedId } from "./auth/loginPrefs.js";
 import { makeRecord, makeMistake } from "./store/recordSchema.js";
 import { levelFromXp, xpForLevel, playerLevel, playerXp, timeAttackCrystal, RELEARN_XP_PER_CORRECT, questionCoin, CYCLE_PRACTICE_TARGET, CYCLE_RELEARN_TARGET, MASTER_CYCLE_COIN, MASTER_CYCLE_CRYSTAL, isUnitCycleCleared, REST_CYCLES_SOFT, restMultiplier, RELEARN_STREAK_TARGET, RELEARN_CONFIRM_COIN } from "./engine/scoring.js";
-import { genProblem, genProblemSeeded, makeChoices } from "./engine/generator.js";
+import { genProblem, genProblemSeeded, makeChoices, choiceMode } from "./engine/generator.js";
 import { updateMastery, levelDifficulty, INITIAL_MASTERY } from "./engine/mastery.js";
 import * as bgm from "./audio/bgm.js";
 import * as sfx from "./audio/sfx.js";
@@ -1591,14 +1591,14 @@ export default function App() {
         const p = genProblemSeeded(unit, lvl, lastId) || genProblemSeeded(unit, battleDiffRef.current.level, lastId);
         if (p) {
           battleMistakeSourceRef.current = { unitId: unit.id, q: p.q };
-          return { ...p, choices: makeChoices(p.ans) };
+          return { ...p, choices: makeChoices(p.ans, { mode: choiceMode(p.id) }) };
         }
       }
       battleMistakeSourceRef.current = null;
       // ④ 難易度ナビ：ふつう開始→2ミスで↓／5連正解で↑（battleDiffRef を1問ごとに更新）
       const lvl = battleDiffRef.current.level;
       const p = genProblemSeeded(unit, lvl, lastId) || genProblemSeeded(unit, "standard", lastId) || genProblemSeeded(unit, "easy", lastId);
-      return p ? { ...p, choices: makeChoices(p.ans) } : null; // choices→4択(数値) / 記述は自由入力
+      return p ? { ...p, choices: makeChoices(p.ans, { mode: choiceMode(p.id) }) } : null; // choices→4択(数値) / 記述は自由入力
     };
   }
   // 演習バトルの解答1問ごと：難易度ナビを更新し、出題が誤答束由来なら学び直しの段階も進める。

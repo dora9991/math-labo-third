@@ -18,7 +18,7 @@ import CharBubble, { voice } from "../components/CharBubble.jsx";
 import DrawPad from "../components/DrawPad.jsx";
 import MathText from "../components/MathText.jsx";
 import * as sfx from "../audio/sfx.js";
-import { buildTemplate, makeChoices } from "../engine/generator.js";
+import { buildTemplate, makeChoices, choiceMode } from "../engine/generator.js";
 import { pickNext } from "../engine/selector.js";
 import { isCorrect } from "../engine/scoring.js";
 import { updateMastery, levelDifficulty, INITIAL_MASTERY, THETA } from "../engine/mastery.js";
@@ -76,7 +76,7 @@ export default function StepUp({ player, chapter, onAttempt, onHome, targetSkill
     if (!problem) { setCur(null); return; }
     lastIdRef.current = entry.templateId;
     setCur({ entry, problem });
-    setChoices(makeChoices(problem.ans));
+    setChoices(makeChoices(problem.ans, { mode: choiceMode(problem.id) }));
     setSelected(null);
     setLocked(false);
     setFb(null);

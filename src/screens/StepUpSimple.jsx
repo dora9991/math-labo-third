@@ -20,7 +20,7 @@ import DrawPad from "../components/DrawPad.jsx";
 import MathText from "../components/MathText.jsx";
 import QuestionText from "../components/QuestionText.jsx";
 import * as sfx from "../audio/sfx.js";
-import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { genProblem, genProblemSeeded, makeChoices, choiceMode } from "../engine/generator.js";
 import { generatePracticeAvoiding } from "../third/problemSource.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
@@ -41,7 +41,7 @@ const POINT_PER_CORRECT = 10;
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 const hasChoices = (q) => Array.isArray(q.choices) && q.choices.length > 0;
 const choicesFor = (q) => (q?.toketa && Array.isArray(q.distractors) ? shuffle(q.distractors.map((d) => String(d.val)))
-  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans));
+  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans, { mode: choiceMode(q.id) }));
 const ansEq = (val, q) => hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : answerMatches(val, q.ans);
 // 選んだ選択肢の値から、その誤答の診断タグを引く（toketa問題のみ。無ければnull＝正解 or 非toketa）
 const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))

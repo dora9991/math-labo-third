@@ -19,7 +19,7 @@ import QuestionText from "../components/QuestionText.jsx";
 import DrawPad from "../components/DrawPad.jsx";
 import * as sfx from "../audio/sfx.js";
 import { logAnswer } from "../store/answerLog.js";
-import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { genProblem, genProblemSeeded, makeChoices, choiceMode } from "../engine/generator.js";
 import { generatePracticeAvoiding } from "../third/problemSource.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
@@ -42,7 +42,7 @@ const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[
 const hasChoices = (q) => Array.isArray(q.choices) && q.choices.length > 0;
 // toketa 問題は診断タグ付き distractors を4択に使う（誤答の意味を持たせる）
 const choicesFor = (q) => (q?.toketa && Array.isArray(q.distractors) ? shuffle(q.distractors.map((d) => String(d.val)))
-  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans));
+  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans, { mode: choiceMode(q.id) }));
 // 選んだ選択肢の値から、その誤答の診断タグを引く（toketa問題のみ。無ければnull＝正解 or 非toketa）
 const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
   ? (q.distractors.find((d) => String(d.val) === String(val))?.tag || null)

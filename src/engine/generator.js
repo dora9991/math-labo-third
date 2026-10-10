@@ -14,6 +14,7 @@ import { rng, pick } from "./rng.js";
 import { randomSeed } from "./seed.js";
 import { buildSeeded } from "./grade.js";
 import { dbTemplatesFor } from "../data/dbProblems.js";
+import { SIGN_MIXED } from "./signMixed.js";
 
 // DB実問題を出す割合（手続き生成より優先。手続きは変化球として残す）
 const DB_PREFER = 0.65;
@@ -121,49 +122,133 @@ export function isHardProblem(p) {
   return false;
 }
 
-/**
- * 4択の選択肢を作る（タイムアタック用）。正解＋それらしいダミー3つ。
- * @param {number} ans 正解の値
- * @returns {number[]} シャッフル済みの4択
- */
-export function makeChoices(ans) {
-  const a = Number(ans);
-  if (!Number.isFinite(a)) return [ans]; // 数値でない答え（記述など）は4択にしない
+// ============================================================
+// 4択の誤答の作り方（2026-10-10 作り直し）
+//
+//  きっかけ：生徒が「答えが17なら必ず-17もあり、符号が反対のものが1つだけ。その反対側を選べば答えになる」
+//  という法則を見つけた。以前は「答えの符号を反転した値(-答え)を必ず1つ＋答えの近くの値」で作っていたため、
+//  この法則で約97%当たり、答えが「小さい順の2・3番目」に偏るなど、解かずに当てられる手がかりが多かった。
+//  今は、選択肢の並びから答えが推測できないように、次のようにする（検査: npm run test:choice-leak）。
+//
+//   ・same（既定）  4つとも答えと同じ符号にする。大きさは答えの近くから選び、答えが「小さい順の何番目」に
+//                   なるかを同じ確率にする。符号が1つだけ違う値、符号を反転した相棒、が生まれない。
+//   ・mirror        符号の判断が問題の肝（答えが負になる割合が30〜70%）のテンプレ用。{答え, -答え, y, -y}
+//                   のように、反対の符号どうしを必ず「対」にして出す。符号の間違いは選べるが、
+//                   符号も「相棒がいるか」も、答えを選ぶ手がかりにならない。
+//   モードはテンプレごとに src/engine/signMixed.js（scripts/gen-sign-mixed.mjs が作る）で決まる。
+// ============================================================
+
+/** テンプレIDから4択の作り方（same / mirror）を決める（符号が問題の肝のテンプレだけ mirror） */
+export const choiceMode = (templateId) => (SIGN_MIXED.has(templateId) ? "mirror" : "same");
+
+/** 答え a の近くの誤答候補を k 個返す（互いに別・答えと別・taken と別）。
+ *  ・隣どうしの間隔を同じ分布から作った「k+1 個の列」を作り、答えをその列の「ランダムな位置」に置く。
+ *    → 答えが「いちばん小さい／大きい」「まん中」「平均に近い」のどれかに偏らない
+ *      （以前は答えの近くに誤答を寄せていたので、答えがまん中に来やすかった）。
+ *  ・答えが小さいときは間隔も小さくして、0 より下に列を作れない分の偏りを防ぐ。
+ *  ・既定は「大きさ（絶対値）」を返す（0以上）。allowNeg なら符号つきの値をそのまま返す（答えが 0 のとき）。 */
+function nearMagnitudes(a, k, taken = [], allowNeg = false) {
   const isInt = Number.isInteger(a);
   const round = (x) => (isInt ? Math.round(x) : Math.round(x * 10) / 10);
-  const choices = new Set([a]);
-
-  // ① よくある誤答を“1つだけ”ダミーに入れる（あてずっぽうで当たりにくいよう、似すぎる罠は1つに絞る）
-  //    符号ミス(-a) … 正負の数で多い間違い／ 絶対値(|a|) … 負の答えのとき
-  const traps = [];
-  if (a !== 0 && -a !== a) traps.push(round(-a));
-  if (a < 0) traps.push(round(Math.abs(a)));
-  for (const t of traps) {
-    if (choices.size >= 2) break;
-    if (Number.isFinite(t) && !choices.has(t)) choices.add(t);
+  const base = allowNeg ? a : Math.abs(a);
+  const m0 = Math.abs(a);
+  const steps = isInt ? [1, 2, 3, 4, 5, 6, 7, 8, 10] : [0.1, 0.2, 0.3, 0.5, 1, 1.5, 2];
+  if (isInt && m0 >= 20) for (const r of [0.1, 0.15, 0.2]) steps.push(Math.max(1, Math.round(m0 * r)));
+  const limit = Math.max(m0 / k, steps[0]);
+  const pool = steps.filter((g) => g <= limit + 1e-9);
+  const gaps = pool.length ? pool : [steps[0]];
+  for (let tries = 0; tries < 60; tries++) {
+    const g = Array.from({ length: k }, () => gaps[Math.floor(Math.random() * gaps.length)]);
+    const pos = [0]; for (const x of g) pos.push(pos[pos.length - 1] + x); // 列の各位置（0, g1, g1+g2, …）
+    const feasible = [];
+    for (let r = 0; r <= k; r++) if (allowNeg || base + pos[0] - pos[r] >= -1e-9) feasible.push(r); // 0 より下にならない位置
+    const r = feasible[Math.floor(Math.random() * feasible.length)];
+    const out = [];
+    for (let i = 0; i <= k; i++) if (i !== r) out.push(round(base + pos[i] - pos[r]));
+    if (out.some((v) => v === base || taken.includes(v)) || new Set(out).size !== out.length) continue;
+    return out;
   }
+  const out = []; // 保険：答えより大きい値で埋める
+  for (let fb = 1; out.length < k; fb++) { const c = round(base + fb); if (!taken.includes(c)) out.push(c); }
+  return out;
+}
 
-  // ② 残りは「正解の近く」のもっともらしい値で埋める。
-  //    ズレ幅を答えの大きさに比例させ、不自然に離れた選択肢を出さない。
-  const mag = Math.max(1, Math.abs(a));
-  const baseDeltas = isInt
-    ? [1, 2, 3, 4, 5, -1, -2, -3]
-    : [0.1, 0.2, 0.5, 1, -0.1, -0.2, -0.5];
-  // 答えが大きい整数のときは ±10〜20% のズレも候補に混ぜる
-  const scaled = isInt && mag >= 20
-    ? [Math.round(mag * 0.1), -Math.round(mag * 0.1), Math.round(mag * 0.2)].filter((d) => d !== 0)
-    : [];
-  const deltas = [...baseDeltas, ...scaled];
+const fisherYates = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-  let guard = 0;
-  while (choices.size < 4 && guard < 300) {
-    guard++;
-    const cand = round(a + pick(deltas));
-    if (Number.isFinite(cand)) choices.add(cand);
+/**
+ * 4択の選択肢を作る。正解＋それらしいダミー3つ（数値の答え用）。
+ * @param {number} ans 正解の値
+ * @param {{mode?: "same"|"mirror"}} [opts] mode … 上の説明を参照（既定 same）
+ * @returns {number[]} シャッフル済みの4択
+ */
+export function makeChoices(ans, opts = {}) {
+  const a = Number(ans);
+  if (!Number.isFinite(a)) return [ans]; // 数値でない答え（記述など）は4択にしない
+  const sign = a < 0 ? -1 : 1;
+  const mags = (k, taken = []) => nearMagnitudes(a, k, taken);
+  let vals;
+  if (opts.mode === "mirror" && a !== 0) {
+    const [y] = mags(1, [0]);                       // 0 だと -0 と重なるので使わない
+    vals = [a, -a, y, -y];                          // 反対の符号どうしが対（x と -x、y と -y）
+  } else if (a === 0) {
+    vals = [0, ...nearMagnitudes(0, 3, [], true)];  // 0 には符号が無い（正負の両方に並べる）
+  } else {
+    vals = [a, ...mags(3).map((m) => sign * m)];   // 4つとも答えと同じ符号
+    // 答えが小さいときは誤答に 0 も出す（答えが 0 の問題もあるので、「0 があれば答え」にならないように）
+    if (Math.abs(a) <= 6 && !vals.includes(0) && Math.random() < 0.11) vals[1 + Math.floor(Math.random() * 3)] = 0;
   }
-  // それでも足りない場合の保険
-  let fb = 1;
-  while (choices.size < 4) choices.add(round(a + fb++));
+  return fisherYates(vals.map((v) => (v === 0 ? 0 : v)));
+}
 
-  return [...choices].sort(() => Math.random() - 0.5);
+/**
+ * 問題のテンプレートが自分で作った数値の4択（文字列）から、「符号が1つだけ違う」「符号を反転した相棒が1組だけいる」
+ * という、答えを推測できる並びを取りのぞく。そうでなければそのまま返す。答えの文字列は変えない。
+ * 手書きの誤答（理由つきヒント＝とけた式）には使わない。
+ * @param {string[]} choices 4択（文字列）
+ * @param {string|number} ans 正解
+ * @param {"same"|"mirror"} [mode]
+ * @returns {string[]}
+ */
+export function deLeakChoices(choices, ans, mode = "same") {
+  const num = (s) => { const t = String(s).replace(/\s/g, "").replace(/−/g, "-"); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
+  if (!Array.isArray(choices) || choices.length !== 4) return choices;
+  const vals = choices.map(num);
+  if (vals.some((v) => v === null) || new Set(vals).size !== 4) return choices;
+  const a = num(ans);
+  const ai = choices.findIndex((c) => String(c).replace(/\s/g, "") === String(ans).replace(/\s/g, ""));
+  if (a === null || ai < 0 || a === 0) return choices;
+  const hasUnicodeMinus = choices.some((c) => String(c).includes("−"));
+  const fmt = (v) => (v < 0 ? (hasUnicodeMinus ? "−" : "-") + Math.abs(v) : String(v));
+  // 「答えの近くの数を並べただけ」の4択（意味のある誤答が無い）は、自動生成と同じ作り方に置きかえる
+  //  （手書きだと、答えがまん中の2つに偏りやすい）。意味のある誤答（和と積を取りちがえた値など）は残す。
+  const band = Math.max(5, 0.25 * Math.abs(a));
+  if (vals.every((v, i) => i === ai || Math.abs(v - a) <= band)) {
+    const made = makeChoices(a, { mode }).map((v) => (v === a ? choices[ai] : fmt(v)));
+    return made.length === 4 ? made : choices;
+  }
+  const pos = vals.filter((v) => v > 0).length, neg = vals.filter((v) => v < 0).length;
+  const pairs = vals.filter((v, i) => v !== 0 && vals.indexOf(-v) > i).length; // 反転して同じ値になる組の数
+  const lone = (pos === 1 && neg === 3) || (neg === 1 && pos === 3);
+  if (!lone && pairs !== 1) return choices; // 手がかりになる並びではない → そのまま
+  const sign = a < 0 ? -1 : 1;
+  let out;
+  if (mode === "mirror") {
+    // {答え, -答え, y, -y}：y は、答え以外でいちばん答えに近い大きさの誤答（無ければ新しく作る）
+    const cands = vals.map((v, i) => ({ m: Math.abs(v), i })).filter((x) => x.i !== ai && x.m !== Math.abs(a) && x.m !== 0);
+    cands.sort((p, q) => Math.abs(p.m - Math.abs(a)) - Math.abs(q.m - Math.abs(a)));
+    const y = cands.length ? cands[0].m : nearMagnitudes(a, 1, [0])[0];
+    out = [choices[ai], fmt(-a), fmt(sign * y), fmt(-sign * y)];
+  } else {
+    // 答えと反対の符号の誤答は、符号を直した値にする（すでにあれば、近い値を新しく作る）
+    const used = new Set(vals);
+    out = choices.map((c, i) => {
+      if (i === ai || vals[i] === 0 || Math.sign(vals[i]) === sign) return c;
+      used.delete(vals[i]);
+      let nv = -vals[i];
+      if (used.has(nv)) nv = sign * nearMagnitudes(a, 1, [...used].map(Math.abs))[0];
+      used.add(nv);
+      return fmt(nv);
+    });
+  }
+  return fisherYates(out);
 }

@@ -7,7 +7,7 @@ import { join } from "node:path";
 const files = [];
 const walk = (d) => { for (const f of readdirSync(d).sort()) { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : /\.(js|json)$/.test(f) && files.push(p); } };
 walk("src/data");
-for (const f of ["src/engine/generator.js", "src/engine/seed.js", "src/engine/rng.js", "src/engine/grade.js", "src/third/seeded.js", "src/third/problemSource.js", "src/third/link.js"]) files.push(f);
+for (const f of ["src/engine/generator.js", "src/engine/signMixed.js", "src/engine/seed.js", "src/engine/rng.js", "src/engine/grade.js", "src/third/seeded.js", "src/third/problemSource.js", "src/third/link.js"]) files.push(f);
 const h = createHash("sha1");
 for (const f of files) h.update(f).update(readFileSync(f));
 const v = h.digest("hex").slice(0, 12);
