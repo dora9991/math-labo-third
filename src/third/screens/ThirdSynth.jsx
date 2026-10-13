@@ -15,6 +15,7 @@ import { GACHA, SYNTH } from "../gachaConfig.js";
 import { monsterImageUrl } from "../data/monsterImages.js";
 import { playGachaChargeSound, playGachaBurstSound } from "../fx/sound.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
+import { displayName } from "../nick.js";
 import ExpMeter from "../components/ExpMeter.jsx";
 import "./synth.css";
 
@@ -127,7 +128,7 @@ export default function ThirdSynth({ nav }) {
     setBusy(true); setMsg(null);
     const r = await actions.limitBreak(lastSpare);
     setBusy(false);
-    if (r.ok) setMsg({ ok: true, text: `💠 ${charactersById[lastSpare]?.name} が 限界突破！ ★${r.breaks}` });
+    if (r.ok) setMsg({ ok: true, text: `💠 ${displayName(charactersById[lastSpare])} が 限界突破！ ★${r.breaks}` });
     else setMsg({ ok: false, text: ERR[r.error] || "うまくいかなかったよ" });
   }
 
@@ -157,7 +158,7 @@ export default function ThirdSynth({ nav }) {
           <div className="sy-target">
             {monsterImageUrl(tChar, "full") ? <img src={monsterImageUrl(tChar, "full")} alt={tChar.name} draggable={false} /> : <div />}
             <div>
-              <div className="sy-tname"><span className={`mw-rarity mw-rarity-${tChar.rarity}`}>{tChar.rarity}</span> {tChar.name}</div>
+              <div className="sy-tname"><span className={`mw-rarity mw-rarity-${tChar.rarity}`}>{tChar.rarity}</span> {displayName(tChar)}</div>
               <div className="sy-tlv">Lv {lvNow}{matCount > 0 && lvAfter > lvNow ? <span style={{ color: "#fde047" }}> → {lvAfter}</span> : ""}</div>
               <div style={{ fontSize: 11.5, color: "#c9d6d8" }}>{atCap ? "レベル上限！" : `経験値 ${tExp}`}</div>
               <button className="mw-diff-btn" style={{ marginTop: 6 }} onClick={() => setChanging(true)}>えらびなおす</button>
@@ -192,7 +193,7 @@ export default function ThirdSynth({ nav }) {
         {tab === "owned" && ownedSel.length > 0 && <div style={{ fontSize: 11.5, color: "#ffb4b4", marginTop: 8 }}>※ 合成したキャラは、力をあずけて旅立ちます（仲間からははなれますが、図鑑には残ります）</div>}
         {canBreak && (
           <button className="mw-fantasy-item" style={{ justifyContent: "center", marginTop: 10, width: "100%" }} onClick={doBreak}>
-            <span className="mw-fantasy-icon">💠</span>予備を使って「{charactersById[lastSpare]?.name}」を限界突破（★{save.owned[lastSpare].breaks} → ★{save.owned[lastSpare].breaks + 1}）
+            <span className="mw-fantasy-icon">💠</span>予備を使って「{displayName(charactersById[lastSpare])}」を限界突破（★{save.owned[lastSpare].breaks} → ★{save.owned[lastSpare].breaks + 1}）
           </button>
         )}
         {msg && <div style={{ marginTop: 8, fontWeight: 900, color: msg.ok ? "#7cff8a" : "#ffb4b4", textAlign: "center" }}>{msg.text}</div>}
@@ -204,7 +205,7 @@ export default function ThirdSynth({ nav }) {
       {createPortal(
       <div className="sy-bar">
         <div className="sum">
-          {!target ? "① 強くする子を えらんでね" : matCount === 0 ? "② 合成するキャラを えらんでね" : <>{matCount}体 → {tChar?.name}<br /><b>経験値 +{gain}</b>　Lv {lvNow} → <b style={{ color: lvAfter > lvNow ? "#fde047" : "#7cff8a" }}>{lvAfter}</b>{atCap ? "（上限！むだになるよ）" : ""}</>}
+          {!target ? "① 強くする子を えらんでね" : matCount === 0 ? "② 合成するキャラを えらんでね" : <>{matCount}体 → {displayName(tChar)}<br /><b>経験値 +{gain}</b>　Lv {lvNow} → <b style={{ color: lvAfter > lvNow ? "#fde047" : "#7cff8a" }}>{lvAfter}</b>{atCap ? "（上限！むだになるよ）" : ""}</>}
         </div>
         <button className="sy-go" disabled={!canSynth} onClick={synth}>{busy ? "…" : "合成！"}</button>
       </div>,

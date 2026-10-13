@@ -35,3 +35,16 @@
 .cp-close { display: block; margin: 14px auto 0; padding: 10px 40px; font-weight: 800; letter-spacing: .2em; color: #141018; background: linear-gradient(135deg,#ffe2a0,#bd762d); border: 1px solid #fff0bd; cursor: pointer; }
 /* スマホの編成：パーティの5枠は控えと同じ大きさの絵にする */
 .mw-party-row.mw-party-row-small.mw-party-edit .mw-portrait-frame { width: 100%; margin: 0; }
+
+/* ニックネーム欄（所持している子だけ） */
+.cp-nick { margin-top: 8px; }
+.cp-nick-label { display: block; font-size: .72rem; letter-spacing: .3em; color: var(--cp-edge); margin-bottom: 4px; }
+.cp-nick-row { display: flex; gap: 6px; }
+.cp-nick-input { flex: 1; min-width: 0; width: 0; font: inherit; font-size: 16px; /* 16px未満だとiPhoneが拡大する */ font-weight: 800; padding: 8px 10px; color: #fff; background: rgba(3,8,18,.7); border: 1px solid rgba(223,189,115,.45); border-radius: 0; }
+.cp-nick-input:focus { outline: none; border-color: var(--cp-edge); box-shadow: 0 0 10px var(--cp-glow); }
+.cp-nick-btn { flex-shrink: 0; min-width: 64px; font: inherit; font-size: .85rem; font-weight: 900; letter-spacing: .1em; padding: 0 12px; color: #141018; background: linear-gradient(135deg,#ffe2a0,#bd762d); border: 1px solid #fff0bd; cursor: pointer; }
+.cp-nick-btn:disabled { opacity: .4; cursor: default; }
+.cp-nick-sub { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: .72rem; color: #c9b98f; }
+.cp-nick-sub .ok { color: #7cff8a; }
+.cp-nick-sub .ng { color: #ff9a8a; }
+.cp-nick-reset { margin-top: 6px; font: inherit; font-size: .72rem; color: #c9b98f; background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; }

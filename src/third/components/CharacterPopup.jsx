@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { getStatsAtLevel } from "../growthCurve.js";
 import { expProgress, expOf, levelFromExp } from "../expCurve.js";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
@@ -5,6 +6,8 @@ import "./characterPopup.css";
 import "./expMeter.css";
 import { getViewGrade } from "../gradeView.js";
 import SubjectPentagon from "./SubjectPentagon.jsx";
+import { useGame } from "../ThirdContext.jsx";
+import { NICK_MAX, clipNick, cleanNick, nickLength, displayName } from "../nick.js";
 
 const STATUS_LABEL = {
   poison: "毒",
@@ -20,9 +23,28 @@ const STATUS_LABEL = {
 const MAX_HP = 1900, MAX_ATK = 650; // バーの目盛り（超えたら満タン扱い）
 
 export default function CharacterPopup({ character, save, onClose }) {
+  const { actions } = useGame();
+  const own = character ? save.owned[character.id] : null;
+  const saved = own?.nick || "";
+  const [draft, setDraft] = useState(saved);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null); // { ok, text }：つけた／もどした／失敗 のひとこと
+  const noteTimer = useRef(0);
+  useEffect(() => () => clearTimeout(noteTimer.current), []);
+  useEffect(() => { setDraft(saved); setNote(null); }, [character?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!character) return null;
   const grade = getViewGrade();
-  const own = save.owned[character.id];
+  const flash = (n) => { setNote(n); clearTimeout(noteTimer.current); noteTimer.current = setTimeout(() => setNote(null), 2600); };
+  const commit = async (value) => {
+    if (busy) return;
+    setBusy(true);
+    const r = await actions.setNick(character.id, value);
+    setBusy(false);
+    if (r.ok) { setDraft(r.nick); flash({ ok: true, text: r.nick ? `「${r.nick}」と よぶよ！` : "もとの名前にもどしたよ" }); }
+    else flash({ ok: false, text: "うまくいかなかったよ。もういちど ためしてね" });
+  };
+  const wanted = cleanNick(draft);
+  const changed = wanted !== saved;
   const chr = { ...character, breaks: own?.breaks || 0 };
   const total = expOf(own, grade);
   const prog = expProgress(total, character.rarity);
@@ -36,9 +58,29 @@ export default function CharacterPopup({ character, save, onClose }) {
         <div className="cp-hero">
           <span className="cp-rar">{character.rarity}</span>
           {url ? <img className="cp-art" src={url} alt={character.name} style={{ filter: monsterImgFilter(character) }} draggable={false} /> : <div style={{ fontSize: "4rem" }}>❓</div>}
-          <div className="cp-name">{character.name}</div>
-          <div className="cp-theme">{character.theme}</div>
+          <div className="cp-name">{displayName(character)}</div>
+          <div className="cp-theme">{saved ? `もとの名前：${character.name}　` : ""}{character.theme}</div>
         </div>
+
+        {own && (
+          <div className="cp-sec cp-nick">
+            <label className="cp-nick-label" htmlFor="cp-nick-input">ニックネーム</label>
+            <div className="cp-nick-row">
+              <input
+                id="cp-nick-input" className="cp-nick-input" value={draft} placeholder={`${NICK_MAX}文字まで（例：ぷにお）`}
+                autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="done"
+                onChange={(e) => setDraft(clipNick(e.target.value))}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && changed && !busy) commit(wanted); }}
+              />
+              <button className="cp-nick-btn" disabled={!changed || busy} onClick={() => commit(wanted)} data-sfx="none">{busy ? "…" : wanted || !saved ? "つける" : "もどす"}</button>
+            </div>
+            <div className="cp-nick-sub">
+              <span className={note ? (note.ok ? "ok" : "ng") : ""}>{note ? note.text : saved ? "自分にだけ見えるよ" : "好きな名前をつけられるよ（自分にだけ見えるよ）"}</span>
+              <span>{nickLength(draft)} / {NICK_MAX}</span>
+            </div>
+            {saved && <button className="cp-nick-reset" onClick={() => commit("")} disabled={busy} data-sfx="none">もとの名前にもどす</button>}
+          </div>
+        )}
 
         <div className="cp-sec">
           <div className="cp-lvbox">

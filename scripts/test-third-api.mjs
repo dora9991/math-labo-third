@@ -73,6 +73,29 @@ function makeClaim({ n = 12, correctRate = 1, ms = 3000, nonce = "n" + Math.rand
   r = await call(s, "set_party", { party: [T.STARTER_PARTY[0], T.STARTER_PARTY[0], null, null, null] }); t("同じキャラの重複は不可", r.status === 400);
   r = await call(s, "set_party", { party: [T.STARTER_PARTY[1], T.STARTER_PARTY[0], null, null, null] }); t("所持キャラの並べ替えはOK", r.status === 200 && r.body.state.party[0] === T.STARTER_PARTY[1]); }
 
+// ===== 3.2 仲間のニックネーム（本人の仲間にだけ・8文字まで・消せる・他の操作で消えない）
+{ const s = makeStore(); await call(s, "get_state", {});
+  const [a, b] = T.STARTER_PARTY;
+  let r = await call(s, "set_nick", { id: a, nick: "ぷにお" }); t("ニックネームをつけられる", r.status === 200 && r.body.state.owned[a].nick === "ぷにお" && r.body.nick === "ぷにお");
+  t("ほかの子・ほかの項目は変わらない", r.body.state.owned[b].nick === undefined && r.body.state.owned[a].exp === 0 && r.body.state.owned[a].breaks === 0 && r.body.state.owned[a].n === 1);
+  r = await call(s, "set_nick", { id: a, nick: "  れっどぶるーぐりーんいえろー  " }); t("9文字以上は8文字までに切る・前後の空白は取る", r.status === 200 && r.body.state.owned[a].nick === "れっどぶるーぐり");
+  r = await call(s, "set_nick", { id: a, nick: "あ\nい\u0000う\u200bえ　　" }); t("改行・制御文字・ゼロ幅は空白にし、続く空白は1つに", r.status === 200 && r.body.state.owned[a].nick === "あ い う え", JSON.stringify(r.body.state.owned[a].nick));
+  r = await call(s, "set_nick", { id: a, nick: "🐱🐶ねこ" }); t("絵文字も1文字と数える", r.status === 200 && r.body.state.owned[a].nick === "🐱🐶ねこ");
+  r = await call(s, "set_nick", { id: "sp_calc_a_ur", nick: "ずる" }); t("未所持の子にはつけられない", r.status === 400 && r.body.error === "not-owned");
+  r = await call(s, "set_nick", { id: a, nick: 123 }); t("文字列でない値は拒否", r.status === 400 && r.body.error === "bad-nick");
+  r = await call(s, "set_nick", { id: a, nick: {} }); t("オブジェクトも拒否", r.status === 400);
+  r = await call(s, "set_nick", { id: a, nick: "ぷにお" });
+  r = await call(s, "set_party", { party: [b, a, null, null, null] }); t("編成を変えてもニックネームは残る", r.status === 200 && r.body.state.owned[a].nick === "ぷにお");
+  const cur = (await s.load("stu1")); cur.state.spares[a] = 2; cur.state.spares[b] = 1; await s.save("stu1", cur.state, cur.version);
+  r = await call(s, "limit_break", { id: a }); t("限界突破してもニックネームは残る", r.status === 200 && r.body.state.owned[a].nick === "ぷにお" && r.body.state.owned[a].breaks === 1);
+  r = await call(s, "synthesize", { targetId: a, grade: 1, materials: [{ id: b, source: "spare", count: 1 }] }); t("合成の強化先になってもニックネームは残る", r.status === 200 && r.body.state.owned[a].nick === "ぷにお");
+  r = await call(s, "get_state", {}); t("読み込み直してもニックネームは残る（正規化）", r.body.state.owned[a].nick === "ぷにお");
+  const dirty = T.normalizeThirdState({ ...r.body.state, owned: { ...r.body.state.owned, [b]: { ...r.body.state.owned[b], nick: "  　\n  " }, [a]: { ...r.body.state.owned[a], nick: "あ".repeat(30) } } });
+  t("壊れた保存でも整える（空白だけ→なし／長すぎ→8文字）", dirty.owned[b].nick === undefined && dirty.owned[a].nick === "あ".repeat(8));
+  r = await call(s, "set_nick", { id: a, nick: "" }); t("空にするとニックネームが消える", r.status === 200 && r.body.state.owned[a].nick === undefined && r.body.nick === "");
+  r = await call(s, "set_nick", { id: a, nick: "   " }); t("空白だけも消す扱い", r.status === 200 && r.body.state.owned[a].nick === undefined);
+  const sa = T.setNick(r.body.state, b, "しろ"); t("元の状態は書き換えない（純関数）", sa.ok && r.body.state.owned[b].nick === undefined && sa.state.owned[b].nick === "しろ"); }
+
 // ===== 3.5 画面が作る問題を、サーバーが同じseedで作り直せるか（全単元・全難度）
 { let bad = 0, n = 0;
   for (const g of [1, 2, 3]) for (const c of T.chaptersForGrade(g)) for (const u of c.units) for (const lv of ["easy", "standard", "advanced", "oni"]) {
