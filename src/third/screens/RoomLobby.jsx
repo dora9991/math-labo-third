@@ -128,9 +128,8 @@ export default function RoomLobby({ nav }) {
           <div style={{ color: "#ffe9b3", textAlign: "center", lineHeight: 1.7 }}>2〜5人で、ひとつのパーティになって戦うよ。<br />部屋をつくって、コードを友だちに伝えよう。</div>
           <button className="mw-btn primary" disabled={busy} onClick={() => run(() => thirdApi.roomCreate())}>🏠 部屋をつくる（ホスト）</button>
           <div style={{ textAlign: "center", color: "rgba(255,255,255,.6)", fontSize: 12 }}>— または —</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={codeIn} onChange={(e) => setCodeIn(normalizeCode(e.target.value))} placeholder="部屋コード（4もじ）" maxLength={ROOM.codeLen}
-              style={{ flex: 1, padding: "12px", fontSize: "1.3rem", letterSpacing: "0.3em", textAlign: "center", borderRadius: 10, border: "2px solid rgba(255,255,255,.25)", background: "rgba(0,0,0,.35)", color: "#fff" }} />
+          <div className="mw-room-join">
+            <input value={codeIn} onChange={(e) => setCodeIn(normalizeCode(e.target.value))} placeholder="部屋コード（4もじ）" maxLength={ROOM.codeLen} />
             <button className="mw-btn primary" disabled={busy || codeIn.length !== ROOM.codeLen} onClick={() => run(() => thirdApi.roomJoin(codeIn))}>入る</button>
           </div>
         </div>

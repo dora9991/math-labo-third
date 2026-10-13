@@ -19,6 +19,8 @@
     "test:third-raid": "node scripts/test-third-raid.mjs",
     "test:third-logging": "node scripts/test-third-logging.mjs",
     "test:recommend": "node scripts/test-recommend.mjs",
+    "test:choice-leak": "node scripts/test-choice-leak.mjs",
+    "gen:sign-mixed": "node scripts/gen-sign-mixed.mjs",
     "release": "node scripts/release.mjs"
   },
   "dependencies": {
