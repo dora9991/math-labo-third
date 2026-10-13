@@ -7,7 +7,7 @@
 //  世界側の小単元ID(m_c1_u3)→ラボ3の単元ID(u3)への変換もここで行う。
 // ============================================================
 import { chaptersForGrade, findUnitById } from "../data/index.js";
-import { genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { genProblemSeeded, makeChoices, deLeakChoices, choiceMode } from "../engine/generator.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import { answerMatches } from "../engine/scoring.js";
 import { labUnitIdForBattle } from "./link.js";
@@ -42,10 +42,15 @@ export function generateThirdProblem(unitId, difficulty = "standard", seed = new
       //  2026-09-30 まではバトルだけ全難度でとけた式になり、難度を変えても問題が同じ＝鬼が得なだけだった）
       const q = level === "standard" && hasToketa(unitId) ? genToketa(unitId) : genProblemSeeded(unit, level);
       if (!q) continue;
+      // 4択の作り方（2026-10-10 改訂：答えを推測できる並びにしない。くわしくは generator.js の makeChoices）
+      //  ・とけた式（手書きの誤答＋理由つきヒント）はそのまま。
+      //  ・テンプレが自分で作った4択は、「符号が1つだけ違う」「符号を反転した相棒が1組だけいる」並びだけ直す。
+      //  ・ふつうの数値問題は、答えと同じ符号の誤答（符号が肝のテンプレだけ ＋と－を対にして）を作る。
+      const mode = choiceMode(q.id);
       let choices;
       if (q.toketa && Array.isArray(q.distractors)) choices = shuffle(q.distractors.map((d) => String(d.val)));
-      else if (Array.isArray(q.choices) && q.choices.length) choices = shuffle(q.choices.map(String));
-      else choices = shuffle(makeChoices(q.ans).map(String));
+      else if (Array.isArray(q.choices) && q.choices.length) choices = shuffle(deLeakChoices(q.choices.map(String), q.ans, mode));
+      else choices = shuffle(makeChoices(q.ans, { mode }).map(String));
       if (choices.length < 2) continue; // 4択にできない(記述式)問題は引き直す
       const ansStr = String(q.ans);
       const correctIndex = choices.findIndex((c) =>

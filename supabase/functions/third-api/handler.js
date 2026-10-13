@@ -7,7 +7,8 @@
 import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
 import { ROOM, newRoomCode, normalizeCode, createRoom, joinRoom, leaveRoom, startRoom, roomView, isActive, memberIds } from "../../../src/third/room.js";
-import { initialThirdState, normalizeThirdState, pullGacha, setParty, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, PROBLEM_VERSION } from "../../../src/third/core.js";
+import { initialThirdState, normalizeThirdState, pullGacha, setParty, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, applyCoopWin, PROBLEM_VERSION } from "../../../src/third/core.js";
+import { startBattle, readyBattle, tickBattle, submitAnswer, rewardEligibility, markRewarded, unmarkRewarded, maxStartIndex } from "../../../src/third/raidBattle.js";
 import { summarizeAttempts, summarizeTags } from "../../../src/third/learnerProfile.js";
 
 // おすすめ（今日のおすすめ・理解度マップ）用に読む解答の範囲
@@ -185,6 +186,94 @@ async function handleRoom({ action, body, userId, store, now, rand }) {
     if (!r.ok) return { status: 400, body: { error: r.error } };
     if (!(await store.roomSave(r.room, rec.version))) return conflict;
     return view(r.room);
+  }
+  // ---------------- 協力バトル（同時に答える裏ボス連戦。2026-10-09）----------------
+  //  全員がほぼ同時に操作するので、部屋の保存が競合しやすい。競合したら読み直して、その場でやり直す（最大 TRIES 回）。
+  const TRIES = 6;
+  const allStates = async (rec) => {
+    const states = {};
+    for (const id of memberIds(rec.room)) { const l = await store.load(id); states[id] = l ? normalizeThirdState(l.state) : normalizeThirdState(initialThirdState()); }
+    return states;
+  };
+  if (action === "room_battle_state") { // 開始画面用：どの裏ボスから始められるか（全員が前を倒している番号まで）
+    const rec = await loadActive(normalizeCode(body.code));
+    if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+    return { status: 200, body: { maxStart: maxStartIndex(await allStates(rec)), now } };
+  }
+  if (action === "room_battle_start") {
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await loadActive(code);
+      if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+      const r = startBattle(rec.room, { userId, index: Number(body.index), states: await allStates(rec), now, rand });
+      if (!r.ok) return { status: 400, body: { error: r.error } };
+      if (await store.roomSave(r.room, rec.version)) return view(r.room);
+    }
+    return conflict;
+  }
+  if (action === "room_battle_ready") { // 開始前の場面を読み終わった。全員が読み終えたら最初のラウンドが始まる
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await loadActive(code);
+      if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+      const r = readyBattle(rec.room, { userId, now, rand });
+      const next = r.room || rec.room;
+      if (next !== rec.room && !(await store.roomSave(next, rec.version))) continue;
+      if (!r.ok) return { status: 200, body: { room: roomView(next), now, ignored: r.error } };
+      return view(next);
+    }
+    return conflict;
+  }
+  if (action === "room_battle_sync") { // 画面が1〜2秒おきに呼ぶ。期限を過ぎていれば、ここで結果が出る
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await loadActive(code);
+      if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+      const next = tickBattle(rec.room, now, rand);
+      if (next === rec.room) return view(rec.room);
+      if (await store.roomSave(next, rec.version)) return view(next);
+    }
+    return conflict;
+  }
+  if (action === "room_battle_answer") {
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await loadActive(code);
+      if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+      const r = submitAnswer(rec.room, { userId, answer: body.answer, nextLevel: body.nextLevel, now, rand });
+      const next = r.room || rec.room;
+      if (next !== rec.room && !(await store.roomSave(next, rec.version))) continue; // 競合：読み直してやり直す
+      if (!r.ok) {
+        // 速すぎる解答は読み直してもらう。それ以外（すでに答えた／まだ始まっていない／もう終わった）は害のない無視として、いまの様子を返す。
+        if (r.error === "too-fast") return { status: 400, body: { error: "too-fast" } };
+        return { status: 200, body: { room: roomView(next), now, ignored: r.error } };
+      }
+      return view(next);
+    }
+    return conflict;
+  }
+  if (action === "room_battle_claim") { // 勝ったあと、自分のごほうびを自分で受け取る（部屋が閉じられたあとでも受け取れる）
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await store.roomLoad(code);
+      if (!rec || now - (rec.room.updatedAt || 0) > ROOM.staleMs) return { status: 404, body: { error: "room-not-found" } };
+      const el = rewardEligibility(rec.room, userId);
+      if (!el.ok) return { status: 400, body: { error: el.error, needed: el.needed, correct: el.correct } };
+      const marked = markRewarded(rec.room, userId, now); // 先に「受け取り済み」の印を原子的に付ける（二重に受け取れない）
+      if (!(await store.roomSave(marked, rec.version))) continue;
+      for (let j = 0; j < TRIES; j++) {
+        const l = await store.load(userId);
+        const st = normalizeThirdState(l ? l.state : initialThirdState());
+        const rw = applyCoopWin(st, el.index, el.tier, now);
+        if (!rw.ok) break;
+        if (await store.save(userId, rw.state, l ? l.version : null)) return { status: 200, body: { rewards: rw.rewards, state: rw.state, room: roomView(marked), now } };
+      }
+      // 保存できなかった：印を外して（できれば）、もう一度やってもらう
+      const again = await store.roomLoad(code);
+      if (again) await store.roomSave(unmarkRewarded(again.room, userId, now), again.version);
+      return conflict;
+    }
+    return conflict;
   }
   return { status: 400, body: { error: "unknown-room-action" } };
 }

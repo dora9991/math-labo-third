@@ -87,7 +87,7 @@ export default function RecordScreen({ player, records, onWeakness, state }) {
       </Card>
 
       <Card icon="V" title={`称号　${gotTitles.length} / ${titles.length}`}>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", marginBottom: 8, lineHeight: 1.6 }}>協力プレイで、各章の「裏ボス」をたおすと もらえるよ。<span style={{ color: "#ffd98a", fontWeight: 800 }}>（協力プレイは じゅんび中）</span></div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", marginBottom: 8, lineHeight: 1.6 }}>協力プレイ「みんなの冒険」で、各章の「裏ボス」をたおすと もらえるよ。　協力メダル {Object.keys(state?.coop?.medals || {}).length} / 21（🥇{Object.values(state?.coop?.medals || {}).filter((x) => x === 3).length}　🥈{Object.values(state?.coop?.medals || {}).filter((x) => x === 2).length}　🥉{Object.values(state?.coop?.medals || {}).filter((x) => x === 1).length}）</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {titles.map((t) => (
             <span key={t.id} style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800,
