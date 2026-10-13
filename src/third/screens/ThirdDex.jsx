@@ -9,6 +9,7 @@ import { useGame } from "../ThirdContext.jsx";
 import { SPECIALIST_ROSTER } from "../specialistRoster.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
 import CharacterPopup from "../components/CharacterPopup.jsx";
+import { displayName } from "../nick.js";
 import "./dex.css";
 
 const RARITY_TABS = ["all", "N", "R", "SR", "UR"];
@@ -60,7 +61,7 @@ export default function ThirdDex({ nav }) {
               onClick={() => got && setPopupCharId(c.id)}
             >
               <MonsterPortrait character={got ? charactersById[c.id] : { rarity: c.rarity }} size="small" />
-              <div className="dx-cell-name">{got ? c.name : "？？？"}</div>
+              <div className="dx-cell-name">{got ? displayName(charactersById[c.id]) : "？？？"}</div>
               {got && <div className="dx-cell-sub">{owned ? "なかま" : spares > 0 ? `予備×${spares}` : "図鑑のみ"}</div>}
             </button>
           );

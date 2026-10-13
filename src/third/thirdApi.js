@@ -54,6 +54,7 @@ export const thirdApi = {
   getState: () => call("get_state"),
   gacha: (count, pool = "normal") => call("gacha", { count, pool }),
   setParty: (party) => call("set_party", { party }),
+  setNick: (id, nick) => call("set_nick", { id, nick }), // 仲間のニックネーム（空なら消す）
   synthesize: (req) => call("synthesize", req), // 合成するキャラを経験値にする
   limitBreak: (id) => call("limit_break", { id }), // 予備を使って限界突破
   claim: (claim) => call("claim", { claim }),

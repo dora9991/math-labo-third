@@ -594,6 +594,17 @@
   line-height: 1.2;
 }
 
+/* ニックネーム（編成画面のカードの下）。長くても枠からはみ出さない */
+.mw-portrait-footer .mw-nick {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  color: #ffe9b3;
+}
+
 .mw-party-row {
   display: grid;
   /* 2026-09-17：パーティ3→5体化。5列に増やす。 */
