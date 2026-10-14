@@ -33,3 +33,13 @@ export function buildSkill(key, tier) {
   const p = def.params(tier);
   return { id: `${key}_${tier}`, name: def.name, icon: def.icon, category: key, tier, target: def.target, ...p, desc: def.desc(p) };
 }
+
+// スキルゲージの満タン値（2026-09-22：スキルの強さ(tier 1〜4)に応じて必要正解数を変える。
+//   弱いスキルほど早く貯まり、強いスキルほど問題数を稼げる＝学習量が増える）。一人用バトルと協力バトルで共通。
+const SKILL_GAUGE_MAX = 4; // 互換用の既定値（tierが無いスキル用）
+const SKILL_GAUGE_BY_TIER = { 1: 6, 2: 9, 3: 12, 4: 15 };
+export function skillGaugeMaxFor(character) {
+  if (character?.skill?.gauge) return character.skill.gauge; // スキルごとに必要な正解数が決まっているもの（回復・状態異常回復）
+  const tier = character?.skill?.tier;
+  return SKILL_GAUGE_BY_TIER[tier] ?? SKILL_GAUGE_MAX;
+}
