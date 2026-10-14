@@ -13,7 +13,7 @@ import { thirdApi } from "../thirdApi.js";
 import { useGame } from "../ThirdContext.jsx";
 import { generateThirdProblem } from "../problemSource.js";
 import { RB, currentFoe, coopSkillOf, coopGaugeMax, coopSkillText, slotKey } from "../raidBattle.js";
-import { TIER_ICON, TIER_LABEL } from "../raid.js";
+import { TIER_ICON, TIER_LABEL, COOP } from "../raid.js";
 import { DIFFICULTY_KEYS, DIFFICULTY_LABEL, DIFFICULTY_DAMAGE_MULTIPLIER } from "../balance.js";
 import { coopScene, COOP_STAGE_TITLES, COOP_STAGE_COUNT } from "../story/coopStory.js";
 import StoryPlayer from "../story/StoryPlayer.jsx";
@@ -303,7 +303,7 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
                   {claim.rewards.title && <div>🏷️ 称号「{claim.rewards.title}」</div>}
                   {claim.rewards.medalUp && <div>{TIER_ICON[claim.rewards.tier]} メダルが {TIER_LABEL[claim.rewards.tier]} になった！{claim.rewards.medalCrystals > 0 ? `　💎 +${claim.rewards.medalCrystals}` : ""}</div>}
                   {!claim.rewards.first && claim.rewards.crystals > 0 && <div>💎 +{claim.rewards.crystals}</div>}
-                  {claim.rewards.perMember > 0 ? <div>✨ 経験値 いまのパーティ 1体ずつ +{claim.rewards.perMember}</div> : claim.rewards.expLimited ? <div className="dim">今日は、経験値がもらえる回数を つかいきったよ</div> : null}
+                  {claim.rewards.perMember > 0 ? <div>✨ 経験値 いまのパーティ 1体ずつ +{claim.rewards.perMember}</div> : claim.rewards.expLimited ? <div className="dim">今日は、2回目以降の経験値がもらえる回数（{COOP.repeatExpDailyMax}回）を つかいきったよ</div> : null}
                   {claim.rewards.gradeBonus > 0 && <div>🏅 学年ボーナス　💎 +{claim.rewards.gradeBonus}</div>}
                   {claim.rewards.allBonus > 0 && <div>🏆 全制覇ボーナス　💎 +{claim.rewards.allBonus}</div>}
                 </div>
