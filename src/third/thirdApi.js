@@ -74,6 +74,7 @@ export const thirdApi = {
   roomBattleReady: (code) => call("room_battle_ready", { code }), // 開始前の場面を読み終えた
   roomBattleSync: (code) => call("room_battle_sync", { code }), // 1〜2秒おき：期限を過ぎていれば結果が出る
   roomBattleAnswer: (code, answer, nextLevel) => call("room_battle_answer", { code, answer, nextLevel }),
+  roomBattleSkill: (code, charId) => call("room_battle_skill", { code, charId }), // スキルを使う（予約）。効果はそのラウンドの結果を出すときに出る
   roomBattleClaim: (code) => call("room_battle_claim", { code }), // 勝ったあと、自分のごほうびを受け取る
   ping: (sid) => call("ping", { sid }), // 滞在時間の計測（1分おき）
   profile: () => call("my_profile"), // おすすめ用：自分の解答を単元×難易度に集計したもの（サーバーが無いときは source:"none"）

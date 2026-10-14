@@ -8,7 +8,7 @@ import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
 import { ROOM, newRoomCode, normalizeCode, createRoom, joinRoom, leaveRoom, startRoom, roomView, isActive, memberIds } from "../../../src/third/room.js";
 import { initialThirdState, normalizeThirdState, pullGacha, setParty, setNick, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, applyCoopWin, PROBLEM_VERSION } from "../../../src/third/core.js";
-import { startBattle, readyBattle, tickBattle, submitAnswer, rewardEligibility, markRewarded, unmarkRewarded, maxStartIndex } from "../../../src/third/raidBattle.js";
+import { startBattle, readyBattle, tickBattle, submitAnswer, queueSkill, rewardEligibility, markRewarded, unmarkRewarded, maxStartIndex } from "../../../src/third/raidBattle.js";
 import { summarizeAttempts, summarizeTags } from "../../../src/third/learnerProfile.js";
 
 // おすすめ（今日のおすすめ・理解度マップ）用に読む解答の範囲
@@ -252,6 +252,23 @@ async function handleRoom({ action, body, userId, store, now, rand }) {
       if (!r.ok) {
         // 速すぎる解答は読み直してもらう。それ以外（すでに答えた／まだ始まっていない／もう終わった）は害のない無視として、いまの様子を返す。
         if (r.error === "too-fast") return { status: 400, body: { error: "too-fast" } };
+        return { status: 200, body: { room: roomView(next), now, ignored: r.error } };
+      }
+      return view(next);
+    }
+    return conflict;
+  }
+  if (action === "room_battle_skill") { // スキルを使う（予約）。ゲージが満タンの自分のキャラだけ。効果はそのラウンドの結果を出すときに出る
+    const code = normalizeCode(body.code);
+    for (let i = 0; i < TRIES; i++) {
+      const rec = await loadActive(code);
+      if (!rec || !memberIds(rec.room).includes(userId)) return { status: 404, body: { error: "room-not-found" } };
+      const r = queueSkill(rec.room, { userId, charId: String(body.charId || ""), now, rand });
+      const next = r.room || rec.room;
+      if (next !== rec.room && !(await store.roomSave(next, rec.version))) continue; // 競合：読み直してやり直す
+      if (!r.ok) {
+        // ゲージが足りない・もう予約した・もう終わった、は害のない無視として、いまの様子を返す（画面が追いつくだけ）。
+        if (r.error === "not-your-character" || r.error === "no-skill") return { status: 400, body: { error: r.error } };
         return { status: 200, body: { room: roomView(next), now, ignored: r.error } };
       }
       return view(next);
