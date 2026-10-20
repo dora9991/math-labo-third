@@ -19,6 +19,7 @@ import { SECRET, SECRET_COUNT, secretOpen, secretKey, secretFirstExp, secretRepe
 import { PROBLEM_VERSION } from "./problemVersion.js";
 import { RAID, RAID_LADDER, raidBoss, COOP, coopExpPerChar } from "./raid.js";
 import { cleanNick } from "./nick.js";
+import { LAP, lapOf, lapFinished, lapCrystals } from "./lap.js";
 
 export { PROBLEM_VERSION };
 
@@ -63,6 +64,8 @@ export function initialThirdState() {
     raid: { cleared: {}, gradeDone: {}, allDone: 0, daily: { date: null, n: 0 } }, // 協力プレイ「裏ボス連戦」：倒した裏ボス { "grade:chapter": ms }・学年/全制覇ボーナス受取・周回の1日カウント
     coop: { medals: {}, daily: { date: null, n: 0 } }, // マルチ専用ストーリー：ステージごとのメダル { "番号": 1銅|2銀|3金 }・経験値が付く周回の1日カウント
     medals: { practiceN: {}, haichi: {}, pracLv: {}, battle: {} }, // メダル：れんしゅうの検証済み正解数／はいち(確認問題)の合格／難易度ごとの正解数（クリスタル用）
+    lap: { n: 1, startedAt: 0, history: [] }, // 「もう一周」：いま何周目か（lap.js）
+    lapBattle: {}, // 2周目以降：この周でクリアしたバトル { unitId: ms }（1周目は medals.battle を使う）
     credit: { ms: 0, at: 0 }, // 実時間の持ち分
   };
 }
@@ -124,6 +127,12 @@ export function normalizeThirdState(s) {
     if (uid && !out.medals.battle[uid]) out.medals.battle[uid] = c?.first || 1;
   }
   out.credit = { ms: Math.max(0, Number(s.credit?.ms) || 0), at: Number(s.credit?.at) || 0 };
+  const lp = s.lap && typeof s.lap === "object" ? s.lap : {};
+  out.lap = {
+    n: Math.max(1, Math.floor(Number(lp.n) || 1)), startedAt: Number(lp.startedAt) || 0,
+    history: (Array.isArray(lp.history) ? lp.history : []).filter((h) => h && Number.isFinite(Number(h.n))).map((h) => ({ n: Math.floor(Number(h.n)), endedAt: Number(h.endedAt) || 0 })).slice(-LAP.historyKeep),
+  };
+  out.lapBattle = s.lapBattle && typeof s.lapBattle === "object" ? { ...s.lapBattle } : {};
   return out;
 }
 
@@ -379,8 +388,9 @@ function awardGradeClear(s, grade, now) {
   if (!g || s.gradeDone[grade]) return 0;
   const all = g.chapters.length > 0 && g.chapters.every((c) => s.chapterDone[`${grade}:${c.chapterId}`] && s.bossDone[`${grade}:${c.chapterId}`]);
   if (!all) return 0;
-  s.gradeDone[grade] = now; s.crystals += CRYSTAL.gradeClear;
-  return CRYSTAL.gradeClear;
+  const bonus = lapCrystals(CRYSTAL.gradeClear, lapOf(s)); // 2周目以降は半分
+  s.gradeDone[grade] = now; s.crystals += bonus;
+  return bonus;
 }
 
 export function applyClaim(state, claim, now) {
@@ -426,7 +436,7 @@ function applyClaimCore(state, claim, now) {
     const bkey = `${claim.grade}:${claim.chapterId}`;
     const firstBoss = !s.bossDone[bkey];
     let crystals = 0;
-    if (firstBoss) { crystals = CRYSTAL.chapterBossFirst; s.bossDone[bkey] = now; }
+    if (firstBoss) { crystals = lapCrystals(CRYSTAL.chapterBossFirst, lapOf(s)); s.bossDone[bkey] = now; }
     s.crystals += crystals;
     const gradeBonus = firstBoss ? awardGradeClear(s, claim.grade, now) : 0;
     return { ok: true, state: s, rewards: { granted: true, reason: firstBoss ? null : "boss-repeat", crystals, gradeBonus, exp: 0, perMember: 0, isFirstClear: firstBoss, kind: "chapterBoss" }, verified, rows: v.rows };
@@ -440,7 +450,7 @@ function applyClaimCore(state, claim, now) {
   const mobExp = Math.floor(baseExp * REWARD.mobExpShare);
   const bossExp = baseExp - mobExp;
   if (first) {
-    crystals = REWARD.firstCrystals; exp = baseExp;
+    crystals = lapCrystals(REWARD.firstCrystals, lapOf(s)); exp = baseExp; // 経験値は周回でも同じ・クリスタルは2周目以降 半分
   } else if (s.daily.repeat < REWARD.repeatDailyMax) {
     exp = mobExp + Math.round(bossExp * REWARD.repeatExpRate);
     if (s.daily.repeat < REWARD.repeatCrystalMax) crystals = REWARD.repeatCrystals; // 周回ボーナス（1日10個まで）
@@ -449,12 +459,13 @@ function applyClaimCore(state, claim, now) {
   s.cleared[key] = { first: s.cleared[key]?.first || now, count: (s.cleared[key]?.count || 0) + 1 };
   const newMedals = [];
   if (!s.medals.battle[v.unitId]) { s.medals.battle[v.unitId] = now; newMedals.push({ kind: "battle", unitId: v.unitId }); } // バトルメダル：はじめてクリアした時
+  if (lapOf(s) > 1 && !s.lapBattle[v.unitId]) s.lapBattle[v.unitId] = now; // 2周目以降：この周でクリアした印（次のバトルが開く）
   // 章クリアボーナス：その章の小単元を全部はじめてクリアした時（章ごとに1回）
   let chapterBonus = 0;
   const wc = getChapter(claim.grade, claim.chapterId);
   const ck = `${claim.grade}:${claim.chapterId}`;
   if (first && wc && !s.chapterDone[ck] && wc.subUnits.every((su) => s.cleared[`${claim.grade}:${claim.chapterId}:${su.id}`])) {
-    chapterBonus = CRYSTAL.chapterClear; s.chapterDone[ck] = now;
+    chapterBonus = lapCrystals(CRYSTAL.chapterClear, lapOf(s)); s.chapterDone[ck] = now;
   }
   s.crystals += crystals + chapterBonus;
   const gradeBonus = chapterBonus > 0 ? awardGradeClear(s, claim.grade, now) : 0;
@@ -487,9 +498,27 @@ export function battleUnitIdsOfChapter(grade, chapter) {
   return (chapter?.units || []).slice(0, n).map((u) => u.id);
 }
 /** その章のバトルがすべてクリア済みか（章ボスの本番が開く条件）。 */
+/**
+ * 「もう一周」：全学年（中1〜中3）をクリアしたあとだけ。物語の進み（バトルの順番・はじめてクリアのごほうび・章／学年クリア）を戻す。
+ *  仲間・レベル・クリスタル・図鑑・メダル・裏ボス／協力の記録・学習の記録は、そのまま残す（lap.js）。
+ */
+export function startNextLap(state, now) {
+  if (!lapFinished(state)) return { ok: false, error: "not-finished" };
+  const s = structuredClone(state);
+  const n = lapOf(s);
+  s.lap = { n: n + 1, startedAt: now, history: [...(s.lap?.history || []), { n, endedAt: now }].slice(-LAP.historyKeep) };
+  s.cleared = {}; s.chapterDone = {}; s.bossDone = {}; s.gradeDone = {}; s.lapBattle = {};
+  return { ok: true, state: s, lap: n + 1 };
+}
+
+/** バトルの順番・章ボスの開放に使う「クリアしたバトル」。1周目は medals.battle（従来どおり）／2周目以降はこの周の lapBattle（メダルは集めたものとして残す） */
+export function battleDone(state) {
+  return lapOf(state) > 1 ? (state?.lapBattle || {}) : (state?.medals?.battle || {});
+}
 export function chapterBattlesCleared(state, grade, chapter) {
   const ids = battleUnitIdsOfChapter(grade, chapter);
-  return ids.length > 0 && ids.every((id) => !!state?.medals?.battle?.[id]);
+  const done = battleDone(state);
+  return ids.length > 0 && ids.every((id) => !!done[id]);
 }
 /**
  * その小単元のバトルに挑戦できるか。ストーリーどおり、**前のバトルをクリアすると次が開く**（章をまたいでも同じ）。
@@ -503,7 +532,8 @@ export function battleOpen(state, grade, unitId) {
   const idx = order.indexOf(unitId);
   if (idx <= 0) return true;
   let furthest = -1;
-  for (let i = 0; i < order.length; i++) if (state.medals?.battle?.[order[i]]) furthest = i;
+  const done = battleDone(state);
+  for (let i = 0; i < order.length; i++) if (done[order[i]]) furthest = i;
   return idx <= furthest + 1;
 }
 

@@ -142,6 +142,8 @@ async function winStage(ids, index, okOf = () => true, opts = {}) {
   const { s, code } = opts.ctx || (await setupRoom(ids, { cleared: index }));
   clock = T0 + (opts.day || 0) * 86400000;
   await startStage(s, code, ids, index);
+  // 「勝ったあとの流れ（ごほうび・次のステージ）」を確かめるテストなので、運で負けないように、敵のHPを半分にして始める（強さの調整は sim-raid-battle.mjs で確かめる）
+  for (const wv of s.rooms.get(code).room.battle.waves) wv.hp = wv.maxHp = Math.round(wv.maxHp * 0.5);
   if (opts.afterStart) await opts.afterStart(s, code);
   let room = await getRoom(s, code, ids[0]); const waves = []; let rounds = 0;
   while (room.battle.status === "fighting" && rounds < 300) {

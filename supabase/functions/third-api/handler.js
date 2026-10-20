@@ -7,7 +7,7 @@
 import { applyAdminOp } from "../../../src/third/adminOps.js";
 import { recordLogs, checkReport } from "./logging.js";
 import { ROOM, newRoomCode, normalizeCode, createRoom, joinRoom, leaveRoom, startRoom, roomView, isActive, memberIds } from "../../../src/third/room.js";
-import { initialThirdState, normalizeThirdState, pullGacha, setParty, setNick, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, applyCoopWin, PROBLEM_VERSION } from "../../../src/third/core.js";
+import { initialThirdState, normalizeThirdState, pullGacha, setParty, setNick, startNextLap, synthesize, limitBreak, applyClaim, applyPractice, applyConfirm, applyCoopWin, PROBLEM_VERSION } from "../../../src/third/core.js";
 import { startBattle, readyBattle, tickBattle, submitAnswer, queueSkill, rewardEligibility, markRewarded, unmarkRewarded, maxStartIndex } from "../../../src/third/raidBattle.js";
 import { summarizeAttempts, summarizeTags } from "../../../src/third/learnerProfile.js";
 
@@ -83,6 +83,12 @@ export async function handle({ action, body = {}, userId, store, now = Date.now(
       if (!r.ok) return { status: 400, body: { error: r.error, state } };
       if (!(await commit(r.state))) return conflict;
       return { status: 200, body: { state: r.state, nick: r.nick } };
+    }
+    case "new_lap": { // 「もう一周」：全学年クリア後だけ。物語の進みを戻す（仲間・レベル・メダルなどは残る）
+      const r = startNextLap(state, now);
+      if (!r.ok) return { status: 400, body: { error: r.error, state } };
+      if (!(await commit(r.state))) return conflict;
+      return { status: 200, body: { state: r.state, lap: r.lap } };
     }
     case "practice": { // れんしゅう：検証済みの正解でメダルの進捗を進める
       const r = applyPractice(state, body, now);
