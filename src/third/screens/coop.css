@@ -1,0 +1,74 @@
+/* 協力バトル「みんなの冒険」(CoopBattle.jsx / RoomLobby.jsx のステージ選び)。色は既存のデザイン言語に合わせる（黒曜石・淡い金・淡いシアン）。 */
+.coop { display: flex; flex-direction: column; gap: 10px; }
+.coop-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-family: 'Noto Serif JP', serif; padding: 2px 4px; }
+.coop-stage { font-weight: 900; color: #ffe9b3; font-size: 14px; }
+.coop-wave { font-size: 12px; color: rgba(233,239,240,.8); white-space: nowrap; }
+.coop-stage-box { padding: 10px 12px 12px; }
+.coop-foe { text-align: center; position: relative; z-index: 1; }
+.coop-foe-img { width: min(46vw, 190px); margin: 0 auto; }
+.coop-hit { animation: coopHit .35s ease-out; }
+@keyframes coopHit { 0% { transform: translateX(0); filter: brightness(2); } 20% { transform: translateX(-7px); } 45% { transform: translateX(6px); } 100% { transform: none; filter: none; } }
+.coop-bosstitle { opacity: .75; font-size: .75em; font-weight: 600; }
+.coop-foehp { width: 80% !important; margin: 4px auto 0; }
+.coop-party { position: relative; z-index: 1; margin-top: 10px; }
+.coop-char { text-align: center; opacity: .88; transition: transform .2s, opacity .2s; }
+.coop-char.is-hit { transform: translateY(-6px); opacity: 1; filter: drop-shadow(0 0 8px rgba(255,214,120,.9)); }
+.coop-owner { font-size: 9.5px; color: #ffe9b3; margin-top: 2px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coop-partyhp { margin: 6px auto 0; }
+.coop-hurt { animation: coopHurt .4s ease-out; }
+@keyframes coopHurt { 0% { box-shadow: 0 0 0 rgba(255,60,40,0); } 25% { box-shadow: 0 0 14px 3px rgba(255,70,50,.9); transform: translateX(-4px); } 60% { transform: translateX(3px); } 100% { box-shadow: none; transform: none; } }
+.coop-hpnum { text-align: center; margin-top: 2px; }
+.coop-last { padding: 8px 12px; font-size: 12.5px; }
+.coop-last-title { color: #ffe9b3; margin-bottom: 6px; }
+.coop-last-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.coop-chip { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: rgba(255,255,255,.08); }
+.coop-chip.ok { background: rgba(120,220,150,.22); color: #c9ffd6; }
+.coop-chip.ng { background: rgba(255,120,120,.2); color: #ffd0d0; }
+.coop-chip.no { color: rgba(255,255,255,.5); }
+.coop-notice { margin-top: 6px; font-weight: 800; color: #ffcf8a; }
+.coop-wait { padding: 16px 12px; }
+.coop-wait-title { font-weight: 900; font-size: 15px; margin-bottom: 6px; }
+.coop-q { padding: 10px 12px 14px; }
+.coop-timer { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.coop-timer-bar { flex: 1; height: 10px; background: rgba(255,255,255,.12); overflow: hidden; clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+.coop-timer-bar > div { height: 100%; background: linear-gradient(90deg, #9be7ef, #ffe3a2); transition: width .25s linear; }
+.coop-timer-bar > div.is-low { background: linear-gradient(90deg, #ff6a3a, #ffb347); }
+.coop-timer > span { min-width: 3.2em; text-align: right; font-weight: 900; color: #ffe9b3; font-size: 14px; }
+.coop-members { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.coop-mem { padding: 2px 8px; font-size: 11px; border-radius: 999px; background: rgba(255,255,255,.07); color: rgba(255,255,255,.75); }
+.coop-mem.done { background: rgba(120,220,150,.2); color: #c9ffd6; }
+.coop-mem.idle { opacity: .55; }
+.coop-mem.me { outline: 1px solid rgba(255,227,162,.7); }
+.coop-ready-count { text-align: center; padding: 18px 6px; font-weight: 900; color: #ffe9b3; }
+.mw-choice.coop-picked { outline: 2px solid #ffe3a2; background: rgba(255,227,162,.16); }
+.coop-waiting { text-align: center; margin-top: 8px; font-weight: 800; color: #9be7ef; font-size: 13px; }
+.coop-waiting.dim { color: rgba(255,255,255,.5); font-weight: 600; }
+.coop-sec { display: block; font-size: 9.5px; opacity: .7; }
+.coop-result { padding: 16px 12px; }
+.coop-result.win { border-color: rgba(255,214,120,.8); box-shadow: 0 0 22px rgba(255,200,90,.35); }
+.coop-result-title { font-size: 19px; font-weight: 900; font-family: 'Noto Serif JP', serif; color: #fff3c8; }
+.coop-medal { font-size: 54px; line-height: 1.1; margin: 6px 0 0; animation: coopMedal .8s cubic-bezier(.2,1.4,.4,1); }
+@keyframes coopMedal { from { transform: scale(.3) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.coop-rewards { margin: 10px auto 0; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; font-weight: 800; color: #ffe9b3; }
+.coop-rewards .dim { opacity: .65; font-weight: 600; font-size: 12px; }
+.coop-claim-err { margin-top: 8px; color: #ffb4b4; font-size: 13px; }
+.coop-result-buttons { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+
+/* ステージ選び（RoomLobby の started 状態） */
+.coop-stages { display: flex; flex-direction: column; gap: 6px; }
+.coop-grade { margin: 10px 0 2px; font-weight: 900; color: #ffe9b3; font-size: 13px; letter-spacing: .08em; }
+.coop-stage-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(223,189,115,.3); text-align: left; color: #e9eff0; font-family: 'Noto Serif JP', serif; cursor: pointer; }
+.coop-stage-row[disabled] { opacity: .5; cursor: default; }
+.coop-stage-row.is-pick { border-color: #ffe3a2; background: rgba(255,227,162,.14); }
+.coop-stage-no { flex: 0 0 2.2em; font-weight: 900; color: #ffe3a2; text-align: center; }
+.coop-stage-body { flex: 1; min-width: 0; }
+.coop-stage-body b { display: block; font-size: 13.5px; }
+.coop-stage-body small { display: block; font-size: 10.5px; opacity: .7; }
+.coop-stage-medal { font-size: 22px; min-width: 1.5em; text-align: center; }
+
+/* 部屋コードで入る（RoomLobby の部屋に入っていない状態）：スマホの狭い幅でも枠からはみ出さない。
+   入力欄は縮められるように min-width:0、「入る」は幅100%(.mw-btn)をやめて1行のまま右に置く。 */
+.mw-room-join { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.mw-room-join input { flex: 1 1 0; min-width: 0; padding: 12px 8px; font-size: 1.3rem; letter-spacing: .3em; text-align: center; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(0,0,0,.35); color: #fff; }
+.mw-room-join input::placeholder { font-size: .85rem; letter-spacing: 0; opacity: .6; }
+.mw-room-join .mw-btn { flex: 0 0 auto; width: auto; padding: 12px 20px; white-space: nowrap; }

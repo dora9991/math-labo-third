@@ -6,6 +6,8 @@
 //  この部屋の戦闘の進行（順番回答・サーバー検証）は次の段階。ここは「相手の一覧・強さ・ごほうび・称号」だけを持つ。
 // ============================================================
 import { bossStats, tierOf } from "./balance.js";
+import { getSubUnitClearExpReward } from "./expCurve.js";
+import { getChapter } from "./data/storyMap.js";
 
 /** 強さと報酬の数値（仮置き・実プレイで調整） */
 export const RAID = {
@@ -65,3 +67,28 @@ export function titlesOf(state) {
   return out;
 }
 export const nextRaidIndex = (index) => (index + 1 < RAID_LADDER.length ? index + 1 : null);
+
+// ---- マルチ専用ストーリー「みんなの冒険」のごほうび（2026-10-09 kazu指定：メダルあり・経験値は低め） ----
+//  ・メダル：ステージごとに 銅(1)＝クリア／銀(2)＝パーティHPが35%以上残ってクリア／金(3)＝65%以上残ってクリア。いちばん良い色を記録。
+//    色が上がったときだけ、その分のクリスタル（tierCrystals）。
+//  ・経験値：クリアした本人の「いまのパーティ」5体に、1体ずつ。初回＝その章の最後の小単元の初回経験値（パーティ5体ぶん）の expFirst 倍を5体で分ける。
+//    ふつうの小単元よりかなり低い。2回目以降は expRepeat 倍で、1日 repeatExpDailyMax 回まで。
+//  ・称号・クリスタル（初回 RAID.firstCrystals など）は、これまでどおり applyRaidWin（core.js）。
+export const COOP = {
+  expFirst: 0.35,
+  expRepeat: 0.1,
+  repeatExpDailyMax: 3,
+  tierCrystals: [0, 1, 1], // 銅・銀・金：その色に「はじめて」なったときのクリスタル
+};
+export const TIER_LABEL = { 1: "銅", 2: "銀", 3: "金" };
+export const TIER_ICON = { 1: "🥉", 2: "🥈", 3: "🥇" };
+
+/** そのステージをクリアしたとき、1体あたりの経験値（初回か2回目以降か） */
+export function coopExpPerChar(index, first) {
+  const b = raidBoss(index);
+  if (!b) return 0;
+  const ch = getChapter(b.grade, b.chapterId);
+  const last = ch?.subUnits?.[ch.subUnits.length - 1];
+  const base = last ? getSubUnitClearExpReward(b.grade, b.chapterId, last.id) : 0;
+  return Math.max(1, Math.round((base * (first ? COOP.expFirst : COOP.expRepeat)) / 5));
+}
