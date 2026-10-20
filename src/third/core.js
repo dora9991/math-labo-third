@@ -18,6 +18,7 @@ import { getSubUnitClearExpReward, expOf, addExp } from "./expCurve.js";
 import { SECRET, SECRET_COUNT, secretOpen, secretKey, secretFirstExp, secretRepeatExp } from "./secretBoss.js";
 import { PROBLEM_VERSION } from "./problemVersion.js";
 import { RAID, RAID_LADDER, raidBoss, COOP, coopExpPerChar } from "./raid.js";
+import { cleanNick } from "./nick.js";
 
 export { PROBLEM_VERSION };
 
@@ -73,7 +74,11 @@ export function normalizeThirdState(s) {
   const out = { ...base, ...s };
   out.owned = {};
   for (const [id, v] of Object.entries(s.owned || {})) {
-    if (ROSTER_BY_ID[id]) out.owned[id] = { exp: Math.max(0, Number(v?.exp) || 0), exp2: Math.max(0, Number(v?.exp2) || 0), exp3: Math.max(0, Number(v?.exp3) || 0), breaks: Math.min(GACHA.maxBreaks, Math.max(0, Number(v?.breaks) || 0)), n: Number(v?.n) || 0 };
+    if (ROSTER_BY_ID[id]) {
+      out.owned[id] = { exp: Math.max(0, Number(v?.exp) || 0), exp2: Math.max(0, Number(v?.exp2) || 0), exp3: Math.max(0, Number(v?.exp3) || 0), breaks: Math.min(GACHA.maxBreaks, Math.max(0, Number(v?.breaks) || 0)), n: Number(v?.n) || 0 };
+      const nick = cleanNick(v?.nick); // 仲間ごとのニックネーム（なければ項目ごと無し）
+      if (nick) out.owned[id].nick = nick;
+    }
   }
   // 初期の5体は「まったく仲間がいない（新規・壊れたデータ）」時だけ配る。（合成で手放した初期の子が、読み込むたびに復活しないように）
   if (!Object.keys(out.owned).length) for (const id of STARTER_PARTY) out.owned[id] = { exp: 0, exp2: 0, exp3: 0, breaks: 0, n: 0 };
@@ -265,6 +270,16 @@ export function synthesize(state, req) {
   }
   addExp(s.owned[targetId], grade, gain);
   return { ok: true, state: s, gain, used };
+}
+
+/** 仲間にニックネームをつける／消す（nick が空なら消す）。所持している子だけ。長さなどは cleanNick（nick.js）で整える。 */
+export function setNick(state, id, nick) {
+  if (typeof id !== "string" || !state.owned[id]) return { ok: false, error: "not-owned" };
+  if (typeof nick !== "string") return { ok: false, error: "bad-nick" };
+  const clean = cleanNick(nick);
+  const owned = { ...state.owned, [id]: { ...state.owned[id] } };
+  if (clean) owned[id].nick = clean; else delete owned[id].nick;
+  return { ok: true, state: { ...state, owned }, nick: clean };
 }
 
 /** 限界突破：予備を1つ使って、その子の凸を+1（最大 GACHA.maxBreaks）。 */

@@ -50,6 +50,7 @@ import FxSpeedToggle from "../../components/FxSpeedToggle.jsx";
 import DrawPad from "../../components/DrawPad.jsx";
 import { fxScale, getFxSpeed, setFxSpeed } from "../../engine/fxSpeed.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
+import { displayName } from "../nick.js";
 import QuestionText from "../../components/QuestionText.jsx";
 import MathText from "../../components/MathText.jsx";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
@@ -1357,6 +1358,7 @@ export default function Battle({ nav, params }) {
                 <MonsterPortrait character={charactersById[skillConfirm]} size="small" />
               </div>
               <div style={{ flex: 1 }}>
+                {charactersById[skillConfirm].nick && <div style={{ fontSize: "0.72rem", opacity: 0.75 }}>{displayName(charactersById[skillConfirm])}</div>}
                 <div style={{ fontWeight: 800 }}>
                   {charactersById[skillConfirm].skill.icon} {charactersById[skillConfirm].skill.name}
                 </div>

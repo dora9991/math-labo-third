@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { expProgress } from "../expCurve.js";
 import { playLevelUpSound } from "../fx/sound.js";
 import MonsterPortrait from "./MonsterPortrait.jsx";
+import { displayName } from "../nick.js";
 import "./expMeter.css";
 
 let lastUpSound = 0; // 5人が同時にレベルアップしても、音は重ならないようにする
@@ -38,7 +39,7 @@ export default function ExpMeter({ character, from, to, delay = 0 }) {
       <div className="xm-face"><MonsterPortrait character={character} size="small" /></div>
       <div className="xm-main">
         <div className="xm-top">
-          <span className="xm-name">{character.name}</span>
+          <span className="xm-name">{displayName(character)}</span>
           <span className="xm-lv">Lv.{p.level}</span>
           <span className="xm-gain">+{gain} EXP</span>
         </div>

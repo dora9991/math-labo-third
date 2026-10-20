@@ -36,7 +36,7 @@ export function ThirdProvider({ children }) {
   const charactersById = useMemo(() => {
     const map = {};
     for (const c of GACHA_ROSTER) map[c.id] = c;
-    for (const c of SPECIALIST_ROSTER) map[c.id] = { ...c, breaks: save?.owned?.[c.id]?.breaks || 0 };
+    for (const c of SPECIALIST_ROSTER) map[c.id] = { ...c, breaks: save?.owned?.[c.id]?.breaks || 0, nick: save?.owned?.[c.id]?.nick || "" }; // nick＝本人がつけたニックネーム（name は元の名前のまま）
     return map;
   }, [save]);
 
@@ -54,6 +54,13 @@ export function ThirdProvider({ children }) {
       const r = await thirdApi.setParty(next);
       if (r.status === 200) setSave(r.body.state);
       else await load(); // 拒否された（未所持など）→ サーバーの状態に戻す
+    },
+    // 仲間のニックネーム（空なら消す）。サーバーが整えた状態で置き換える。
+    async setNick(id, nick) {
+      const r = await thirdApi.setNick(id, nick);
+      if (r.status === 200) { setSave(r.body.state); return { ok: true, nick: r.body.nick }; }
+      if (r.body?.state) setSave(r.body.state);
+      return { ok: false, error: r.body?.error || "failed" };
     },
     async pullGacha(count, pool = "normal") {
       const r = await thirdApi.gacha(count, pool);
