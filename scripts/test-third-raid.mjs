@@ -4,7 +4,7 @@ import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export * from "./src/third/room.js"; export * from "./src/third/raidBattle.js"; export * from "./src/third/raid.js"; export * from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { expOf } from "./src/third/expCurve.js"; export { coopScene, COOP_STAGE_COUNT, COOP_STAGE_TITLES } from "./src/third/story/coopStory.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export * from "./src/third/room.js"; export * from "./src/third/raidBattle.js"; export * from "./src/third/raid.js"; export * from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { expOf } from "./src/third/expCurve.js"; export { STARTER_PARTY } from "./src/third/gachaConfig.js"; export { coopScene, COOP_STAGE_COUNT, COOP_STAGE_TITLES } from "./src/third/story/coopStory.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_raid.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_raid.mjs");
@@ -142,6 +142,7 @@ async function winStage(ids, index, okOf = () => true, opts = {}) {
   const { s, code } = opts.ctx || (await setupRoom(ids, { cleared: index }));
   clock = T0 + (opts.day || 0) * 86400000;
   await startStage(s, code, ids, index);
+  if (opts.afterStart) await opts.afterStart(s, code);
   let room = await getRoom(s, code, ids[0]); const waves = []; let rounds = 0;
   while (room.battle.status === "fighting" && rounds < 300) {
     rounds++;
@@ -171,7 +172,8 @@ async function winStage(ids, index, okOf = () => true, opts = {}) {
   r = await call(w.s, "room_battle_start", { code: w.code, index: 1 }, "h"); t("次へ: 同じ部屋で次のステージを始められる", r.status === 200 && r.body.room.battle.index === 1 && r.body.room.battle.phase === "intro");
 }
 // ただ乗り防止・周回・日ごとの上限
-{ const ids = ["h", "a", "b"]; const w = await winStage(ids, 0, (u) => (u === "b" ? null : true)); // bは一度も答えない（離席）
+{ const ids = ["h", "a", "c", "b"]; // bは一度も答えない（離席）。確実に勝てるよう、敵のHPを半分にして始める（強さの調整とは別に、ごほうびの条件だけを確かめるため）
+  const w = await winStage(ids, 0, (u) => (u === "b" ? null : true), { afterStart: (s, code) => { for (const wv of s.rooms.get(code).room.battle.waves) wv.hp = wv.maxHp = Math.round(wv.maxHp * 0.5); } });
   const r = await call(w.s, "room_battle_claim", { code: w.code }, "b");
   t("ただ乗り防止: 正解が足りない人はごほうびが付かない", w.room.battle.status === "won" && r.status === 400 && r.body.error === "too-few-correct");
   const h = await call(w.s, "room_battle_claim", { code: w.code }, "h"); t("ただ乗り防止: ちゃんと答えた人には付く", h.status === 200);
@@ -221,6 +223,114 @@ async function setupRoomOn(s, ids, cleared) { // 同じストアで、新しい�
 // 状態の正規化・既存データ
 { const s0 = T.initialThirdState(); const n = T.normalizeThirdState({ ...s0, coop: { medals: { 0: 3, 1: 9, x: 2 }, daily: { date: "2026-10-09", n: 2 } } });
   t("保存データ: 協力のメダルは 1〜3 だけ・数字の番号だけを残す／古いデータにも coop が付く", n.coop.medals["0"] === 3 && !("1" in n.coop.medals) && !("x" in n.coop.medals) && T.normalizeThirdState({}).coop.daily.n === 0); }
+
+// ---- スキル（2026-10-14）：ゲージは正解で貯まる→満タンで使う（予約）→そのラウンドの結果を出すときに効く
+const ROSTER = Object.fromEntries(T.SPECIALIST_ROSTER.map((c) => [c.id, c]));
+const slotKeyOf = (p) => `${p.ownerId}:${p.id}`;
+const editRoom = (s, code, fn) => { const rec = s.rooms.get(code); fn(rec.room); };
+const healId = T.SPECIALIST_ROSTER.find((c) => c.skill?.category === "heal" && c.skill.tier === 3).id;
+const cureId = T.SPECIALIST_ROSTER.find((c) => c.skill?.category === "cure").id;
+const singleUR = T.SPECIALIST_ROSTER.find((c) => c.skill?.category === "singleDamage" && c.rarity === "UR").id;
+{ t("スキル設定: 対応しているのは 全体/単体ダメージ・回復・状態異常回復（回復に置きかえ）。それ以外は使えない", T.coopSkillOf(ROSTER[T.STARTER_PARTY[0]]).kind === "damage" && T.coopSkillOf(ROSTER[healId]).kind === "heal" && T.coopSkillOf(ROSTER[cureId]).replaced === true && T.coopSkillOf({ skill: { category: "buffAtk" } }) === null && T.coopSkillOf({ skill: { category: "sleep" } }) === null && T.coopSkillOf({}) === null);
+  t("スキル設定: ゲージは一人用より少ない正解で満タン（0.75倍・切り上げ。N=6→5、UR=15→12）／最低2", T.coopGaugeMax(ROSTER[T.STARTER_PARTY[0]]) === 5 && T.coopGaugeMax(ROSTER[singleUR]) === 12 && T.coopGaugeMax({ skill: { gauge: 1 } }) === 2);
+  t("スキル設定: 状態異常回復の置きかえ・説明文が出る", /12%/.test(T.coopSkillText(ROSTER[cureId])) && /倍/.test(T.coopSkillText(ROSTER[T.STARTER_PARTY[0]])) && T.coopSkillText({}) === "");
+}
+{ const ids = ["h", "a"]; const { s, code } = await setupRoom(ids); clock = T0; await startStage(s, code, ids, 0);
+  let room = await getRoom(s, code, "h");
+  const mineH = room.party.filter((p) => p.ownerId === "h"), mineA = room.party.filter((p) => p.ownerId === "a");
+  t("スキル: 戦闘のはじめは、ゲージ0・予約なし", Object.keys(room.battle.gauge).length === 0 && room.battle.queue.length === 0);
+  // 1ラウンド：hだけ正解 → hのキャラだけゲージ+1
+  room = await playRound(s, code, ids, { h: true, a: false });
+  const gh = mineH.map((p) => room.battle.gauge[slotKeyOf(p)] || 0), ga = mineA.map((p) => room.battle.gauge[slotKeyOf(p)] || 0);
+  t("ゲージ: 正解した人のキャラだけ+1（間違えた人・答えない人は貯まらない）", gh.every((g) => g === 1) && ga.every((g) => g === 0), JSON.stringify({ gh, ga }));
+  // 満タン前は使えない
+  let r = await call(s, "room_battle_skill", { code, charId: mineH[0].id }, "h");
+  t("使う: ゲージが足りないと使えない（害のない無視）", r.status === 200 && r.body.ignored === "gauge-not-full" && r.body.room.battle.queue.length === 0 && r.body.room.battle.gauge[slotKeyOf(mineH[0])] === 1);
+  r = await call(s, "room_battle_skill", { code, charId: mineH[0].id }, "a");
+  t("使う: 同じ子を持っていても、他の人のゲージは使えない（自分の枠のゲージだけ）", r.status === 200 && r.body.ignored === "gauge-not-full" && r.body.room.battle.gauge[slotKeyOf(mineH[0])] === 1 && r.body.room.battle.queue.length === 0, JSON.stringify(r.body).slice(0, 80));
+  r = await call(s, "room_battle_skill", { code, charId: "sp_calc_a_ur" }, "h"); t("使う: パーティにいない子は使えない", r.status === 400 && r.body.error === "not-your-character");
+  r = await call(s, "room_battle_skill", { code, charId: 123 }, "h"); t("使う: 不正な値は拒否", r.status === 400);
+  const max = T.coopGaugeMax(ROSTER[mineH[0].id]);
+  for (let i = 1; i < max; i++) room = await playRound(s, code, ids, { h: true, a: i === 1 ? false : true });
+  if (room.battle.status !== "fighting") t("（テストの前提：スキルが貯まるまで戦闘が続く）", false);
+  const gauge = room.battle.gauge[slotKeyOf(mineH[0])];
+  t("ゲージ: 満タンまで貯まる（上限を超えない）", gauge === max, `${gauge}/${max}`);
+  // 使う
+  const before = room.battle; const foeBefore = before.waves[before.wave].hp, hpBefore = before.partyHp;
+  r = await call(s, "room_battle_skill", { code, charId: mineH[0].id }, "h");
+  const q = r.body.room?.battle;
+  t("使う: 満タンなら予約され、ゲージは0に戻る（効果はまだ出ない）", r.status === 200 && !r.body.ignored && q.queue.length === 1 && q.queue[0].uid === "h" && q.gauge[slotKeyOf(mineH[0])] === 0 && q.waves[q.wave].hp === foeBefore);
+  r = await call(s, "room_battle_skill", { code, charId: mineH[0].id }, "h"); t("使う: 同じラウンドに2回は使えない（ゲージが0なので）", r.status === 200 && r.body.ignored && r.body.room.battle.queue.length === 1);
+  // ラウンドの結果で効く：全員が不正解でも、スキルのダメージは入る
+  room = await playRound(s, code, ids, { h: false, a: false });
+  const L = room.battle.last, sk = L.skills[0];
+  t("効果: ラウンドの結果で、スキルのダメージが敵に入る（答えが不正解でも）", L.skills.length === 1 && sk.kind === "damage" && sk.damage > 0 && sk.uid === "h" && L.dealt === sk.damage && L.skillDealt === sk.damage && room.battle.queue.length === 0, JSON.stringify(L.skills));
+  t("効果: スキルの上限（敵の最大HPの割合）を超えない", sk.damage <= Math.round(room.battle.waves[L.wave].maxHp * T.RB.skillCapFrac));
+  t("効果: スキルのダメージの分だけ、敵のHPが減っている", room.battle.waves[L.wave].hp === foeBefore - sk.damage || L.waveCleared, `${room.battle.waves[L.wave].hp} vs ${foeBefore - sk.damage}`);
+  void hpBefore;
+}
+// スキルの種類ごとの効果（回復・状態異常回復・上限・とどめ）
+{ const ids = ["h", "a"]; const { s, code } = await setupRoom(ids); clock = T0; await startStage(s, code, ids, 0);
+  let room = await getRoom(s, code, "h");
+  const myH = room.party.map((p, i) => [p, i]).filter(([p]) => p.ownerId === "h");
+  // hの3体を、回復・状態異常回復・最強の単体攻撃(UR・高Lv)にして、ゲージを満タンにする
+  editRoom(s, code, (rm) => {
+    rm.party[myH[0][1]].id = healId; rm.party[myH[1][1]].id = cureId; rm.party[myH[2][1]].id = singleUR;
+    rm.party[myH[2][1]].exps = [9e6, 9e6, 9e6];
+    rm.battle.partyHp = Math.round(rm.battle.partyMaxHp * 0.4);
+    rm.battle.waves[0].hp = rm.battle.waves[0].maxHp = 20000; // 上限の確認：最強のスキルの生のダメージ(約8500)が、上限(20000×12%=2400)より大きくなるHPにする
+  });
+  room = await getRoom(s, code, "h");
+  const myH2 = room.party.filter((p) => p.ownerId === "h").map((p) => [p]); // 差し替えたあとのキャラで、ゲージを満タンにする
+  editRoom(s, code, (rm) => { for (const [p] of myH2) rm.battle.gauge[slotKeyOf(p)] = 99; });
+  room = await getRoom(s, code, "h");
+  const hp0 = room.battle.partyHp, max = room.battle.partyMaxHp;
+  let r;
+  for (const [p] of myH2) r = await call(s, "room_battle_skill", { code, charId: p.id }, "h");
+  // ゲージ99は満タン超え（編集用）。使うとすべて0に戻る
+  t("使う: 3体とも予約できる（回復・状態異常回復・単体攻撃）", r.body.room?.battle.queue.length === 3 && myH2.every(([p]) => r.body.room.battle.gauge[slotKeyOf(p)] === 0), JSON.stringify(r.body).slice(0, 120));
+  room = await playRound(s, code, ids, { h: false, a: false });
+  const L = room.battle.last, byKind = (id) => L.skills.find((x) => x.id === id);
+  const heal = byKind(healId), cure = byKind(cureId), hit = byKind(singleUR);
+  const healExp = Math.round(max * ROSTER[healId].skill.percent), cureExp = Math.round(max * T.RB.cureHeal);
+  t("回復: みんなのHPが 最大HP×割合 ぶん増える", heal?.kind === "heal" && heal.heal === healExp, JSON.stringify(heal) + " exp " + healExp);
+  t("状態異常回復: 協力バトルでは、HP回復(12%)に置きかわる", cure?.kind === "heal" && cure.heal === Math.min(cureExp, max - hp0 - heal.heal), JSON.stringify(cure));
+  t("単体攻撃（最強のUR・高Lv）でも、1回の上限で止まる", hit?.kind === "damage" && hit.damage === Math.round(20000 * T.RB.skillCapFrac) && hit.damage < 8000, JSON.stringify(hit));
+  t("回復のあと敵が反撃しても、HPは 前のHP＋回復−反撃 になっている", room.battle.last.partyHp === Math.max(0, Math.min(max, hp0 + heal.heal + cure.heal) - L.foeDmg), `${room.battle.last.partyHp}`);
+}
+{ // とどめ：スキルだけで波を倒せる／終わったあと・場面を読んでいる間・部屋の外の人は使えない
+  const ids = ["h", "a"]; const { s, code } = await setupRoom(ids); clock = T0; await startStage(s, code, ids, 0);
+  let room = await getRoom(s, code, "h"); const p0 = room.party.find((p) => p.ownerId === "h");
+  editRoom(s, code, (rm) => { rm.battle.gauge[slotKeyOf(p0)] = 99; rm.battle.waves[0].hp = 1; });
+  await call(s, "room_battle_skill", { code, charId: p0.id }, "h");
+  room = await playRound(s, code, ids, { h: false, a: false });
+  t("とどめ: 誰も正解しなくても、スキルで敵を倒して次の波に進める", room.battle.last.waveCleared && room.battle.wave === 1 && room.battle.last.skills[0]?.damage >= 1);
+  // 終わったあと
+  const w = await winStage(["h", "a"], 0); const pw = w.room.party.find((p) => p.ownerId === "h");
+  const r = await call(w.s, "room_battle_skill", { code: w.code, charId: pw.id }, "h"); t("使う: 戦闘が終わったあとは使えない（害のない無視）", r.status === 200 && r.body.ignored === "not-fighting");
+  // 場面を読む段階
+  const c2 = await setupRoom(["h", "a"]); await call(c2.s, "room_battle_start", { code: c2.code, index: 0 }, "h");
+  const r2 = await call(c2.s, "room_battle_skill", { code: c2.code, charId: T.STARTER_PARTY[0] }, "h"); t("使う: 場面を読んでいる間は使えない", r2.status === 200 && r2.body.ignored === "not-fighting");
+  // 部屋の外の人
+  const r3 = await call(c2.s, "room_battle_skill", { code: c2.code, charId: T.STARTER_PARTY[0] }, "zzz"); t("使う: 部屋にいない人は使えない", r3.status === 404);
+}
+{ // 予約したまま部屋を出た人のスキルは出ない
+  const ids = ["h", "a", "b"]; const { s, code } = await setupRoom(ids); clock = T0; await startStage(s, code, ids, 0);
+  let room = await getRoom(s, code, "h"); const pb = room.party.find((p) => p.ownerId === "b");
+  editRoom(s, code, (rm) => { rm.battle.gauge[slotKeyOf(pb)] = 99; });
+  await call(s, "room_battle_skill", { code, charId: pb.id }, "b");
+  const nb = structuredClone((await getRoom(s, code, "h")).battle);
+  // 部屋から b を外した状態で結果を出す
+  const rec = s.rooms.get(code); const rm2 = { ...structuredClone(rec.room), members: rec.room.members.filter((m) => m.id !== "b") };
+  const out = T.tickBattle({ ...rm2, battle: { ...nb, round: { ...nb.round, deadline: 1 } } }, clock + 99999);
+  t("部屋を出た人: 予約していたスキルは出ない", out.battle.last.skills.length === 0 && out.battle.queue.length === 0);
+}
+{ // 古い戦闘（gauge・queue が無い）でも壊れない
+  const ids = ["h", "a"]; const { s, code } = await setupRoom(ids); clock = T0; await startStage(s, code, ids, 0);
+  editRoom(s, code, (rm) => { delete rm.battle.gauge; delete rm.battle.queue; });
+  const room = await playRound(s, code, ids, { h: true, a: true });
+  t("互換: ゲージ・予約の項目が無い戦闘でも、そのまま進む（ゲージが貯まり始める）", room.battle.last?.n === 1 && Array.isArray(room.battle.queue) && Object.keys(room.battle.gauge).length > 0);
+}
 
 console.log(`\n${fail ? "❌" : "✅"} ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
