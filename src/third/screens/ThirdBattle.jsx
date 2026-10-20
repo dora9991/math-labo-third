@@ -51,6 +51,7 @@ import DrawPad from "../../components/DrawPad.jsx";
 import { fxScale, getFxSpeed, setFxSpeed } from "../../engine/fxSpeed.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
 import { displayName } from "../nick.js";
+import { lapOf, scaleEncountersForLap } from "../lap.js";
 import QuestionText from "../../components/QuestionText.jsx";
 import MathText from "../../components/MathText.jsx";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
@@ -186,7 +187,7 @@ export default function Battle({ nav, params }) {
   // 雑魚の波／ボスの波でゲージの長さが変わる。裏ボスは専用の短いゲージ（secretBoss.js の SECRET.gaugeSeconds）。
   const gaugeMaxFor = (isBoss) => (kind === "secretBoss" ? SECRET.gaugeSeconds : gaugeSecondsFor(unitId, isBoss, tierNow));
 
-  const encounters = useMemo(() => buildEncounters(params, chapter, gradeData), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const encounters = useMemo(() => scaleEncountersForLap(buildEncounters(params, chapter, gradeData), lapOf(save)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 小単元クリア報酬の配分（2026-09-18）：小単元丸ごとクリアの目標値
   // （expCurve.jsのカリキュラム位置カーブ）を、雑魚6割・ボス4割で山分けする。

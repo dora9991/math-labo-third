@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import { execSync } from "node:child_process";
 execSync("node scripts/gen-problem-version.mjs", { stdio: "ignore" });
 await build({
-  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export * from "./src/third/secretBoss.js"; export * from "./src/third/enemyMoves.js"; export * from "./src/third/enemyFx.js"; export * from "./src/third/skillDefs.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { STATUS_KEYS, STATUS_DEFS, rollStatusInflict, applyStatusEffect, tickStatusEffects, canActThisRound, canUseSkillThisRound } from "./src/third/battleEngine.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
+  stdin: { contents: `export * from "./supabase/functions/third-api/handler.js"; export { applyAdminOp } from "./src/third/adminOps.js"; export { haichiKeyForUnit } from "./src/third/core.js"; export { generateThirdProblem } from "./src/third/problemSource.js"; export * from "./src/third/core.js"; export { getSubUnitClearExpReward, expOf } from "./src/third/expCurve.js"; export { tierOf } from "./src/third/balance.js"; export * from "./src/third/secretBoss.js"; export * from "./src/third/lap.js"; export * from "./src/third/enemyMoves.js"; export * from "./src/third/enemyFx.js"; export * from "./src/third/skillDefs.js"; export { SPECIALIST_ROSTER } from "./src/third/specialistRoster.js"; export { STATUS_KEYS, STATUS_DEFS, rollStatusInflict, applyStatusEffect, tickStatusEffects, canActThisRound, canUseSkillThisRound } from "./src/third/battleEngine.js"; export { SUBUNIT_SEQUENCE } from "./src/third/data/storyMap.js"; export { RAID, RAID_LADDER, raidStats, titlesOf } from "./src/third/raid.js"; export { GACHA, REWARD, VERIFY, MEDAL, STARTER_PARTY, CRYSTAL, DAILY, SYNTH } from "./src/third/gachaConfig.js"; export { generatePractice, generatePracticeAvoiding, practiceCorrect } from "./src/third/problemSource.js"; export { HAICHI_COURSE } from "./src/data/haichiCourse.js"; export { worldBattleFor } from "./src/third/link.js"; export { chaptersForGrade } from "./src/data/index.js";`, resolveDir: process.cwd(), loader: "js" },
   bundle: true, format: "esm", platform: "node", outfile: "dist-fn/_t.mjs", loader: { ".json": "json" }, logLevel: "error",
 });
 const T = await import("../dist-fn/_t.mjs");
@@ -716,6 +716,65 @@ async function earnMedals(s, u = "stu1", t = T0) { // 本物の手順でメダ�
   s.attemptHistory = async () => { throw new Error("db down"); };
   const r3 = await call(s, "my_profile", {}, "pf1", now);
   t("プロフィール: 読み込みに失敗しても 200 で空の集計（おすすめは端末の記録で出す）", r3.status === 200 && Object.keys(r3.body.units).length === 0);
+}
+
+// ===== 「もう一周」（2周目以降）：全学年クリア後だけ。物語の進みだけ戻す／仲間・メダル・記録は残す／クリスタルは半分・経験値は同じ／敵は強く
+{ const L = T;
+  t("周回の設定: 2周目のクリスタルは半分（切り上げ・最低1）／0は0", L.lapCrystals(2, 1) === 2 && L.lapCrystals(2, 2) === 1 && L.lapCrystals(5, 2) === 3 && L.lapCrystals(30, 2) === 15 && L.lapCrystals(1, 3) === 1 && L.lapCrystals(0, 2) === 0);
+  t("周回の設定: 敵の強さは1周ごとに +25%（1周目は×1）", L.lapEnemyMul(1) === 1 && L.lapEnemyMul(2) === 1.25 && L.lapEnemyMul(3) === 1.5 && L.lapEnemyMul(0) === 1 && L.lapEnemyMul("x") === 1);
+  const waves = [[{ id: "a", kind: "unit", hp: 100, maxHp: 100, dmg: 40 }, { id: "b", kind: "unit", hp: 33, maxHp: 33, dmg: 7 }], [{ id: "c", kind: "chapterBoss", hp: 800, maxHp: 800, dmg: 90 }], [{ id: "s", kind: "secretBoss", hp: 9000, maxHp: 9000, dmg: 300 }]];
+  const w1 = L.scaleEncountersForLap(waves, 1), w2 = L.scaleEncountersForLap(waves, 2), w3 = L.scaleEncountersForLap(waves, 3);
+  t("周回: 敵のHP・攻撃は2周目で×1.25・3周目で×1.5（裏ボスは変えない／1周目はそのまま／元のデータは変えない）", w1 === waves && w2[0][0].hp === 125 && w2[0][0].maxHp === 125 && w2[0][0].dmg === 50 && w2[0][1].hp === 41 && w2[1][0].hp === 1000 && w2[1][0].dmg === 113 && w3[1][0].hp === 1200 && w2[2][0].hp === 9000 && w2[2][0].dmg === 300 && waves[0][0].hp === 100);
+  const old = T.normalizeThirdState({ crystals: 7 });
+  t("保存データ: 古いデータ（lap無し）は1周目として読む／壊れた値は整える", old.lap.n === 1 && Object.keys(old.lapBattle).length === 0 && T.normalizeThirdState({ lap: { n: "x", history: [null, { n: 1, endedAt: 5 }, { n: "z" }] }, lapBattle: [] }).lap.history.length === 1 && T.normalizeThirdState({ lap: { n: -4 } }).lap.n === 1 && T.lapOf({ lap: { n: 3 } }) === 3);
+}
+{ const s = makeStore(); const U = "lap1"; await call(s, "get_state", {}, U, T0);
+  const ch1 = T.chaptersForGrade(1)[0], order1 = T.battleOrder(1), c1ids = T.battleUnitIdsOfChapter(1, ch1);
+  // 準備：全学年クリア済み・仲間・メダル・裏ボス/協力の記録・ニックネーム・クリスタル
+  const setup = async (fn) => { const cur = await s.load(U); const st = cur.state; fn(st); await s.save(U, st, cur.version); };
+  await setup((st) => {
+    st.gradeDone = { 1: T0, 2: T0, 3: T0 }; st.chapterDone = { "1:c1": T0 }; st.bossDone = { "1:c1": T0 }; st.cleared = { "1:c1:x": { first: T0, count: 2 } };
+    for (const id of order1) st.medals.battle[id] = T0; st.medals.practiceN[order1[0]] = 5; st.medals.haichi["g1m1"] = T0;
+    st.crystals = 123; st.dex.sp_calc_a_ur = 1; st.spares[T.STARTER_PARTY[0]] = 2; st.owned[T.STARTER_PARTY[0]].nick = "ぷにお"; st.owned[T.STARTER_PARTY[0]].exp = 999;
+    st.secret.cleared["1:0"] = T0; st.raid.cleared["1:c1"] = T0; st.coop.medals["0"] = 3;
+  });
+  const before = (await s.load(U)).state;
+  t("もう一周: 全学年クリア済みなら、できる状態（lapFinished）", T.lapFinished(before) && T.lapOf(before) === 1);
+  // まだ終わっていない人はできない
+  const s2 = makeStore(); await call(s2, "get_state", {}, "x", T0); const c2 = await s2.load("x"); c2.state.gradeDone = { 1: 1, 2: 1 }; await s2.save("x", c2.state, c2.version);
+  let r = await call(s2, "new_lap", {}, "x", T0 + MIN); t("もう一周: 中3まで終わっていない人はできない（状態は変わらない）", r.status === 400 && r.body.error === "not-finished" && (await s2.load("x")).state.lap.n === 1);
+  r = await call(s, "new_lap", {}, U, T0 + MIN); const st2 = r.body.state;
+  t("もう一周: 2周目に入る（周回数・履歴）", r.status === 200 && r.body.lap === 2 && st2.lap.n === 2 && st2.lap.history.length === 1 && st2.lap.history[0].n === 1 && st2.lap.startedAt === T0 + MIN);
+  t("もう一周: 物語の進み（クリア記録・章/ボス/学年クリア）が戻る", Object.keys(st2.cleared).length === 0 && Object.keys(st2.chapterDone).length === 0 && Object.keys(st2.bossDone).length === 0 && Object.keys(st2.gradeDone).length === 0 && Object.keys(st2.lapBattle).length === 0);
+  t("もう一周: 仲間・レベル・予備・図鑑・クリスタル・ニックネームはそのまま", JSON.stringify(st2.owned) === JSON.stringify(before.owned) && JSON.stringify(st2.party) === JSON.stringify(before.party) && st2.crystals === 123 && JSON.stringify(st2.spares) === JSON.stringify(before.spares) && JSON.stringify(st2.dex) === JSON.stringify(before.dex) && st2.owned[T.STARTER_PARTY[0]].nick === "ぷにお");
+  t("もう一周: メダル・裏ボス・協力の記録もそのまま（集めたものは消さない）", JSON.stringify(st2.medals) === JSON.stringify(before.medals) && st2.secret.cleared["1:0"] === T0 && st2.raid.cleared["1:c1"] === T0 && st2.coop.medals["0"] === 3 && T.unitMedalsOf(st2, order1[3]).battle === true);
+  t("もう一周: バトルの順番がまた1つ目から（メダルがあっても、この周でクリアするまで次は開かない）", T.battleOpen(st2, 1, order1[0]) && !T.battleOpen(st2, 1, order1[1]) && !T.battleOpen(st2, 1, order1[5]) && !T.chapterBattlesCleared(st2, 1, ch1));
+  t("もう一周: 裏ボスは開いたまま（2周目に入れたのは全学年クリア後だから）", T.secretOpen(st2, 1, 0) && T.secretOpen(st2, 3, 0) && !T.secretOpen(T.normalizeThirdState({}), 1, 0) && T.gradeEverDone(st2, 2));
+  r = await call(s, "new_lap", {}, U, T0 + 2 * MIN); t("もう一周: 2周目をクリアするまで、続けてはできない", r.status === 400 && r.body.error === "not-finished");
+  // 2周目の最初のバトル：経験値は同じ・クリスタルは半分
+  const attemptsFor = (uid, n, seedBase) => Array.from({ length: n }, (_, i) => { const level = ["easy", "standard", "advanced", "oni"][i % 4]; const p = T.generateThirdProblem(uid, level, seedBase + i) || T.generateThirdProblem(uid, "standard", seedBase + i); return { unitId: uid, level: p.level, seed: seedBase + i, answer: p.choices[p.correctIndex], ms: 3000 }; });
+  let now = T0 + 30 * MIN, nn = 0;
+  const claimUnit = async (i, seedBase) => { const w = T.worldBattleFor(1, ch1, ch1.units[i]); return call(s, "claim", { claim: { nonce: "lap2-" + (nn++) + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: w.chapterId, kind: "subUnit", subUnitId: w.subUnitId, startedAt: now - 60000, endedAt: now, attempts: attemptsFor(ch1.units[i].id, 12, seedBase) } }, U, now); };
+  const base0 = T.getSubUnitClearExpReward(1, T.worldBattleFor(1, ch1, ch1.units[0]).chapterId, T.worldBattleFor(1, ch1, ch1.units[0]).subUnitId);
+  r = await claimUnit(1, 7000000); now += 5 * MIN; t("2周目: 順番が戻っているので、2つ目のバトルはまだ申請できない（locked）", r.status === 400 && r.body.error === "locked", JSON.stringify(r.body).slice(0, 120));
+  r = await claimUnit(0, 7100000); now += 5 * MIN; const cr0 = before.crystals;
+  t("2周目: 1つ目のバトルは「はじめてクリア」（クリスタルは半分＝1）", r.status === 200 && r.body.rewards.isFirstClear && r.body.rewards.crystals === T.lapCrystals(T.REWARD.firstCrystals, 2) && r.body.rewards.crystals === 1 && r.body.state.crystals === cr0 + 1 + (r.body.rewards.dailyMission || 0), JSON.stringify({ rw: r.body.rewards, cr: r.body.state.crystals, cr0 }));
+  t("2周目: 経験値は1周目と同じ（満額）", r.body.rewards.exp === base0, `${r.body.rewards.exp} vs ${base0}`);
+  t("2周目: メダルは新しく付かない（もう持っている）／この周のクリアが記録され、次のバトルが開く", !(r.body.rewards.newMedals || []).length && r.body.state.lapBattle[order1[0]] > 0 && T.battleOpen(r.body.state, 1, order1[1]) && !T.battleOpen(r.body.state, 1, order1[2]));
+  // 章をクリア（章クリアボーナス 5→3）→ 章ボス（5→3）
+  let bonus = 0;
+  for (let i = 1; i < c1ids.length; i++) { r = await claimUnit(i, 7200000 + i * 1000); now += 5 * MIN; if (r.status !== 200) { t(`2周目: ${i + 1}つ目の申請が通る（テストの前提）`, false, JSON.stringify(r.body)); break; } bonus = r.body.rewards.chapterBonus || 0; }
+  t("2周目: 章クリアボーナスも半分（5→3）", bonus === T.lapCrystals(T.CRYSTAL.chapterClear, 2) && bonus === 3, String(bonus));
+  const stC = (await s.load(U)).state;
+  t("2周目: 章のバトルを全部クリアすると、章ボスが開く", T.chapterBattlesCleared(stC, 1, ch1));
+  const bossAt = attemptsFor(ch1.units[0].id, 12, 7300000).concat([]);
+  const bossUnits = T.labUnitIdsOfChapter ? T.labUnitIdsOfChapter(1, ch1.id) : ch1.units.map((u) => u.id);
+  const bossAttempts = Array.from({ length: 12 }, (_, i) => { const uid = bossUnits[i % bossUnits.length]; const p = T.generateThirdProblem(uid, "standard", 7400000 + i); return { unitId: uid, level: p.level, seed: 7400000 + i, answer: p.choices[p.correctIndex], ms: 3000 }; }); void bossAt;
+  r = await call(s, "claim", { claim: { nonce: "lap2-boss-" + Math.random().toString(36).slice(2, 10), pv: T.PROBLEM_VERSION, grade: 1, chapterId: ch1.id, kind: "chapterBoss", startedAt: now - 60000, endedAt: now, attempts: bossAttempts } }, U, now); now += 5 * MIN;
+  t("2周目: 章ボスをはじめて倒す（この周で）クリスタルは半分（5→3）", r.status === 200 && r.body.rewards.isFirstClear && r.body.rewards.crystals === T.lapCrystals(T.CRYSTAL.chapterBossFirst, 2) && r.body.rewards.crystals === 3, JSON.stringify(r.body.rewards || r.body).slice(0, 140));
+  // 1周目のプレイヤー（lap=1）は従来どおり
+  const s3 = makeStore(); await call(s3, "get_state", {}, "p1", T0); const rr = await call(s3, "claim", { claim: makeClaim({ now: T0 + 10 * MIN }) }, "p1", T0 + 10 * MIN);
+  t("1周目は従来どおり（初回クリスタル2・周回数は1のまま）", rr.status === 200 && rr.body.rewards.crystals === T.REWARD.firstCrystals && rr.body.state.lap.n === 1 && Object.keys(rr.body.state.lapBattle).length === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

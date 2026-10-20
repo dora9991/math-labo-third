@@ -10,6 +10,7 @@ import { initialThirdState, normalizeThirdState, haichiKeyForUnit } from "./core
 import { GRADES } from "../data/index.js";
 import { getGrade, getChapter } from "./data/storyMap.js";
 import { labUnitIdForBattle } from "./link.js";
+import { lapOf } from "./lap.js";
 
 const ROSTER_IDS = new Set(SPECIALIST_ROSTER.map((c) => c.id));
 const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
@@ -18,6 +19,12 @@ export const ADMIN_OPS = ["setCrystals", "addCrystals", "setCoins", "clearAllMed
 
 /** @returns {{ok:boolean, error?:string, state?:object, message?:string}} */
 export function applyAdminOp(state, op, args = {}) {
+  const r = applyAdminOpBase(state, op, args);
+  // 2周目以降：管理者が付けたバトルメダルは「この周のクリア」にも反映する（バトルの順番・章ボスの開放が、メダルと同じになるように）
+  if (r.ok && r.state && lapOf(r.state) > 1) for (const [id, v] of Object.entries(r.state.medals?.battle || {})) if (v === "admin") r.state.lapBattle[id] ||= "admin";
+  return r;
+}
+function applyAdminOpBase(state, op, args = {}) {
   const s = structuredClone(normalizeThirdState(state));
   switch (op) {
     case "setCrystals": s.crystals = clampInt(args.n, 0, 99999); return { ok: true, state: s, message: `クリスタルを ${s.crystals} 個にしました` };

@@ -6,13 +6,15 @@
 //  画面の位置(pos)は App が持つ（はいち・練習・バトルから戻ってきた時に、同じ小単元の画面へ戻すため）。
 //  デザインは既存の部品(GameButton/Header)を使った仮置き。仕上げはCodex側で。
 // ============================================================
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Header from "../../components/Header.jsx";
 import GameButton from "../../components/GameButton.jsx";
 import { MathBackdrop } from "../../components/Decorations.jsx";
 import { chaptersForGrade } from "../../data/index.js";
 import { unitMedals, medalSummary, MEDAL_PRACTICE_TARGET } from "../medals.js";
-import { battleOpen, battleOrder, chapterBattlesCleared } from "../core.js";
+import { battleOpen, battleOrder, chapterBattlesCleared, battleDone } from "../core.js";
+import { LAP, lapOf, lapFinished, gradeEverDone, lapCrystals, lapEnemyMul } from "../lap.js";
 import { findUnitById } from "../../data/index.js";
 import { getChapter } from "../data/storyMap.js";
 import { worldBattleFor } from "../link.js";
@@ -83,6 +85,18 @@ export function MedalPair({ m, size = 26, battleLocked = false }) {
 export default function ThirdMenu(props) {
   const { player, records, grade, pos, setPos, onSetGrade, updatePlayer, medalState } = props; // medalState＝サーバーが付与したメダル(thirdApi.getState().state)
   const view = pos?.view || "main";
+  const [lapAsk, setLapAsk] = useState(false); // 「もう一周」の確認
+  const [lapBusy, setLapBusy] = useState(false);
+  const [lapMsg, setLapMsg] = useState(""); // 失敗したときのひとこと
+  const [lapStarted, setLapStarted] = useState(0); // 周回を始めた直後の演出（何周目か）
+  const lap = lapOf(medalState);
+  const doNewLap = async () => {
+    if (lapBusy || !props.onNewLap) return;
+    setLapBusy(true); setLapMsg("");
+    const r = await props.onNewLap();
+    setLapBusy(false);
+    if (r?.ok) { setLapAsk(false); setLapStarted(r.lap); } else setLapMsg("うまくいかなかったよ。もういちど ためしてね");
+  };
   const chapters = chaptersForGrade(grade);
   const chapter = chapters.find((c) => c.id === pos?.chapterId) || null;
   const unit = chapter?.units?.find((u) => u.id === pos?.unitId) || null;
@@ -106,7 +120,15 @@ export default function ThirdMenu(props) {
         <div className="menu-title-lockup">
           <div className="home-title-tab"><span>ASTRA ACADEMY ── ADVENTURER'S ARCHIVE</span><b>冒険の書</b><i>MENU</i></div>
           <div>{player.name ? `${player.name}、` : ""}きょうも数学をたのしもう！</div>
+          {lap > 1 && <div style={{ marginTop: 6 }}><span style={{ display: "inline-block", fontSize: 12, fontWeight: 900, color: "#3a2a00", background: "linear-gradient(135deg,#fde68a,#f59e0b)", borderRadius: 999, padding: "3px 12px" }}>🔁 {lap}周目　敵が少し強い（×{lapEnemyMul(lap).toFixed(2).replace(/0$/, "")}）</span></div>}
         </div>
+        {/* もう一周：全学年（中1〜中3）をクリアしたら。仲間はそのまま、物語の進みだけ戻す */}
+        {props.onNewLap && lapFinished(medalState) && (
+          <section className="home-alert" style={{ marginBottom: 14 }}>
+            <b>🎉 全学年クリア！　もう一周できるよ</b>
+            <GameButton tone="gold" icon="🔁" onClick={() => { setLapMsg(""); setLapAsk(true); }}><strong>もう一周する（{lap + 1}周目）</strong><small>仲間・レベル・メダルはそのまま。1章から また冒険しよう</small></GameButton>
+          </section>
+        )}
         {weak.length > 0 && (
           <section className="home-alert" style={{ marginBottom: 14 }}>
             <b>MISSION UPDATE　苦手が見つかったよ</b>
@@ -131,10 +153,43 @@ export default function ThirdMenu(props) {
           <GameButton tone="gold" icon="📖" onClick={() => go({ view: "story" })}><strong>ものがたり{(() => { const n = countNew(grade, medalState, loadSeen()); return n > 0 ? `　NEW ${n}` : ""; })()}</strong><small>これまでのお話を見返そう</small></GameButton>
           <GameButton tone="danger" icon="🎰" onClick={props.onGacha}><strong>ガチャ</strong><small>💎 {medalState?.crystals ?? 0}個　{(medalState?.crystals ?? 0) >= 5 ? "いま引ける！" : `あと${5 - ((medalState?.crystals ?? 0) % 5 || 0)}個で1回`}</small></GameButton>
           <GameButton tone="blue" icon="📔" onClick={props.onDex}><strong>図鑑</strong><small>{Object.keys(medalState?.dex || {}).length} / {DEX_TOTAL}体　であった仲間をコレクション</small></GameButton>
-          {props.onSecret && medalState?.gradeDone?.[grade] && <GameButton tone="danger" icon="👹" onClick={props.onSecret}><strong>裏ボス（中{grade}）</strong><small>中{grade}を クリアした ごほうび！ 推奨Lv30〜90 の強敵が7体</small></GameButton>}
+          {props.onSecret && gradeEverDone(medalState, grade) && <GameButton tone="danger" icon="👹" onClick={props.onSecret}><strong>裏ボス（中{grade}）</strong><small>中{grade}を クリアした ごほうび！ 推奨Lv30〜90 の強敵が7体</small></GameButton>}
           {props.onRoom && <GameButton tone="blue" icon="🤝" onClick={props.onRoom}><strong>みんなで戦う</strong><small>2〜5人で同時に答えて、回廊のボスへ（部屋コードで集まる）</small></GameButton>}
           <GameButton tone="mint" icon="⚙️" onClick={() => go({ view: "settings" })}><strong>設定</strong><small>学年の変更・アラーム</small></GameButton>
         </div>
+        {lapAsk && createPortal( // 入れ物に変形(transform)がかかっていて、fixed のままだと画面いっぱいにならない→bodyへ出す
+          <div onClick={() => !lapBusy && setLapAsk(false)} data-testid="lap-ask" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 215, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", background: "linear-gradient(160deg,#0a1226,#1b2a52)", border: "2px solid #fbbf24", borderRadius: 16, padding: "18px 18px 16px", color: "#fff" }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#fde047", letterSpacing: 1 }}>🔁 もう一周</div>
+              <div style={{ fontSize: 17, fontWeight: 900, margin: "6px 0 10px" }}>{lap + 1}周目に すすむ？</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(255,255,255,.92)" }}>
+                <b style={{ color: "#7cff8a" }}>そのまま残るもの</b><br />仲間・レベル・クリスタル・図鑑・メダル・ニックネーム・裏ボスと協力の記録<br />
+                <b style={{ color: "#ffd166", display: "inline-block", marginTop: 6 }}>はじめに戻るもの</b><br />物語の進み（バトルがまた1章1話から・章と学年のクリア）<br />
+                <b style={{ color: "#9be7ef", display: "inline-block", marginTop: 6 }}>{lap + 1}周目のきまり</b><br />
+                ・「はじめてクリア」の 経験値は同じ／💎クリスタルは<b>半分</b><br />
+                ・敵が <b>少し強く</b> なる（HP・攻撃 ×{lapEnemyMul(lap + 1).toFixed(2).replace(/0$/, "")}）<br />
+                ・{LAP.grades.map((g) => `中${g}`).join("・")}をぜんぶクリアすると、また もう一周できる
+              </div>
+              {lapMsg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 800, color: "#ff9a8a" }}>{lapMsg}</div>}
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button onClick={() => setLapAsk(false)} disabled={lapBusy} data-sfx="back" style={{ flex: 1, padding: 12, borderRadius: 12, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.06)", color: "#fff", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>やめる</button>
+                <button onClick={doNewLap} disabled={lapBusy} data-sfx="none" data-testid="lap-go" style={{ flex: 1, padding: 12, borderRadius: 12, border: "none", background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#3a2a00", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>{lapBusy ? "…" : "もう一周する！"}</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+        {lapStarted > 0 && createPortal(
+          <div onClick={() => setLapStarted(0)} data-testid="lap-started" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 215, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div style={{ textAlign: "center", background: "linear-gradient(160deg,#0a1226,#1b2a52)", border: "2px solid #fbbf24", borderRadius: 16, padding: "22px 26px", color: "#fff", maxWidth: 340 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#fde047", letterSpacing: 2 }}>👑 つよくなって もう一周！</div>
+              <div style={{ fontSize: 22, fontWeight: 900, margin: "8px 0" }}>{lapStarted}周目スタート！</div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.7, color: "rgba(255,255,255,.9)" }}>仲間はそのまま。1章から また冒険しよう。<br />敵は少し強くなっているよ！</div>
+              <button style={{ marginTop: 14, padding: "10px 28px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#3a2a00", fontWeight: 900, cursor: "pointer", fontFamily: "inherit" }}>はじめる</button>
+            </div>
+          </div>,
+          document.body
+        )}
       </Shell>
     );
   }
@@ -207,14 +262,14 @@ export default function ThirdMenu(props) {
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%" }}>
                   <span style={{ textAlign: "left" }}><strong>{u.emoji ? u.emoji + " " : ""}{u.name}</strong></span>
                   {/* 🔒 は「バトルだけ」が閉じている印（学ぶ・練習はいつでもできる）。以前は名前の前に付いていて、単元ごと入れないように見えた */}
-                  <MedalPair m={m} battleLocked={!m.battle && !battleOpen(medalState, grade, u.id)} />
+                  <MedalPair m={m} battleLocked={!battleOpen(medalState, grade, u.id)} />
                 </span>
               </GameButton>
             );
           })}
           <GameButton tone="danger" icon="👑" disabled={!bossAvail || !bossOpen} onClick={() => bossAvail && bossOpen && props.onChapterBoss?.(chapter)}>
             <strong>{bossAvail && !bossOpen ? "🔒 " : ""}章のボスと戦う</strong>
-            <small>{!bossAvail ? "準備中" : !bossOpen ? "この章の小単元のバトルを ぜんぶクリアすると開くよ" : `${chapter.name} の総まとめ！ はじめて倒すと 💎+5`}</small>
+            <small>{!bossAvail ? "準備中" : !bossOpen ? "この章の小単元のバトルを ぜんぶクリアすると開くよ" : `${chapter.name} の総まとめ！ はじめて倒すと 💎+${lapCrystals(CRYSTAL.chapterBossFirst, lap)}${lap > 1 ? "（周回は半分）" : ""}`}</small>
           </GameButton>
         </div>
       </Shell>
@@ -258,7 +313,7 @@ export default function ThirdMenu(props) {
         <GameButton tone="mint" icon="✏️" onClick={() => go({ view: "practicePick", chapterId: chapter.id, unitId: unit.id })}><strong>練習</strong><small>4択学習モード（むずかしさをえらべるよ）</small></GameButton>
         <GameButton tone="gold" icon="⚔️" disabled={!battleAvail} onClick={() => battleAvail && props.onBattle?.(chapter, unit)}>
           <strong>バトルモード</strong>
-          <small>{!battleExists ? "この小単元のバトルは準備中" : !open ? `🔒 前のバトルをクリアすると開くよ${prevName ? `（${prevName}）` : ""}` : m.battle ? "クリアずみ！ もう一度たたかえるよ" : "はじめてクリアで ⚔️バトルメダルと 💎クリスタル2個！"}</small>
+          <small>{!battleExists ? "この小単元のバトルは準備中" : !open ? `🔒 前のバトルをクリアすると開くよ${prevName ? `（${prevName}）` : ""}` : battleDone(medalState)[unit.id] ? "クリアずみ！ もう一度たたかえるよ" : lap > 1 ? `この周ではじめてクリアで 💎クリスタル${lapCrystals(2, lap)}個（経験値は同じ）` : "はじめてクリアで ⚔️バトルメダルと 💎クリスタル2個！"}</small>
         </GameButton>
       </div>
     </Shell>

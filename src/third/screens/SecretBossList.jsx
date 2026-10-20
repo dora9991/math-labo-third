@@ -4,6 +4,7 @@
 // ============================================================
 import { useGame } from "../ThirdContext.jsx";
 import { getViewGrade } from "../gradeView.js";
+import { gradeEverDone } from "../lap.js";
 import { secretLadder, secretOpen, secretCleared, secretFirstExp, SECRET } from "../secretBoss.js";
 import { levelFromExp, expOf } from "../expCurve.js";
 import { monsterImageUrl } from "../data/monsterImages.js";
@@ -12,7 +13,7 @@ export default function SecretBossList({ nav }) {
   const { save, charactersById } = useGame();
   const grade = getViewGrade();
   const list = secretLadder(grade);
-  const gradeClear = !!save.gradeDone?.[grade];
+  const gradeClear = gradeEverDone(save, grade);
   const members = save.party.filter(Boolean).map((id) => charactersById[id]).filter(Boolean);
   const avg = members.length ? Math.round(members.reduce((a, c) => a + levelFromExp(expOf(save.owned[c.id], grade), c.rarity), 0) / members.length) : 0;
   return (

@@ -10,6 +10,7 @@
 //  ・公開：SECRET_OPEN（App.jsx）を true にする。それまでは URL に ?secret=1 を付けた時だけ、メニューに出る。
 // ============================================================
 import { RAID_LADDER } from "./raid.js";
+import { gradeEverDone } from "./lap.js";
 
 export const SECRET = {
   levels: [30, 40, 50, 60, 70, 80, 90],
@@ -54,7 +55,7 @@ const key = (grade, index) => `${Number(grade)}:${index}`;
 /** その裏ボスに挑戦できるか：学年クリア済み＆前の裏ボスを倒している。state 未取得(null)の間は閉じておく */
 export function secretOpen(state, grade, index) {
   if (!state || !Number.isInteger(index) || index < 0 || index >= SECRET_COUNT) return false;
-  if (!state.gradeDone?.[grade]) return false;
+  if (!gradeEverDone(state, grade)) return false; // もう一周（2周目以降）に入れたのは全学年クリア後なので、裏ボスはずっと開いたまま
   return index === 0 || !!state.secret?.cleared?.[key(grade, index - 1)];
 }
 export const secretCleared = (state, grade, index) => !!state?.secret?.cleared?.[key(grade, index)];

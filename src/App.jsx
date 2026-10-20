@@ -1518,6 +1518,12 @@ export default function App() {
     const r = await thirdApi.getState();
     if (r.status === 200) setThirdState(r.body.state);
   }
+  // 「もう一周」（全学年クリア後だけ。サーバーが物語の進みを戻す）。成功したら最新の状態に置き換える
+  async function doNewLap() {
+    const r = await thirdApi.newLap();
+    if (r.status === 200) { setThirdState(r.body.state); return { ok: true, lap: r.body.lap }; }
+    return { ok: false, error: r.body?.error || "failed" };
+  }
   function applyMedalResponse(r) {
     if (r.status === 200) {
       setThirdState(r.body.state);
@@ -2349,6 +2355,7 @@ export default function App() {
       onSetGrade={setWorld}
       updatePlayer={updatePlayer}
       medalState={thirdState}
+      onNewLap={doNewLap}
       pos={menuPos}
       setPos={setMenuPos}
       quizWeakUnits={quizWeakUnits}

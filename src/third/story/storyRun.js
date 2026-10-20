@@ -8,6 +8,7 @@
 // ============================================================
 import STORY from "./storyData.json";
 import { getChapter } from "../data/storyMap.js";
+import { lapOf } from "../lap.js";
 
 const SEEN_KEY = "mathLabo3_story_seen_v1";
 export function loadSeen() {
@@ -107,6 +108,7 @@ export function libraryFor(grade, state, seen) {
   const data = STORY[grade];
   if (!data) return [];
   const cleared = state?.cleared || {}, bossDone = state?.bossDone || {};
+  const everDone = lapOf(state) > 1; // もう一周に入れたのは全学年クリア後。物語は、周が変わっても見返せる
   // 1項目＝1〜2場面。「見た」か、その進み具合に届いていれば見られる（unlockedByProgress）。1つでも未視聴なら NEW
   const entry = (label, keys, beatsList, propsList, unlockedByProgress) => {
     const usable = keys.map((k, i) => ({ k, b: beatsList[i], p: propsList[i] })).filter((x) => x.b?.length);
@@ -124,9 +126,9 @@ export function libraryFor(grade, state, seen) {
       if (!s) continue;
       const t = `${ci + 1}-${sub.order}　${s.title}`;
       items.push(entry(t, [`${grade}:${cid}:s${sub.order}:pre`, `${grade}:${cid}:s${sub.order}:post`], [s.pre, s.post],
-        [{ ...base, kind: "pre", title: t, enemyId: sub.boss?.id }, { ...base, kind: "post", title: t, enemyId: sub.boss?.id }], !!cleared[`${grade}:${cid}:${sub.id}`]));
+        [{ ...base, kind: "pre", title: t, enemyId: sub.boss?.id }, { ...base, kind: "post", title: t, enemyId: sub.boss?.id }], everDone || !!cleared[`${grade}:${cid}:${sub.id}`]));
     }
-    const bossHere = !!bossDone[`${grade}:${cid}`];
+    const bossHere = everDone || !!bossDone[`${grade}:${cid}`];
     const bt = `${ch.title}の主`;
     items.push(entry(bt, [`${grade}:${cid}:boss:pre`, `${grade}:${cid}:boss:post`], [ch.bossPre, ch.bossPost],
       [{ ...base, kind: "bossPre", title: bt, enemyId: wc?.chapterBoss?.id }, { ...base, kind: "bossPost", title: bt, enemyId: wc?.chapterBoss?.id }], bossHere));
