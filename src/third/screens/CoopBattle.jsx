@@ -12,8 +12,8 @@ import { createPortal } from "react-dom";
 import { thirdApi } from "../thirdApi.js";
 import { useGame } from "../ThirdContext.jsx";
 import { generateThirdProblem } from "../problemSource.js";
-import { RB, currentFoe } from "../raidBattle.js";
-import { TIER_ICON, TIER_LABEL } from "../raid.js";
+import { RB, currentFoe, coopSkillOf, coopGaugeMax, coopSkillText, slotKey } from "../raidBattle.js";
+import { TIER_ICON, TIER_LABEL, COOP } from "../raid.js";
 import { DIFFICULTY_KEYS, DIFFICULTY_LABEL, DIFFICULTY_DAMAGE_MULTIPLIER } from "../balance.js";
 import { coopScene, COOP_STAGE_TITLES, COOP_STAGE_COUNT } from "../story/coopStory.js";
 import StoryPlayer from "../story/StoryPlayer.jsx";
@@ -23,6 +23,7 @@ import QuestionText from "../../components/QuestionText.jsx";
 import MathText from "../../components/MathText.jsx";
 import HypeFx from "../fx/HypeFx.jsx";
 import { getFxSpeed } from "../../engine/fxSpeed.js";
+import { displayName } from "../nick.js";
 import "./coop.css";
 
 const CLAIM_ERR = {
@@ -46,6 +47,8 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
   const [claim, setClaim] = useState(null); // { ok, rewards | error… }
   const [showResult, setShowResult] = useState(false);
   const [startMsg, setStartMsg] = useState("");
+  const [skillAsk, setSkillAsk] = useState(null); // スキルを使うか確認中のパーティの1枠 { p, c }
+  const [skillMsg, setSkillMsg] = useState(""); // スキルを使えなかったときのひとこと
   const hypeRef = useRef(null);
   const stageRef = useRef(null);
   const handledIntro = useRef(0), handledEnd = useRef(0), shownLast = useRef(0);
@@ -93,6 +96,7 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
   useEffect(() => {
     const last = b.last; if (!last || shownLast.current === `${b.startedAt}:${last.n}`) return;
     shownLast.current = `${b.startedAt}:${last.n}`;
+    if (last.skills?.length) hypeRef.current?.move({ name: last.skills[0].name, icon: last.skills[0].icon, finisher: last.skills.length > 1 || last.skills[0].damage >= foe.maxHp * 0.1 });
     if (last.waveCleared) hypeRef.current?.kill({ boss: last.foeKind === "boss" });
     else if (last.dealt > 0 && last.foeDmg > 0) hypeRef.current?.shake("small");
   }, [b.last, b.startedAt]);
@@ -116,6 +120,23 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
     if (res.status === 409) { await new Promise((x) => setTimeout(x, 300)); res = await thirdApi.roomBattleAnswer(code, problem.choices[i], nextLevel); }
     if (res.status === 400 && res.body?.error === "too-fast") { setPicked(null); setTooFast((n) => n + 1); return; }
     push(res);
+  };
+
+  // ---- スキル（ゲージが満タンの自分のキャラをタップ → 確認 → 予約。効果は、このラウンドの結果が出るときに出る）
+  const gaugeOf = (p) => b.gauge?.[slotKey(p)] || 0;
+  const queuedOf = (p) => (b.queue || []).some((q) => q.key === slotKey(p));
+  const skillReady = (p, c) => !!c && p.ownerId === me && !!coopSkillOf(c) && gaugeOf(p) >= coopGaugeMax(c) && !queuedOf(p);
+  const tapChar = (p) => {
+    const c = charactersById[p.id];
+    if (!fighting || !skillReady(p, c)) return;
+    setSkillMsg(""); setSkillAsk({ p, c });
+  };
+  const useSkill = async () => {
+    const ask = skillAsk; setSkillAsk(null);
+    if (!ask || !fighting) return;
+    const res = await thirdApi.roomBattleSkill(code, ask.p.id);
+    push(res);
+    if (res.status !== 200 || res.body?.ignored) setSkillMsg("スキルを使えなかったよ（もう終わったか、ゲージが足りなかったよ）");
   };
 
   const idleOf = (id) => (b.idle?.[id] || 0) >= RB.idleAfter;
@@ -150,12 +171,21 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
 
         <div className="coop-party">
           <div className="mw-party-row mw-party-row-small">
-            {room.party.map((p, i) => (
-              <div key={i} className={`coop-char ${last?.per?.[p.ownerId]?.correct ? "is-hit" : ""}`}>
-                <MonsterPortrait character={charactersById[p.id] ? { ...charactersById[p.id], breaks: p.breaks } : null} size="small" />
-                <div className="coop-owner">{nameOf[p.ownerId] || ""}</div>
-              </div>
-            ))}
+            {room.party.map((p, i) => {
+              const c = charactersById[p.id];
+              const sk = coopSkillOf(c), mx = c ? coopGaugeMax(c) : 1, g = Math.min(mx, gaugeOf(p));
+              const ready = skillReady(p, c), queued = queuedOf(p), mineChar = p.ownerId === me;
+              return (
+                <div key={i} className={`coop-char ${last?.per?.[p.ownerId]?.correct ? "is-hit" : ""} ${mineChar ? "is-mine" : ""} ${ready ? "is-ready" : ""}`}>
+                  <button type="button" className="coop-char-btn" disabled={!ready || !fighting} onClick={() => tapChar(p)} aria-label={ready ? `${displayName(c)}のスキルを使う` : displayName(c)} data-sfx="none">
+                    <MonsterPortrait character={c ? { ...c, breaks: p.breaks } : null} size="small" ready={ready} />
+                    {queued && <span className="coop-queued">⚡よやく</span>}
+                  </button>
+                  {sk && <div className={`coop-gauge ${g >= mx ? "full" : ""}`} title={`スキルゲージ ${g}/${mx}`}><i style={{ width: `${(g / mx) * 100}%` }} /></div>}
+                  <div className="coop-owner">{mineChar && c?.nick ? c.nick : nameOf[p.ownerId] || ""}</div>
+                </div>
+              );
+            })}
           </div>
           <div className={`mw-hpbar coop-partyhp ${last?.foeDmg > 0 ? "coop-hurt" : ""}`} key={`php-${last?.n}`}><div style={{ width: hpPct(b.partyHp, b.partyMaxHp) }} /></div>
           <div className="mw-sub coop-hpnum">みんなのHP {Math.round(b.partyHp)} / {Math.round(b.partyMaxHp)}</div>
@@ -172,6 +202,15 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
               return <span key={m.id} className={`coop-chip ${x?.correct ? "ok" : x?.answered ? "ng" : "no"}`}>{m.name}　{x?.correct ? `⭕ ${x.damage}${x.crit ? "！" : ""}` : x?.answered ? "❌" : "💤"}</span>;
             })}
           </div>
+          {last.skills?.length > 0 && (
+            <div className="coop-skills">
+              {last.skills.map((sk, i) => (
+                <div key={i} className="coop-skill-line">
+                  {sk.icon} <b>{nameOf[sk.uid] || ""}</b> の「{sk.name}」！　{sk.kind === "damage" ? <>敵に <b>{sk.damage}</b> ダメージ{sk.crit ? "！" : ""}</> : <>みんなのHP <b>+{sk.heal}</b></>}
+                </div>
+              ))}
+            </div>
+          )}
           {last.notice && <div className="coop-notice">{last.notice}</div>}
         </div>
       )}
@@ -223,6 +262,30 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
         </div>
       )}
 
+      {skillMsg && fighting && <div className="coop-claim-err">{skillMsg}</div>}
+
+      {skillAsk && createPortal(
+        <div className="mw-modal-backdrop" onClick={() => setSkillAsk(null)}>
+          <div className="mw-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ width: 56 }}><MonsterPortrait character={skillAsk.c} size="small" /></div>
+              <div style={{ flex: 1 }}>
+                {skillAsk.c.nick && <div style={{ fontSize: "0.72rem", opacity: 0.75 }}>{displayName(skillAsk.c)}</div>}
+                <div style={{ fontWeight: 800 }}>{skillAsk.c.skill.icon} {skillAsk.c.skill.name}</div>
+                <div style={{ opacity: 0.8, fontSize: "0.8rem" }}>{coopSkillText(skillAsk.c)}</div>
+              </div>
+            </div>
+            <div style={{ fontWeight: 700, textAlign: "center" }}>スキルを発動しますか？</div>
+            <div className="mw-sub" style={{ textAlign: "center" }}>答えが合っていなくても、このラウンドの結果で効くよ</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="mw-btn primary" style={{ flex: 1 }} onClick={useSkill}>使う</button>
+              <button className="mw-btn" style={{ flex: 1 }} onClick={() => setSkillAsk(null)}>やめる</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {b.status !== "fighting" && !showResult && !playing && (
         <div className="mw-panel mw-center coop-wait"><div className="coop-wait-title">{wins ? "けっかを確認しているよ…" : "…"}</div></div>
       )}
@@ -240,7 +303,7 @@ export default function CoopBattle({ room, me, code, onRoom, onDismiss, onStart,
                   {claim.rewards.title && <div>🏷️ 称号「{claim.rewards.title}」</div>}
                   {claim.rewards.medalUp && <div>{TIER_ICON[claim.rewards.tier]} メダルが {TIER_LABEL[claim.rewards.tier]} になった！{claim.rewards.medalCrystals > 0 ? `　💎 +${claim.rewards.medalCrystals}` : ""}</div>}
                   {!claim.rewards.first && claim.rewards.crystals > 0 && <div>💎 +{claim.rewards.crystals}</div>}
-                  {claim.rewards.perMember > 0 ? <div>✨ 経験値 いまのパーティ 1体ずつ +{claim.rewards.perMember}</div> : claim.rewards.expLimited ? <div className="dim">今日は、経験値がもらえる回数を つかいきったよ</div> : null}
+                  {claim.rewards.perMember > 0 ? <div>✨ 経験値 いまのパーティ 1体ずつ +{claim.rewards.perMember}</div> : claim.rewards.expLimited ? <div className="dim">今日は、2回目以降の経験値がもらえる回数（{COOP.repeatExpDailyMax}回）を つかいきったよ</div> : null}
                   {claim.rewards.gradeBonus > 0 && <div>🏅 学年ボーナス　💎 +{claim.rewards.gradeBonus}</div>}
                   {claim.rewards.allBonus > 0 && <div>🏆 全制覇ボーナス　💎 +{claim.rewards.allBonus}</div>}
                 </div>

@@ -39,7 +39,7 @@ import { setViewGrade } from "../gradeView.js";
 import { secretBoss, SECRET } from "../secretBoss.js";
 import { mobSpecialty, mobAttack, isBossKind, nextBossMove, peekBossMove } from "../enemyMoves.js";
 import { newEnemyFx, newPartyFx, applySkip, applyPoison, applyCurse, applyPanic, tickEnemyTurn, enemyFxTags, absorbDamage, partyFxChips } from "../enemyFx.js";
-import { NEW_SKILL_KEYS } from "../skillDefs.js";
+import { NEW_SKILL_KEYS, skillGaugeMaxFor } from "../skillDefs.js";
 import BattleFX, { PROJECTILE_MS } from "../fx/BattleFX.jsx";
 import HypeFx, { HardModeChip } from "../fx/HypeFx.jsx"; // 技名・フラッシュ・撃破・ハードモード突入の演出（見た目だけ）
 import { pickAttackMove } from "../fx/attackMoves.js";
@@ -50,22 +50,13 @@ import FxSpeedToggle from "../../components/FxSpeedToggle.jsx";
 import DrawPad from "../../components/DrawPad.jsx";
 import { fxScale, getFxSpeed, setFxSpeed } from "../../engine/fxSpeed.js";
 import MonsterPortrait from "../components/MonsterPortrait.jsx";
+import { displayName } from "../nick.js";
 import QuestionText from "../../components/QuestionText.jsx";
 import MathText from "../../components/MathText.jsx";
 import { monsterImageUrl, monsterImgFilter } from "../data/monsterImages.js";
 import { chaptersForGrade } from "../../data/index.js";
 import { gaugeSecondsFor } from "../gaugeTime.js";
 import { VERIFY } from "../gachaConfig.js";
-
-// スキルゲージの満タン値（2026-09-22：スキルの強さ(tier 1〜4)に応じて必要正解数を変える。
-//   弱いスキルほど早く貯まり、強いスキルほど問題数を稼げる＝学習量が増える）。
-const SKILL_GAUGE_MAX = 4; // 互換用の既定値（tierが無いスキル用）
-const SKILL_GAUGE_BY_TIER = { 1: 6, 2: 9, 3: 12, 4: 15 };
-function skillGaugeMaxFor(character) {
-  if (character?.skill?.gauge) return character.skill.gauge; // スキルごとに必要な正解数が決まっているもの（回復・状態異常回復）
-  const tier = character?.skill?.tier;
-  return SKILL_GAUGE_BY_TIER[tier] ?? SKILL_GAUGE_MAX;
-}
 
 // 状態異常アイコン（2026-09-18追加）。パーティ側の各ポートレートの下に表示する。
 const STATUS_ICON = {
@@ -1357,6 +1348,7 @@ export default function Battle({ nav, params }) {
                 <MonsterPortrait character={charactersById[skillConfirm]} size="small" />
               </div>
               <div style={{ flex: 1 }}>
+                {charactersById[skillConfirm].nick && <div style={{ fontSize: "0.72rem", opacity: 0.75 }}>{displayName(charactersById[skillConfirm])}</div>}
                 <div style={{ fontWeight: 800 }}>
                   {charactersById[skillConfirm].skill.icon} {charactersById[skillConfirm].skill.name}
                 </div>

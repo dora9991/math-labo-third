@@ -13,7 +13,9 @@
 //   partyHp, partyMaxHp, status:"fighting"|"won"|"lost"|"aborted", phase:"intro"|"fight", ready:[uid], introDeadline,
 //   n, round:{ n, startAt, deadline, problems:{uid:{unitId,level,seed}}, answers:{uid:{answer,correct,at}} } | null,
 //   last:null|{ n, per:{uid:{answered,correct,damage,crit,level}}, dealt, foeName, foeHp, partyHp, foeDmg, move, notice, waveCleared },
-//   stats:{uid:{correct,total}}, idle:{uid:n}, nextLevel:{uid:level}, moveState:{step}, rewarded:[uid], tier, startedAt, endedAt }
+//   stats:{uid:{correct,total}}, idle:{uid:n}, nextLevel:{uid:level}, moveState:{step}, rewarded:[uid], tier, startedAt, endedAt,
+//   gauge:{"持ち主:キャラID":正解数}, queue:[{key,uid,id,at}]（スキル。ゲージは正解した人のキャラが+1。満タンのキャラを使うと予約され、ラウンドの結果を出すときに効く）
+//   last.skills:[{uid,id,name,icon,kind:"damage"|"heal",damage?,heal?,crit?}] }
 // ============================================================
 import { SPECIALIST_ROSTER } from "./specialistRoster.js";
 import { resolvePlayerAttack, computePartyMaxHp } from "./battleEngine.js";
@@ -21,6 +23,7 @@ import { generateThirdProblem, labUnitIdsOfChapter } from "./problemSource.js";
 import { RAID_LADDER, raidBoss, COOP } from "./raid.js";
 import { DIFFICULTIES, DIFFICULTY_KEYS, capDamageFor, bossStats, tierOf } from "./balance.js";
 import { levelFromExp } from "./expCurve.js";
+import { skillGaugeMaxFor } from "./skillDefs.js";
 import { CHAPTER_SUBJECT, getChapter } from "./data/storyMap.js";
 import { nextBossMove } from "./enemyMoves.js";
 import { VERIFY } from "./gachaConfig.js";
@@ -38,18 +41,45 @@ export const RB = {
   maxRounds: 200, // これを超えたら負け扱い
   // 敵の強さ。ボスは「その章の章ボス（ひとりで戦うときの強さ。balance.js の bossStats）」を土台に、HPを bossHp 倍・1回の攻撃を bossDmg 倍。
   //  雑魚のHPは「ボスに対する割合」。
-  bossHp: 0.41,
-  hpGrowth: 1.2, // ステージが進むほど敵のHPを足す（最後のステージで 1+この値 倍）。パーティが育つぶん、HPも増やす
+  bossHp: 0.54,
+  hpGrowth: 1.5, // ステージが進むほど敵のHPを足す（最後のステージで 1+この値 倍）。パーティが育つぶん、HPも増やす
+  lateFrom: 0.4, lateHp: 0.2, lateDmg: 0.07, // 後半（全体の lateFrom 以降）だけ、さらにHP・攻撃を足す。最後のステージで HP ×(1+lateHp)・攻撃 ×(1+lateDmg)。育ったパーティで簡単になりすぎないように
   mobHp: [0.16, 0.26],
   // 敵の攻撃は「共通のパーティHP（最大）に対する割合」で決める＝どんな編成でも「何ラウンドで全滅するか」が同じになる（強い編成ほど先に倒せる）。
   //  ボスは技のパターン（ため→大技など）の平均がこの割合。雑魚は毎ラウンドこの割合。
-  bossDmgFrac: 0.085, mobDmgFrac: [0.03, 0.045],
-  //  調整の結果（scripts/sim-raid-battle.mjs・3人・各40回）：いろいろな子が混ざった教室で勝率 約6〜10割、普通の子ばかりだと 約1〜9割（パーティの育ち具合しだい）、得意な子ばかりだと約9〜10割。1ステージ 約6〜8分。
+  bossDmgFrac: 0.102, mobDmgFrac: [0.034, 0.05],
+  //  調整の結果（scripts/sim-raid-battle.mjs・3人・各80回）：いろいろな子が混ざった教室で勝率 約6〜10割、普通の子ばかりだと 約2〜9割（パーティの育ち具合しだい）、得意な子ばかりだと約9〜10割。1ステージ 約6〜8分。
+  //  スキルを入れた（2026-10-14）ぶん、敵のHP・攻撃を少し強くして、スキルが無かったときの勝率にそろえた（スキルは与ダメの1〜2割）。
   waveHeal: 0.12, // 波を倒したときのパーティHPの回復（最大HPの割合）
   spread: 0.1, // 敵の攻撃のばらつき（±）
   enrage: 1.15, // ボスのHPが半分以下になったときの攻撃倍率
   tierGold: 0.65, tierSilver: 0.35, // メダル：クリア時のパーティHPの残り割合（金／銀。それ未満は銅）
+  // スキル（2026-10-14）。ゲージは、その子の持ち主が正解するたびに+1。一人用より早く貯まる（1ステージが短いので）。
+  skillGaugeMul: 0.75, // 満タンに必要な正解数 ＝ 一人用の値 × この倍率（切り上げ）
+  skillCapFrac: 0.12, // スキル1回で敵の最大HPから削れる上限（割合）
+  cureHeal: 0.12, // 「状態異常回復」は、協力バトルでは状態異常が出ないので、みんなのHPを最大の何割回復するかに置きかえる
 };
+
+/** 協力バトルでのスキル。使えない（協力バトルに対応していない）スキルは null。 kind: "damage"（敵に ×mult）／"heal"（みんなのHPを percent 回復） */
+export function coopSkillOf(c) {
+  const s = c?.skill;
+  if (!s) return null;
+  if (s.category === "aoeDamage" || s.category === "singleDamage") return { kind: "damage", mult: Number(s.multiplier) || 1 }; // 協力バトルの敵は1体ずつ＝全体も単体も同じ
+  if (s.category === "heal" && (s.mode || "instant") === "instant") return { kind: "heal", percent: Number(s.percent) || 0 };
+  if (s.category === "cure") return { kind: "heal", percent: RB.cureHeal, replaced: true };
+  return null;
+}
+/** そのスキルの満タンに必要な正解数（協力バトル） */
+export const coopGaugeMax = (c) => Math.max(2, Math.ceil(skillGaugeMaxFor(c) * RB.skillGaugeMul));
+/** 画面に出す説明（協力バトル用） */
+export function coopSkillText(c) {
+  const k = coopSkillOf(c);
+  if (!k) return "";
+  if (k.kind === "damage") return `敵に 通常の${k.mult}倍の ダメージ`;
+  return k.replaced ? `みんなのHPを 最大の${Math.round(k.percent * 100)}%ぶん回復（ここでは状態異常は出ないので）` : `みんなのHPを 最大の${Math.round(k.percent * 100)}%ぶん回復`;
+}
+/** 部屋のパーティの1枠を指す名前（同じ子を2人が持っていても区別する） */
+export const slotKey = (p) => `${p.ownerId}:${p.id}`;
 
 const BY_ID = Object.fromEntries(SPECIALIST_ROSTER.map((c) => [c.id, c]));
 const stepOf = (level) => (DIFFICULTY_KEYS.includes(level) ? level : "standard");
@@ -84,10 +114,11 @@ export function stageWaves(index, partyMaxHp = 3000) {
   const subs = ch?.subUnits || [];
   const mobBases = [subs[0]?.enemy, subs[Math.floor(subs.length / 2)]?.enemy].map((e, i) => e || { id: `mob_${boss.chapterId}_${i}`, name: "カゲのかけら", art: "calc", kind: "unit" });
   const pos = index / Math.max(1, RAID_LADDER.length - 1);
-  const bossHp = Math.max(1, Math.round(st.hp * RB.bossHp * (1 + RB.hpGrowth * pos))), bossDmg = Math.max(1, Math.round(partyMaxHp * RB.bossDmgFrac));
+  const late = Math.max(0, (pos - RB.lateFrom) / (1 - RB.lateFrom)); // 後半だけ 0→1
+  const bossHp = Math.max(1, Math.round(st.hp * RB.bossHp * (1 + RB.hpGrowth * pos) * (1 + RB.lateHp * late))), bossDmg = Math.max(1, Math.round(partyMaxHp * RB.bossDmgFrac * (1 + RB.lateDmg * late)));
   const waves = mobBases.map((m, i) => {
     const hp = Math.max(1, Math.round(bossHp * RB.mobHp[i]));
-    return { kind: "mob", id: m.id, name: m.name, art: m.art, mobKind: m.kind, hp, maxHp: hp, dmg: Math.max(1, Math.round(partyMaxHp * RB.mobDmgFrac[i])) };
+    return { kind: "mob", id: m.id, name: m.name, art: m.art, mobKind: m.kind, hp, maxHp: hp, dmg: Math.max(1, Math.round(partyMaxHp * RB.mobDmgFrac[i] * (1 + RB.lateDmg * late))) };
   });
   waves.push({ kind: "boss", id: boss.id, name: boss.name, art: boss.art, title: boss.title, desc: boss.desc, hp: bossHp, maxHp: bossHp, dmg: bossDmg });
   return waves;
@@ -129,6 +160,7 @@ export function startBattle(room, { userId, index, states, now, rand = Math.rand
     idle: Object.fromEntries(ids.map((id) => [id, 0])),
     nextLevel: Object.fromEntries(ids.map((id) => [id, "standard"])),
     moveState: {}, rewarded: [], tier: 0, startedAt: now, endedAt: null, idleRounds: 0,
+    gauge: {}, queue: [],
   };
   return { ok: true, room: touch({ ...room, battle: b }, now) };
 }
@@ -168,6 +200,29 @@ function resolveRound(room, now, rand) {
   const ids = room.members.map((m) => m.id);
   const per = {};
   let dealt = 0;
+  // スキル（このラウンドの間に予約されたもの）を先に効かせる。回復はこのラウンドの敵の攻撃の前に、ダメージは、みんなの攻撃と合わせて敵のHPから引く。
+  const subject = CHAPTER_SUBJECT[b.chapterId];
+  const skills = [];
+  b.gauge ||= {};
+  for (const q of b.queue || []) {
+    if (!ids.includes(q.uid)) continue; // 部屋を出た人のスキルは出ない
+    const p = room.party.find((x) => slotKey(x) === q.key);
+    const c = p && charOf(p), sk = coopSkillOf(c);
+    if (!sk) continue;
+    const base = { uid: q.uid, id: p.id, name: c.skill.name, icon: c.skill.icon, kind: sk.kind };
+    if (sk.kind === "damage") {
+      const a = resolvePlayerAttack(c, levelOfMember(p, b.grade), subject, true, { skillMultiplier: sk.mult });
+      const dmg = Math.max(1, Math.min(a.damage, Math.round(foe.maxHp * RB.skillCapFrac))); // 1回で削れる量の上限（ぱんち1発で終わらないように）
+      dealt += dmg;
+      skills.push({ ...base, damage: dmg, crit: a.isCrit });
+    } else {
+      const before = b.partyHp;
+      b.partyHp = Math.min(b.partyMaxHp, b.partyHp + Math.round(b.partyMaxHp * sk.percent));
+      skills.push({ ...base, heal: Math.round(b.partyHp - before) });
+    }
+  }
+  b.queue = [];
+  const skillDealt = dealt;
   for (const id of ids) {
     const ans = r.answers[id];
     const level = r.problems[id]?.level || "standard";
@@ -179,9 +234,9 @@ function resolveRound(room, now, rand) {
     let damage = 0, crit = false;
     if (correct) {
       const mine = room.party.filter((p) => p.ownerId === id);
-      const subject = CHAPTER_SUBJECT[b.chapterId];
       for (const p of mine) {
         const c = charOf(p); if (!c) continue;
+        if (coopSkillOf(c)) b.gauge[slotKey(p)] = Math.min(coopGaugeMax(c), (b.gauge[slotKey(p)] || 0) + 1); // 正解した人のキャラは、スキルゲージ+1
         const a = resolvePlayerAttack(c, levelOfMember(p, b.grade), subject, true, {});
         damage += a.damage * DIFFICULTIES[level].dmgMult; if (a.isCrit) crit = true;
       }
@@ -193,7 +248,7 @@ function resolveRound(room, now, rand) {
     per[id] = { answered: !!ans, correct, damage, crit, level };
   }
   foe.hp = Math.max(0, foe.hp - dealt);
-  const last = { n: r.n, per, dealt, foeName: foe.name, foeKind: foe.kind, foeHp: foe.hp, partyHp: b.partyHp, foeDmg: 0, move: null, notice: null, waveCleared: false, wave: b.wave };
+  const last = { n: r.n, per, dealt, skillDealt, skills, foeName: foe.name, foeKind: foe.kind, foeHp: foe.hp, partyHp: b.partyHp, foeDmg: 0, move: null, notice: null, waveCleared: false, wave: b.wave };
   let advance = false;
   if (foe.hp <= 0) {
     last.waveCleared = true;
@@ -262,6 +317,29 @@ export function submitAnswer(room, { userId, answer, nextLevel, now, rand = Math
   const waiting = rm.members.filter((m) => isActive(nb, m.id) && !nb.round.answers[m.id]);
   if (waiting.length === 0) rm = resolveRound(rm, now, rand);
   return { ok: true, room: rm };
+}
+
+/**
+ * スキルを使う（予約）。ゲージが満タンの自分のキャラだけ。ゲージはすぐ0に戻り、効果は「このラウンドの結果を出すとき」に出る。
+ * 正解・不正解とは関係なく使える（一人用と同じ「ボーナス行動」）。ただしゲージは自分が正解しないと貯まらない。
+ */
+export function queueSkill(room, { userId, charId, now, rand = Math.random }) {
+  const rm = tickBattle(room, now, rand);
+  const b = rm?.battle;
+  if (!b || b.status !== "fighting" || b.phase !== "fight" || !b.round || b.round.closed) return { ok: false, error: "not-fighting", room: rm };
+  if (!rm.members.some((m) => m.id === userId)) return { ok: false, error: "not-in-room", room: rm };
+  const p = rm.party.find((x) => x.ownerId === userId && x.id === charId);
+  if (!p) return { ok: false, error: "not-your-character", room: rm };
+  const c = charOf(p), sk = coopSkillOf(c);
+  if (!sk) return { ok: false, error: "no-skill", room: rm };
+  const key = slotKey(p);
+  if ((b.queue || []).some((q) => q.key === key)) return { ok: false, error: "already-queued", room: rm };
+  if ((b.gauge?.[key] || 0) < coopGaugeMax(c)) return { ok: false, error: "gauge-not-full", room: rm };
+  const nb = structuredClone(b);
+  nb.gauge ||= {}; nb.queue ||= [];
+  nb.gauge[key] = 0;
+  nb.queue.push({ key, uid: userId, id: charId, at: now });
+  return { ok: true, room: touch({ ...rm, battle: nb }, now) };
 }
 
 /** ごほうびの資格：勝っていて、まだ受け取っていなくて、その人の正解数が足りている */

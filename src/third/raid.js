@@ -72,12 +72,14 @@ export const nextRaidIndex = (index) => (index + 1 < RAID_LADDER.length ? index 
 //  ・メダル：ステージごとに 銅(1)＝クリア／銀(2)＝パーティHPが35%以上残ってクリア／金(3)＝65%以上残ってクリア。いちばん良い色を記録。
 //    色が上がったときだけ、その分のクリスタル（tierCrystals）。
 //  ・経験値：クリアした本人の「いまのパーティ」5体に、1体ずつ。初回＝その章の最後の小単元の初回経験値（パーティ5体ぶん）の expFirst 倍を5体で分ける。
-//    ふつうの小単元よりかなり低い。2回目以降は expRepeat 倍で、1日 repeatExpDailyMax 回まで。
+//    2回目以降は expRepeat 倍で、1日 repeatExpDailyMax 回まで。
+//    2026-10-14 「経験値がなかなか手に入らない」の声で引き上げ：初回 0.35→0.8、2回目以降 0.1→0.3、1日 3→5回。
+//    それでも一人用（小単元の2回目以降は雑魚ぶん全額＋ボスぶん30%・1日10回）よりは少なく、勉強で経験値をためる流れは変えない。
 //  ・称号・クリスタル（初回 RAID.firstCrystals など）は、これまでどおり applyRaidWin（core.js）。
 export const COOP = {
-  expFirst: 0.35,
-  expRepeat: 0.1,
-  repeatExpDailyMax: 3,
+  expFirst: 0.8,
+  expRepeat: 0.3,
+  repeatExpDailyMax: 5,
   tierCrystals: [0, 1, 1], // 銅・銀・金：その色に「はじめて」なったときのクリスタル
 };
 export const TIER_LABEL = { 1: "銅", 2: "銀", 3: "金" };
