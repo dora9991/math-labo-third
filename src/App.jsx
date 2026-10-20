@@ -17,8 +17,8 @@ import { isGuest } from "./auth/session.js";
 import { setViewGrade } from "./third/gradeView.js";
 // マルチプレイ（みんなで戦う）は一旦非公開。開発者の確認用に URL に ?multi=1 を付けた時だけ出す。公開するときは true にする
 // 裏ボス（クリア後のやり込み）も一旦非公開。URL に ?secret=1 を付けた時だけメニューに出す。公開するときは true にする
-const SECRET_OPEN = (() => { try { return new URLSearchParams(location.search).has("secret"); } catch { return false; } })();
-const MULTIPLAY_OPEN = (() => { try { return new URLSearchParams(location.search).has("multi"); } catch { return false; } })();
+const SECRET_OPEN = true; // 2026-10-09 公開（kazu確認済み）。以前は (() => { try { return new URLSearchParams(location.search).has("secret"); } catch { return false; } })() で、URL に ?secret=1 を付けた時だけ出していた
+const MULTIPLAY_OPEN = true; // 2026-10-09 公開（kazu確認済み）。以前は URL に ?multi=1 を付けた時だけ出していた。サーバーモード・ゲスト不可は下の onRoom の条件のまま
 import { startSessionPing } from "./third/sessionPing.js";
 import { flushBattleLogs } from "./third/battleLog.js";
 import * as store from "./store/localStore.js"; // ★将来ここを supabase.js に差し替える
