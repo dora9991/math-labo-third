@@ -178,18 +178,18 @@ async function winStage(ids, index, okOf = () => true, opts = {}) {
   t("ただ乗り防止: 正解が足りない人はごほうびが付かない", w.room.battle.status === "won" && r.status === 400 && r.body.error === "too-few-correct");
   const h = await call(w.s, "room_battle_claim", { code: w.code }, "h"); t("ただ乗り防止: ちゃんと答えた人には付く", h.status === 200);
 }
-{ // 周回：2回目以降は経験値が少なく、1日3回まで。メダルは色が上がったときだけクリスタル
+{ // 周回：2回目以降は経験値が少なく、1日5回まで。メダルは色が上がったときだけクリスタル
   const ids = ["h", "a"]; const first = await winStage(ids, 0); await call(first.s, "room_battle_claim", { code: first.code }, "h");
   const ctx = { s: first.s, code: first.code };
   const exps = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     await call(ctx.s, "room_leave", { code: ctx.code }, "a"); // 部屋を作り直す
     const nr = await setupRoomOn(ctx.s, ids, 0);
     const w = await winStage(ids, 0, () => true, { ctx: { s: ctx.s, code: nr } });
     const r = await call(ctx.s, "room_battle_claim", { code: nr }, "h"); exps.push(r.body.rewards?.perMember ?? "x");
     Object.assign(ctx, { code: nr });
   }
-  t("周回: 経験値は初回より少なく、1日3回まで（4回目以降は0）", exps[0] > 0 && exps[0] < T.coopExpPerChar(0, true) && exps[1] > 0 && exps[2] > 0 && exps[3] === 0 && exps[4] === 0, JSON.stringify(exps));
+  t("周回: 経験値は初回より少なく、1日5回まで（6回目以降は0）", exps[0] > 0 && exps[0] < T.coopExpPerChar(0, true) && exps.slice(0, 5).every((x) => x > 0) && exps[5] === 0 && exps[6] === 0 && T.COOP.repeatExpDailyMax === 5, JSON.stringify(exps));
 }
 async function setupRoomOn(s, ids, cleared) { // 同じストアで、新しい部屋を作る
   const code = (await call(s, "room_create", {}, ids[0])).body.room.code;

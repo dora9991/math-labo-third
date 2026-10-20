@@ -41,12 +41,13 @@ export const RB = {
   maxRounds: 200, // これを超えたら負け扱い
   // 敵の強さ。ボスは「その章の章ボス（ひとりで戦うときの強さ。balance.js の bossStats）」を土台に、HPを bossHp 倍・1回の攻撃を bossDmg 倍。
   //  雑魚のHPは「ボスに対する割合」。
-  bossHp: 0.52,
+  bossHp: 0.54,
   hpGrowth: 1.5, // ステージが進むほど敵のHPを足す（最後のステージで 1+この値 倍）。パーティが育つぶん、HPも増やす
+  lateFrom: 0.4, lateHp: 0.2, lateDmg: 0.07, // 後半（全体の lateFrom 以降）だけ、さらにHP・攻撃を足す。最後のステージで HP ×(1+lateHp)・攻撃 ×(1+lateDmg)。育ったパーティで簡単になりすぎないように
   mobHp: [0.16, 0.26],
   // 敵の攻撃は「共通のパーティHP（最大）に対する割合」で決める＝どんな編成でも「何ラウンドで全滅するか」が同じになる（強い編成ほど先に倒せる）。
   //  ボスは技のパターン（ため→大技など）の平均がこの割合。雑魚は毎ラウンドこの割合。
-  bossDmgFrac: 0.1, mobDmgFrac: [0.034, 0.05],
+  bossDmgFrac: 0.102, mobDmgFrac: [0.034, 0.05],
   //  調整の結果（scripts/sim-raid-battle.mjs・3人・各80回）：いろいろな子が混ざった教室で勝率 約6〜10割、普通の子ばかりだと 約2〜9割（パーティの育ち具合しだい）、得意な子ばかりだと約9〜10割。1ステージ 約6〜8分。
   //  スキルを入れた（2026-10-14）ぶん、敵のHP・攻撃を少し強くして、スキルが無かったときの勝率にそろえた（スキルは与ダメの1〜2割）。
   waveHeal: 0.12, // 波を倒したときのパーティHPの回復（最大HPの割合）
@@ -113,10 +114,11 @@ export function stageWaves(index, partyMaxHp = 3000) {
   const subs = ch?.subUnits || [];
   const mobBases = [subs[0]?.enemy, subs[Math.floor(subs.length / 2)]?.enemy].map((e, i) => e || { id: `mob_${boss.chapterId}_${i}`, name: "カゲのかけら", art: "calc", kind: "unit" });
   const pos = index / Math.max(1, RAID_LADDER.length - 1);
-  const bossHp = Math.max(1, Math.round(st.hp * RB.bossHp * (1 + RB.hpGrowth * pos))), bossDmg = Math.max(1, Math.round(partyMaxHp * RB.bossDmgFrac));
+  const late = Math.max(0, (pos - RB.lateFrom) / (1 - RB.lateFrom)); // 後半だけ 0→1
+  const bossHp = Math.max(1, Math.round(st.hp * RB.bossHp * (1 + RB.hpGrowth * pos) * (1 + RB.lateHp * late))), bossDmg = Math.max(1, Math.round(partyMaxHp * RB.bossDmgFrac * (1 + RB.lateDmg * late)));
   const waves = mobBases.map((m, i) => {
     const hp = Math.max(1, Math.round(bossHp * RB.mobHp[i]));
-    return { kind: "mob", id: m.id, name: m.name, art: m.art, mobKind: m.kind, hp, maxHp: hp, dmg: Math.max(1, Math.round(partyMaxHp * RB.mobDmgFrac[i])) };
+    return { kind: "mob", id: m.id, name: m.name, art: m.art, mobKind: m.kind, hp, maxHp: hp, dmg: Math.max(1, Math.round(partyMaxHp * RB.mobDmgFrac[i] * (1 + RB.lateDmg * late))) };
   });
   waves.push({ kind: "boss", id: boss.id, name: boss.name, art: boss.art, title: boss.title, desc: boss.desc, hp: bossHp, maxHp: bossHp, dmg: bossDmg });
   return waves;
