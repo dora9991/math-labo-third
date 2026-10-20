@@ -36,8 +36,8 @@ export default function ResultReview({
   const keys = Object.keys(groups);
 
   return (
-    <div style={card}>
-      <div style={head}>📝 まちがい直し・復習</div>
+    <div className="result-review" style={card}>
+      <div className="result-review__head" style={head}>まちがい直し・復習</div>
 
       {/* 特に苦手な単元（あれば） */}
       {weakUnits.length > 0 && (
@@ -47,7 +47,7 @@ export default function ResultReview({
             {weakUnits.slice(0, 3).map((w) => (
               <button key={w.unitId} data-sfx="none"
                 onClick={() => (onRelearn ? onRelearn(w.unit) : onOpenRelearnList && onOpenRelearnList())}
-                style={chip} title="この単元を学び直す">
+                className="result-review__chip" style={chip} title="この単元を学び直す">
                 {w.unit?.emoji || "📌"} {w.unit?.name || w.unitId}
               </button>
             ))}
@@ -75,16 +75,16 @@ export default function ResultReview({
             {u && (
               <div style={{ display: "flex", gap: 7, margin: "8px 0 2px" }}>
                 {onRelearn && (
-                  <button data-sfx="none" onClick={() => onRelearn(u)} style={btnPrimary}>
+                  <button className="result-review__primary" data-sfx="none" onClick={() => onRelearn(u)} style={btnPrimary}>
                     ✏️ この単元を学び直す
                   </button>
                 )}
                 {onHaichi && hasHaichiLessonForUnit(key) ? (
-                  <button data-sfx="none" onClick={() => onHaichi(u)} style={btnHaichi} title="葉一さんの動画＋プリントに書き込み">
+                  <button className="result-review__secondary" data-sfx="none" onClick={() => onHaichi(u)} style={btnHaichi} title="葉一さんの動画＋プリントに書き込み">
                     📺 動画＋プリント
                   </button>
                 ) : vurl ? (
-                  <button data-sfx="none" onClick={() => window.open(vurl, "_blank", "noopener")} style={btnHaichi} title="19chの解説ページ">
+                  <button className="result-review__secondary" data-sfx="none" onClick={() => window.open(vurl, "_blank", "noopener")} style={btnHaichi} title="19chの解説ページ">
                     📺 解説
                   </button>
                 ) : null}
@@ -106,7 +106,7 @@ export default function ResultReview({
       })}
 
       {onOpenRelearnList && (
-        <button data-sfx="none" onClick={onOpenRelearnList} style={btnList}>📖 学び直しモードでまとめて復習する</button>
+        <button className="result-review__list" data-sfx="none" onClick={onOpenRelearnList} style={btnList}>学び直しモードでまとめて復習する</button>
       )}
     </div>
   );

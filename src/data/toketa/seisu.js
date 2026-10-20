@@ -31,6 +31,13 @@ export const MISC = {
   "mul-sign": { label: "かけ算・わり算の符号", coach: "同符号→＋、異符号→−。符号を先に決めよう" },
   "pow-sign": { label: "累乗の符号", coach: "（−a）²は＋、−a²は−。²がどこにかかるか見よう" },
   "order": { label: "計算の順番", coach: "×・÷ を先に、＋・− はあとで計算するよ" },
+  "prime-one": { label: "1は素数？", coach: "素数は「約数が1と自分自身の2つだけ」の数。1は約数が1つだけだから素数じゃないよ" },
+  "prime-odd": { label: "奇数＝素数と思った", coach: "奇数でも素数とは限らないよ。9＝3×3 のように、ほかの数でも割れないか確かめよう" },
+  "exp-mult": { label: "指数の意味", coach: "2³ は 2×3 ではなく、2を3回かける 2×2×2 だよ" },
+  "mul-add": { label: "かけ算とたし算", coach: "素因数分解は「かけ算」で表すよ。たし算にしないでね" },
+  "fac-count": { label: "指数と個数のちがい", coach: "指数は「同じ素数を何回かけたか」。素数の種類の数とはちがうよ" },
+  "count-off": { label: "指数の数え間違い", coach: "素数で順に割っていって、その素数で何回割れたかを数え直そう" },
+  "sq-whole": { label: "2乗にする数の取り違え", coach: "n自身をかけるのではなく、指数が奇数の素数を1つずつ足りない分だけかけるよ" },
   "calc": { label: "計算ミス", coach: "式の順番どおり、ひとつずつ ゆっくり計算し直してみよう" },
 };
 
@@ -176,6 +183,71 @@ function genWord() {
     distractors: four(ans, [{ val: up ? a - d : a + d, tag: "sign-flip" }, { val: -ans, tag: "abs-sign" }]) };
 }
 
+
+// ── 6. 素因数分解（素数・指数・平方数） ──
+const PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+const COMP_ODD = [9, 15, 21, 25, 27, 33, 35, 39, 45, 49];
+const COMP_EVEN = [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26];
+const SUP = { 2: "²", 3: "³" };
+const pick = (arr, k) => shuffle(arr).slice(0, k);
+// 手作りの4択（padding無し）：正解が1つだけ・重複なしを保証する
+function fixed(ans, ds) {
+  const seen = new Set([ans]); const out = [{ val: ans, tag: null }];
+  for (const d of ds) { if (out.length < 4 && !seen.has(d.val)) { seen.add(d.val); out.push(d); } }
+  // 値が重なって4つに満たない時は、正の近い数（calc＝計算ミス）で補う
+  for (let d = 1; out.length < 4 && d <= 30; d++) {
+    for (const v of [ans + d, ans - d]) { if (out.length < 4 && v > 0 && !seen.has(v)) { seen.add(v); out.push({ val: v, tag: "calc" }); } }
+  }
+  return shuffle(out);
+}
+
+function genPrimeChoose() {
+  const ans = PRIMES[ri(0, PRIMES.length - 1)];
+  const ds = [];
+  if (Math.random() < 0.5) ds.push({ val: 1, tag: "prime-one" });
+  for (const v of pick(COMP_ODD, 3)) ds.push({ val: v, tag: "prime-odd" });
+  ds.push({ val: pick(COMP_EVEN, 1)[0], tag: "calc" });
+  return { q: "次のうち、素数はどれ？", ans,
+    steps: ["素数は「約数が1と自分自身の2つだけ」の数", "1は素数ではない。2, 3, 5, 7, 11, 13… が素数", "それぞれを2, 3, 5… で割れるか調べて、割れない数をえらぼう"],
+    distractors: fixed(ans, ds) };
+}
+
+function genFactorValue() {
+  const p1 = pick([2, 3], 1)[0], p2 = pick([5, 7], 1)[0];
+  const a = ri(2, 3), b = ri(1, 2);
+  const pw = (p, e) => (e === 1 ? `${p}` : `${p}${SUP[e]}`);
+  const ans = p1 ** a * p2 ** b;
+  return { q: `${pw(p1, a)}×${pw(p2, b)} を計算しよう`, ans,
+    steps: [`${p1}${SUP[a]} は ${p1} を ${a} 回かける：${Array(a).fill(p1).join("×")}＝${p1 ** a}`,
+      b === 1 ? `${p2} はそのまま ${p2}` : `${p2}${SUP[b]} は ${p2} を ${b} 回かける：${Array(b).fill(p2).join("×")}＝${p2 ** b}`,
+      `かけ算で答えを出す：${p1 ** a}×${p2 ** b}＝${ans}`],
+    distractors: fixed(ans, [
+      { val: p1 * a * p2 ** b, tag: "exp-mult" }, { val: p1 ** a * p2 * b, tag: "exp-mult" },
+      { val: p1 ** a + p2 ** b, tag: "mul-add" }, { val: ans + 10, tag: "calc" }]) };
+}
+
+function genExponentBlank() {
+  const a = ri(2, 4), b = ri(1, 3);
+  const n = 2 ** a * 3 ** b;
+  return { q: `${n} ＝（2の□乗）×（3の${b}乗）のとき、□に入る数は？`, ans: a,
+    steps: [`3の${b}乗 は ${3 ** b}。まず ${n} を ${3 ** b} で割る`, `${n}÷${3 ** b}＝${2 ** a}`, `${2 ** a} は 2 を何回かけた数？ 2で割っていって回数を数えよう（答えは ${a}）`],
+    distractors: fixed(a, [{ val: a + b, tag: "fac-count" }, { val: a + 1, tag: "count-off" }, { val: a - 1, tag: "count-off" }, { val: 2 ** a, tag: "calc" }]) };
+}
+
+function genSquareMult() {
+  const s = pick([2, 3, 5, 6, 7], 1)[0], k = pick([2, 3, 5], 1)[0];
+  const n = s * k * k;
+  return { q: `${n} にできるだけ小さい自然数をかけて、ある自然数の2乗にしたい。かける数は？`, ans: s,
+    steps: [`${n} を素因数分解する：${factorStr(n)}`, "指数が奇数の素数があると、2乗（指数がぜんぶ偶数）にならない", `指数を偶数にするため、足りない素数 ${s} をかける（かける数は ${s}）`],
+    distractors: fixed(s, [{ val: n, tag: "sq-whole" }, { val: s * k, tag: "calc" }, { val: s * 2 === n ? s * 3 : s * 2, tag: "calc" }, { val: k, tag: "sq-whole" }]) };
+}
+// n の素因数分解を「2²×3」形式の文字列にする
+function factorStr(n) {
+  const parts = []; let m = n;
+  for (let p = 2; p <= m; p++) { let e = 0; while (m % p === 0) { m /= p; e++; } if (e) parts.push(e === 1 ? `${p}` : `${p}${SUP[e] || "^" + e}`); }
+  return parts.join("×");
+}
+
 // math-labo の c1 単元ID → その単元にふさわしい toketa ジェネレータ群
 const TOKETA_BY_UNIT = {
   u1: [genDaisho, genWord],      // 正負の意味・大小（＋文章題）
@@ -183,7 +255,7 @@ const TOKETA_BY_UNIT = {
   u3: [genGenpou, genChain],     // 減法（＋加減の混合）
   u4: [genJokujo, genPow],       // 乗法・除法（＋累乗）
   u5: [genShisoku, genChain],    // 四則混合
-  // u6（素因数分解）は toketa 対象外 → 従来問題にフォールバック
+  u6: [genPrimeChoose, genFactorValue, genExponentBlank, genSquareMult], // 素因数分解
 };
 
 /** その単元に toketa ヒント付き問題があるか */

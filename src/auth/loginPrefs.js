@@ -5,8 +5,8 @@
 //                    そのまま使う。falseなら次回訪問時に明示的にサインアウトし、
 //                    共有端末で前の生徒のログインが残らないようにする。
 // ============================================================
-const ID_KEY = "ml2_login_id";
-const REMEMBER_KEY = "ml2_auto_login";
+const ID_KEY = "ml3_login_id";
+const REMEMBER_KEY = "ml3_auto_login";
 
 export function getRememberedId() {
   try { return localStorage.getItem(ID_KEY) || ""; } catch { return ""; }

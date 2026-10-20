@@ -6,15 +6,28 @@
   "description": "数学ラボ3（数学ラボ2から派生・デザイン刷新版／math-labo10を別アプリとして複製）。黒板を見ながらAI先生と発問でやり取りする（math-dialogueから派生）。",
   "scripts": {
     "dev": "vite",
+    "dev:local": "VITE_THIRD_SERVER=0 vite --port 5199 --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && gh-pages -d dist",
-    "teacher": "node --env-file=.env.local scripts/teacher-server.mjs"
+    "teacher": "node --env-file=.env.local scripts/teacher-server.mjs",
+    "prebuild": "node scripts/gen-problem-version.mjs",
+    "build:third-api": "node scripts/build-third-api.mjs",
+    "build:story": "node scripts/build-story.mjs",
+    "test:third-api": "node scripts/test-third-api.mjs",
+    "test:third-room": "node scripts/test-third-room.mjs",
+    "test:third-raid": "node scripts/test-third-raid.mjs",
+    "test:third-logging": "node scripts/test-third-logging.mjs",
+    "test:recommend": "node scripts/test-recommend.mjs",
+    "test:choice-leak": "node scripts/test-choice-leak.mjs",
+    "gen:sign-mixed": "node scripts/gen-sign-mixed.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@supabase/supabase-js": "^2.110.0",
     "pdfjs-dist": "^4.10.38",
+    "pixi.js": "^7.4.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

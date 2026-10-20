@@ -1,0 +1,50 @@
+/* 合成画面と、合成エフェクト */
+.sy-target { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; padding: 10px; border: 1px solid rgba(255,224,102,.6); background: linear-gradient(120deg,rgba(40,28,10,.85),rgba(18,30,58,.85)); }
+.sy-target img { width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+.sy-tname { font-weight: 900; font-size: 1rem; }
+.sy-tlv { font-family: 'Cinzel',serif; color: #ffe9b3; font-size: 1.4rem; font-weight: 900; }
+.sy-pick { position: relative; }
+.sy-pick.on::after { content: ''; position: absolute; inset: 0; border: 3px solid #7cff8a; box-shadow: 0 0 12px rgba(124,255,138,.7), inset 0 0 10px rgba(124,255,138,.3); pointer-events: none; border-radius: 12px; }
+.sy-check { position: absolute; right: 2px; top: 2px; min-width: 20px; padding: 0 5px; height: 20px; border-radius: 999px; background: #22c55e; color: #fff; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.sy-tools { display: flex; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
+.sy-tools button { flex: 1; min-height: 40px; padding: 6px 8px; font-weight: 800; font-size: 12.5px; cursor: pointer; color: #fff; font-family: inherit; border: 1px solid rgba(155,231,239,.5); background: rgba(7,17,34,.8); }
+.sy-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 300; margin: 0 auto; max-width: 720px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(180deg,rgba(4,10,22,.94),rgba(4,10,22,.99)); border-top: 1px solid rgba(223,189,115,.5); display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.sy-bar .sum { font-size: 12.5px; color: #ffe9b3; line-height: 1.5; }
+.sy-bar .sum b { color: #7cff8a; font-size: 1.1rem; }
+.sy-go { min-height: 52px; padding: 0 22px; font-size: 1.05rem; font-weight: 900; letter-spacing: .1em; color: #141018; cursor: pointer; font-family: inherit; border: 1px solid #fff0bd; background: linear-gradient(135deg,#ffe2a0,#bd762d); box-shadow: 0 0 16px rgba(255,190,80,.5); }
+.sy-go:disabled { filter: grayscale(.8) brightness(.6); box-shadow: none; cursor: default; }
+
+/* ---- エフェクト ---- */
+.sfx { position: fixed; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center; flex-direction: column; overflow: hidden;
+  background: radial-gradient(circle at 50% 42%, rgba(30,50,110,.92), rgba(4,6,20,.98) 70%); animation: sfx-in .25s ease-out; }
+@keyframes sfx-in { from { opacity: 0; } to { opacity: 1; } }
+.sfx-stage { position: relative; width: min(78vw, 340px); aspect-ratio: 1; }
+.sfx-core { position: absolute; inset: 22%; display: flex; align-items: center; justify-content: center; }
+.sfx-core img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 14px rgba(155,231,239,.8)); }
+.sfx-core.pop img { animation: sfx-pop .7s cubic-bezier(.2,1.6,.4,1) both; filter: drop-shadow(0 0 22px rgba(255,224,102,.95)); }
+@keyframes sfx-pop { 0% { transform: scale(.7); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.sfx-glow { position: absolute; inset: 8%; border-radius: 50%; background: radial-gradient(circle, rgba(255,240,180,.9), rgba(120,190,255,.35) 45%, transparent 70%); opacity: 0; }
+.sfx-glow.charge { animation: sfx-glow 1.3s ease-in forwards; }
+@keyframes sfx-glow { 0% { opacity: 0; transform: scale(.4); } 100% { opacity: 1; transform: scale(1.1); } }
+.sfx-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #fff3b0; opacity: 0; box-shadow: 0 0 24px #ffe066, inset 0 0 24px #ffe066; }
+.sfx-ring.burst { animation: sfx-ring .9s ease-out forwards; }
+.sfx-ring.b2 { animation-delay: .14s; border-color: #9be7ef; box-shadow: 0 0 24px #9be7ef, inset 0 0 24px #9be7ef; }
+@keyframes sfx-ring { 0% { opacity: 1; transform: scale(.25); } 100% { opacity: 0; transform: scale(1.9); } }
+.sfx-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.sfx-flash.burst { animation: sfx-flash .55s ease-out forwards; }
+@keyframes sfx-flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+/* 素材：まわりから中心へ吸い込まれる */
+.sfx-mat { position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; margin: -11% 0 0 -11%; }
+.sfx-mat img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 8px rgba(155,231,239,.9)); }
+.sfx-mat.go { animation: sfx-suck 1.25s cubic-bezier(.5,0,.9,.4) forwards; animation-delay: calc(var(--i) * 60ms); }
+@keyframes sfx-suck { 0% { opacity: 1; transform: rotate(var(--a)) translateY(-135%) rotate(calc(var(--a) * -1)) scale(1); }
+  70% { opacity: 1; } 100% { opacity: 0; transform: rotate(calc(var(--a) + 200deg)) translateY(0) rotate(calc((var(--a) + 200deg) * -1)) scale(.15); } }
+.sfx-spark { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; border-radius: 50%; background: #fff3b0; box-shadow: 0 0 10px #ffe066; opacity: 0; }
+.sfx-spark.burst { animation: sfx-spark 1s ease-out forwards; animation-delay: calc(var(--i) * 12ms); }
+@keyframes sfx-spark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(var(--d)) scale(.2); } }
+.sfx-title { margin-top: 10px; font-family: 'Cinzel','Shippori Mincho',serif; font-weight: 900; letter-spacing: .3em; color: #ffe9b3; text-shadow: 0 0 14px rgba(255,200,90,.8); font-size: 1.1rem; min-height: 1.6em; }
+.sfx-result { width: min(92vw, 420px); margin-top: 6px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; animation: sfx-in .4s ease-out; }
+.sfx-gain { text-align: center; font-size: 1.5rem; font-weight: 900; color: #7cff8a; text-shadow: 0 0 12px rgba(124,255,138,.6); animation: xm-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+.sfx-ok { align-self: center; min-width: 160px; min-height: 48px; font-weight: 900; letter-spacing: .2em; cursor: pointer; font-family: inherit; color: #141018; border: 1px solid #fff0bd; background: linear-gradient(135deg,#ffe2a0,#bd762d); }
+
+.sy-pick .mw-spare-badge { left: 2px; right: auto; }

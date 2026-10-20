@@ -9,34 +9,83 @@
 // 公開先のフォルダ階層が変わっても鳴るよう、相対パス（BASE_URL）を前につける。
 const BASE = import.meta.env.BASE_URL; // 例: "./" や "/リポジトリ名/"
 const FILES = {
-  op: BASE + "bgm/op.mp3",                 // タイトル（OP）
-  menu: BASE + "bgm/menu.mp3",             // メニュー（以前のBGMに戻す）
+  op: BASE + "bgm/title.m4a",              // タイトル（2026-09-21：数学ラボ3のタイトルBGMに差し替え）
+  menu: BASE + "bgm/menu3.m4a",            // メニュー画面（数学ラボ3）
   calcplay: BASE + "bgm/menu_select.mp3",   // 計算王への道のプレイ中（スタート後）
   timeattack: BASE + "bgm/timeattack.mp3", // タイムアタック中
   timeattack_end: BASE + "bgm/timeattack_end.mp3", // タイムアタック終了時
-  slow: BASE + "bgm/slow.mp3",             // じっくり
+  slow: BASE + "bgm/practice.m4a",         // れんしゅうモード（じっくり・ステップアップ・学び直し・確認問題の練習）
   unittest: BASE + "bgm/unittest.mp3",     // 単元テスト
-  battle: BASE + "bgm/battle.mp3",         // 通常戦闘
-  boss: BASE + "bgm/boss.mp3",             // ボス戦
-  victory: BASE + "bgm/victory.mp3",       // 勝利
-  defeat: BASE + "bgm/defeat.mp3",         // 敗北
+  battle: BASE + "bgm/battle3.m4a",        // 通常戦闘（雑魚の波）
+  boss: BASE + "bgm/subboss.m4a",          // 小単元ボス戦闘
+  chapterboss: BASE + "bgm/chapterboss.m4a", // 章のボス（章ボス／最終ボス）
+  victory: BASE + "bgm/victory3.m4a",      // 戦闘勝利（1回だけ流す）
+  defeat: BASE + "bgm/defeat3.m4a",        // 戦闘敗北（1回だけ流す）
+  ending: BASE + "bgm/ending.m4a",         // エンディング（最終ボス撃破のごほうび画面）
+  coop: BASE + "bgm/coop.m4a",             // 協力プレイ（パーティ編成・ガチャ＝仲間と協力する画面）
+  // 【2026-09-25】ストーリー用BGM（Suno制作）。通常戦闘は章・小単元ごとに battle / battle_g1 / battle_g3 を巡回（飽き防止）。
+  battle_g1: BASE + "bgm/battle_g1.m4a",
+  battle_g3: BASE + "bgm/battle_g3.m4a",
+  story_prologue: BASE + "bgm/story_prologue.m4a",
+  story_daily: BASE + "bgm/story_daily.m4a",
+  story_dread: BASE + "bgm/story_dread.m4a",
+  story_relief: BASE + "bgm/story_relief.m4a",
+  story_g1: BASE + "bgm/story_g1.m4a",
+  story_g2: BASE + "bgm/story_g2.m4a",
+  story_g3: BASE + "bgm/story_g3.m4a",
+  story_memory: BASE + "bgm/story_memory.m4a",
+  story_boss_pre: BASE + "bgm/story_boss_pre.m4a",
+  story_sad: BASE + "bgm/story_sad.m4a",
+  story_finale_gate: BASE + "bgm/story_finale_gate.m4a",
+  story_epilogue_g1: BASE + "bgm/story_epilogue_g1.m4a",
+  story_epilogue_g2: BASE + "bgm/story_epilogue_g2.m4a",
+  story_epilogue_g3: BASE + "bgm/story_epilogue_g3.m4a",
 };
 
 let el = null;          // 再生用の <audio>
 let current = null;     // 今鳴っている曲名
 let unlocked = false;
 let muted = false;
-try { muted = localStorage.getItem("bgm_muted") === "1"; } catch {}
+try { muted = localStorage.getItem("ml3_bgm_muted") === "1"; } catch {}
 
 // 曲ごとの音量。タイトル(op)は大きめ、その他は控えめ（効果音を聞き取りやすく）。
-const VOLUME = { op: 0.6 };
+const VOLUME = { op: 0.6,
+  // 新BGMの音量を実測(ブラウザでRMS)して既存曲に揃えた値。会話用は文字を読むので少し小さめ
+  battle_g1: 0.337,
+  battle_g3: 0.311,
+  story_prologue: 0.208,
+  story_daily: 0.194,
+  story_dread: 0.173,
+  story_relief: 0.217,
+  story_g1: 0.21,
+  story_g2: 0.194,
+  story_g3: 0.222,
+  story_memory: 0.208,
+  story_boss_pre: 0.198,
+  story_sad: 0.23,
+  story_finale_gate: 0.241,
+  story_epilogue_g1: 0.185,
+  story_epilogue_g2: 0.205,
+  story_epilogue_g3: 0.244,
+};
 const DEFAULT_VOLUME = 0.28;
+
+// 【2026-09-22】ダッキング：ユーザーの「ミュート」設定(muted)とは別に、今鳴っている曲の
+//  音量に一時的な係数(0〜1)をかける仕組み。はいちモード滞在中は控えめに、YouTube動画の
+//  再生中はさらに0（実質オフ）にする、といった「画面の状況に応じた一時的な調整」に使う。
+//  曲を切り替えても(play())係数は保たれる（画面のBGM切替と独立して効かせるため）。
+let duckLevel = 1;
+let currentBaseVolume = DEFAULT_VOLUME; // 今の曲の「素の」音量（係数をかける前）
+
+function applyVolume() {
+  if (el) el.volume = currentBaseVolume * duckLevel;
+}
 
 function ensure() {
   if (!el) {
     el = new Audio();
     el.loop = true;
-    el.volume = DEFAULT_VOLUME;
+    el.volume = currentBaseVolume * duckLevel;
     el.muted = muted;
   }
   return el;
@@ -58,7 +107,8 @@ export function play(name, { loop = true } = {}) {
   el.src = src;
   el.loop = loop;
   el.muted = muted;
-  el.volume = VOLUME[name] != null ? VOLUME[name] : DEFAULT_VOLUME;
+  currentBaseVolume = VOLUME[name] != null ? VOLUME[name] : DEFAULT_VOLUME;
+  applyVolume();
   const p = el.play();
   if (p && p.catch) p.catch(() => {}); // 自動再生ブロック時は無視
 }
@@ -68,10 +118,23 @@ export function stop() {
   if (el) { el.pause(); current = null; }
 }
 
+/**
+ * BGMの音量に一時的な係数(0〜1)をかける。1=通常、0=実質無音。
+ *  例：はいちモード滞在中は0.35（控えめ）、YouTube動画の再生中だけ0（オフ）、
+ *      動画が止まったら0.35に戻す、はいちモードを出たら1に戻す。
+ * ミュート設定(muted/toggleMute)には触れない＝ユーザーが手動でミュートしていれば無音のまま。
+ */
+export function setDuckLevel(level) {
+  duckLevel = Math.max(0, Math.min(1, level));
+  applyVolume();
+}
+
+export function getDuckLevel() { return duckLevel; }
+
 /** ミュート切替（true=ミュート中を返す） */
 export function toggleMute() {
   muted = !muted;
-  try { localStorage.setItem("bgm_muted", muted ? "1" : "0"); } catch {}
+  try { localStorage.setItem("ml3_bgm_muted", muted ? "1" : "0"); } catch {}
   if (el) el.muted = muted;
   return muted;
 }

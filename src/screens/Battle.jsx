@@ -8,6 +8,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import Avatar from "../components/Avatar.jsx";
 import HeroImg from "../components/HeroImg.jsx";
+import AttackOrbFx from "../components/AttackOrbFx.jsx";
+import UltimateCutIn from "../components/UltimateCutIn.jsx";
+import FxSpeedToggle from "../components/FxSpeedToggle.jsx";
 import { heroImageFor } from "../data/heroes.js";
 import { pickHitCheer, pickHurtCheer } from "../data/cheers.js";
 import { BigWord, StarField } from "../components/Decorations.jsx";
@@ -20,6 +23,7 @@ import { gearSpecials } from "../engine/gear.js";
 import { allyStats, partnerHpLv, partnerAtkLv } from "../engine/partners.js";
 import { findItem } from "../engine/items.js";
 import { isCorrect, playerLevel } from "../engine/scoring.js";
+import { getFxSpeed, setFxSpeed } from "../engine/fxSpeed.js";
 
 const ENEMY_CHARGE_NEED = 2; // super型が超必殺を撃つまでのチャージ回数（engine ENEMY_AI.super と一致）
 const DODGE_CHANCE = 0.2; // 敵の通常こうげきは20%の確率でかわせる（ため攻撃・超必殺技は対象外＝必ず当たる）
@@ -100,10 +104,18 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   const [enemyFx, setEnemyFx] = useState(null);      // 敵の行動演出 { icon, label, color }
   const [enemyIntent, setEnemyIntent] = useState(null); // 敵の「ため」状態の予告 { text, color }
   const [charging, setCharging] = useState(false);   // ためている間のオーラ
+  const [attackFx, setAttackFx] = useState(null);
+  const [ultimateCutIn, setUltimateCutIn] = useState(null);
+  const [fxSpeed, setCurrentFxSpeed] = useState(() => getFxSpeed());
   const aiStateRef = useRef({ charged: false, superCount: 0 }); // 敵のためチャージ状態
 
   // 安定参照（タイマーから最新処理を呼ぶ）
   const lockedRef = useRef(false);
+  const heroAnchorRef = useRef(null);
+  const monsterAnchorRef = useRef(null);
+  const attackFxIdRef = useRef(0);
+  const attackImpactRef = useRef(null);
+  const launchUltimateAttackRef = useRef(null);
   const phaseRef = useRef("intro");
   const endedRef = useRef(false); // 勝敗確定の二重発火を防ぐ
   const tallyRef = useRef({ correct: 0, wrong: 0 }); // 学習記録用：このバトルの正解/不正解（時間切れ含む）数
@@ -186,6 +198,18 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   }
 
   const setTimerBoth = (v) => { timerRef.current = v; setTimer(v); };
+  function playAttackOrb(options, impact) {
+    const id = ++attackFxIdRef.current;
+    attackImpactRef.current = impact;
+    setAttackFx({ id, ...options });
+  }
+  function handleAttackImpact(id) {
+    if (id !== attackFxIdRef.current || endedRef.current) return;
+    const impact = attackImpactRef.current;
+    attackImpactRef.current = null;
+    impact?.();
+  }
+  function changeFxSpeed(speed) { setCurrentFxSpeed(setFxSpeed(speed)); }
   // バフは ref（即時参照）と state（表示）を両方更新する
   const setAtkBuffBoth = (v) => { atkBuffRef.current = v; setAtkBuff(v); };
   const setGuardBuffBoth = (v) => { guardBuffRef.current = v; setGuardBuff(v); };
@@ -302,8 +326,10 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
     changeSp(sp - skill.cost);
     const isUlt = skill.kind === "ultimate" || skill.kind === "drain" || (skill.kind === "burst" && (skill.mult ?? 0) > 0);
     sfx.skill({ ult: isUlt });
-    setSkillFx({ name: skill.name, icon: skill.icon, color: skill.color, big: isUlt });
-    setTimeout(() => setSkillFx(null), 2000);
+    if (!isUlt) {
+      setSkillFx({ name: skill.name, icon: skill.icon, color: skill.color, big: false });
+      setTimeout(() => setSkillFx(null), 2000);
+    }
 
     if (skill.kind === "time2x") {
       const mult = skill.timeMult ?? 2;
@@ -372,9 +398,10 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         setLog(`${skill.icon} ${skill.name}発動！ 力がみなぎる！`);
         return;
       }
-      // カットイン演出を見せてから着弾させる（倒した瞬間の余韻を出す）
-      setTimeout(() => {
+      // カットイン完了（またはスキップ）後に、既存の着弾処理を一度だけ実行する。
+      const launchAttack = () => {
         if (endedRef.current) return;
+        playAttackOrb({ strong: true }, () => {
         setMonState("damage"); setAnimKey((k) => k + 1);
         setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
         setShowRing(true); setTimeout(() => setShowRing(false), 700);
@@ -391,7 +418,10 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
           else setTimeout(() => setMonState("idle"), 700);
           return nv;
         });
-      }, 1500);
+        });
+      };
+      launchUltimateAttackRef.current = launchAttack;
+      setUltimateCutIn({ id: Date.now(), skill });
     }
   }
 
@@ -801,6 +831,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
       setShowRing(true); setTimeout(() => setShowRing(false), 700);
       setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340); // 自キャラ前のめり
       setCheer({ text: pickHitCheer({ streak: newCombo }), hurt: false, key: ++cheerKey.current });
+      playAttackOrb({ strong: crit || doubled || newCombo >= 3 || dmg >= baseDmg * 2 }, () => {
       setMonState("damage"); setAnimKey((k) => k + 1);
       // バリア／みがわり：あればダメージを肩代わりする
       let toHp = dmg, absorbed = 0;
@@ -833,6 +864,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
         if (nv <= 0) setTimeout(triggerWin, 350);
         else setTimeout(() => { setMonState("idle"); allyFollowUp(); }, 700); // 主人公→仲間の追撃→次の問題
         return nv;
+      });
       });
     } else {
       sfx.wrong();
@@ -877,23 +909,23 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
   if (phase === "win" || phase === "lose") {
     const win = phase === "win";
     return (
-      <div className="battle-app">
+      <div className={`battle-app fx-${fxSpeed}`}>
+        <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
         <StarField />
         <div className="bt-moon" />
         <div className="battle-ground" />
-        <div className="battle-content" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-          <div style={{ fontSize: 64 }}>{win ? "🎉" : "💀"}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: win ? "#7fff7f" : "#ff6b6b", textShadow: win ? "0 0 18px #00ff88" : "none" }}>
-            {win ? "勝利！" : "敗北…"}
-          </div>
-          <div style={{ fontSize: 13, color: "#cceebb", margin: "6px 0 14px" }}>
+        <div className="battle-content battle-result" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+          {win && <><div className="victory-confetti" aria-hidden>{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</div><div className="victory-banner">VICTORY<span>MISSION CLEAR</span></div></>}
+          <div className="battle-result__icon">{win ? "✦" : "☠"}</div>
+          <div className="battle-result__title">{win ? "勝利！" : "敗北…"}</div>
+          <div className="battle-result__text">
             {win ? `${monster.name} をたおした！ 💰+${monster.reward} を獲得！` : `${monster.name} に やられてしまった…`}
           </div>
           {!win && <div style={{ fontSize: 12, color: "#88aa88", marginBottom: 14, maxWidth: 300 }}>💡 HP1でメニューに戻ります。「アイテム」で回復してから もう一度挑戦しよう。強くなるには「学習サイクル」をクリアしてレベルを上げよう！</div>}
           {win ? (
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="bt-choice" style={{ padding: "12px 18px" }} onClick={onExit}>👾 相手を選ぶ</button>
-              <button className="bt-choice" style={{ padding: "12px 18px", borderColor: "#7fff7f" }} onClick={() => onResult("retry")}>🔁 もう一度</button>
+            <div className="battle-result__actions">
+              <button className="bt-choice" onClick={onExit}>相手を選ぶ</button>
+              <button className="bt-choice is-result-main" onClick={() => onResult("retry")}>もう一度</button>
             </div>
           ) : (
             <div style={{ fontSize: 13, color: "#cceebb", fontWeight: 700 }}>メニューにもどります…</div>
@@ -905,7 +937,9 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
 
   // ---- 戦闘中 ----
   return (
-    <div className={"battle-app" + (hurt ? " bt-screen-shake" : "")}>
+    <div className={`battle-app fx-${fxSpeed}` + (hurt ? " bt-screen-shake" : "")}>
+      <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
+      {ultimateCutIn && <UltimateCutIn key={ultimateCutIn.id} ultimate={ultimateCutIn.skill} heroSrc={heroImageFor(player.avatar)} speed={fxSpeed} onComplete={() => { const launch = launchUltimateAttackRef.current; launchUltimateAttackRef.current = null; setUltimateCutIn(null); launch?.(); }} />}
       <div className="encounter-flash" />
       {phase === "intro" && <BigWord text="START!" color="#7fff7f" onDone={() => { phaseRef.current = "fight"; setPhase("fight"); }} />}
       <StarField />
@@ -951,6 +985,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
             <div key={cheer.key} className={"bt-cheer" + (cheer.hurt ? " hurt" : "")}>{cheer.text}</div>
           )}
           {/* 自分のキャラ（立ち絵）：左下。正解で前のめり／被ダメでのけぞり＋赤フラッシュ */}
+          <div ref={heroAnchorRef} className="bt-hero-anchor">
           {heroImageFor(player.avatar) && (
             <HeroImg
               src={heroImageFor(player.avatar)} alt="あなた"
@@ -961,8 +996,9 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
               }}
             />
           )}
+          </div>
           {/* 敵モンスター＋戦闘演出（右側にまとめて配置） */}
-          <div className="bt-mon">
+          <div ref={monsterAnchorRef} className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && (
@@ -986,6 +1022,7 @@ export default function Battle({ player, monster, ally = null, onResult, onSpCha
               </div>
             )}
           </div>
+          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} fxSpeed={fxSpeed} />
         </div>
 
         {/* プレイヤー（自分のHP）：ステージ直下に配置 */}

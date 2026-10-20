@@ -14,7 +14,11 @@ const TOKEN = "(?:\\d+|\\([^()]+\\)|[A-Za-zπ√])";
 // 符号(任意) + 分子 + "/" + 分母
 const FRAC_RE = new RegExp(`([-−])?(${TOKEN})\\/(${TOKEN})`, "g");
 
-function Frac({ num, den }) {
+// 縦書きの分数では、横棒がまとまりを示すので、分子・分母を囲むだけのかっこは外す（(1±√13)/6 → 分子 1±√13）
+const unwrap = (t) => (/^\([^()]+\)$/.test(t) ? t.slice(1, -1) : t);
+
+function Frac({ num: rawNum, den: rawDen }) {
+  const num = unwrap(rawNum), den = unwrap(rawDen);
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center", verticalAlign: "middle", margin: "0 .12em", lineHeight: 1.05 }}>
       <span style={{ padding: "0 .2em", fontSize: ".82em" }}>{num}</span>

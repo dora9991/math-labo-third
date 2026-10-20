@@ -19,40 +19,43 @@ import QuestionText from "../components/QuestionText.jsx";
 import DrawPad from "../components/DrawPad.jsx";
 import * as sfx from "../audio/sfx.js";
 import { logAnswer } from "../store/answerLog.js";
-import { genProblem, genProblemSeeded, makeChoices } from "../engine/generator.js";
+import { genProblem, genProblemSeeded, makeChoices, choiceMode } from "../engine/generator.js";
+import { generatePracticeAvoiding } from "../third/problemSource.js";
 import { genToketa, hasToketa } from "../data/toketa/index.js";
 import ToketaHint from "../components/ToketaHint.jsx";
-import { isCorrect, SLOW_TARGET, xpRepeatMultiplier, CYCLE_PRACTICE_TARGET, slowPointsForLevel } from "../engine/scoring.js";
+import HintMenu from "../components/HintMenu.jsx";
+import WhyBox from "../components/WhyBox.jsx";
+import ProofFigure from "../components/ProofFigure.jsx";
+import ProblemRateBadge from "../components/ProblemRateBadge.jsx";
+import { MEDAL_PRACTICE_TARGET } from "../third/medals.js";
+import { isCorrect, answerMatches, SLOW_TARGET, xpRepeatMultiplier, CYCLE_PRACTICE_TARGET, slowPointsForLevel } from "../engine/scoring.js";
 import { initDifficulty, nextDifficulty, PRACTICE_LEVELS } from "../engine/progress.js";
 
 const todayStr = () => new Date().toLocaleDateString("ja-JP");
 // れんしゅう（あんしん）は「5問ずつの区切り」。1回で15問やり切らなくてよい＝負担を減らす。
 //  サイクルの「ためす」15問は、何回に区切っても貯まるメーター(cyclePracticeN)で達成する。
 const ANSHIN_TARGET = 5;
-const LEVEL_LABEL = { easy: "かんたん", standard: "ふつう", advanced: "発展" };
+const LEVEL_LABEL = { easy: "簡単", standard: "普通", advanced: "難しい", oni: "鬼" };
 
 // 4択ヘルパー（タイムアタックと同じ。式の4択＝文字列厳密一致／数値＝makeChoices＋数値照合）
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 const hasChoices = (q) => Array.isArray(q.choices) && q.choices.length > 0;
 // toketa 問題は診断タグ付き distractors を4択に使う（誤答の意味を持たせる）
 const choicesFor = (q) => (q?.toketa && Array.isArray(q.distractors) ? shuffle(q.distractors.map((d) => String(d.val)))
-  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans));
+  : hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans, { mode: choiceMode(q.id) }));
 // 選んだ選択肢の値から、その誤答の診断タグを引く（toketa問題のみ。無ければnull＝正解 or 非toketa）
 const tagForChoice = (q, val) => (q?.toketa && Array.isArray(q.distractors))
   ? (q.distractors.find((d) => String(d.val) === String(val))?.tag || null)
   : null;
-const ansEq = (val, q) => (hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : isCorrect(val, q.ans));
+const ansEq = (val, q) => (hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : answerMatches(val, q.ans));
 
 // 正負(u1〜u5)は toketa のヒント付き問題に差し替え。無ければ seed 付き生成（サーバー採点の下地）。
+// 【数学ラボ3】seed から完全に再現できる問題を作る（サーバーが同じ問題を作り直して採点し、メダルを付与する）。
 function genPractice(unit, level, lastId) {
-  if (unit && hasToketa(unit.id)) {
-    const t = genToketa(unit.id);
-    if (t) return t;
-  }
-  return genProblemSeeded(unit, level, lastId);
+  return generatePracticeAvoiding(unit, level, lastId);
 }
 
-export default function SlowMode({ player, chapter, unit, level, anshin = false, navDifficulty = false, initialNavLevel = "standard", onNavLevelChange, cyclePracticeN = 0, onComplete, onBackToMap, onHome, onRelearn, onBattle, onHaichi, onAttempt }) {
+export default function SlowMode({ player, chapter, unit, level, anshin = false, navDifficulty = false, initialNavLevel = "standard", onNavLevelChange, cyclePracticeN = 0, fixedLevel = false, onComplete, onBackToMap, onHome, onRelearn, onBattle, onHaichi, onAttempt }) {
   const target = anshin ? ANSHIN_TARGET : SLOW_TARGET[level];
   // ④ 難易度ナビ：navDifficulty のときは前回の到達レベル(initialNavLevel)から始め、2ミスで↓／5連正解で↑。
   //  ＝5問ずつに区切っても「発展まで上がった」のが次の区切りへ引き継がれる。
@@ -63,15 +66,18 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
   const earnedXpRef = useRef(0);                          // この区切りで貯めたポイント（難易度が高いほど多い）
   const [dontKnow, setDontKnow] = useState(false);        // 「わからない」で答えを見せている最中か
   // 出題する難易度：nav時は前回到達レベル開始／あんしんは「かんたん」開始／じっくりは選んだ level
-  const firstLevel = navDifficulty ? initialNavLevel : anshin ? "easy" : level;
+  const firstLevel = navDifficulty ? initialNavLevel : anshin && !fixedLevel ? "easy" : level; // fixedLevel＝えらんだ難度でずっと出題
   const [q, setQ] = useState(() => genPractice(unit, firstLevel));
+  const shownAtRef = useRef(Date.now()); // 問題を出した時刻（解答にかかった時間をサーバーへ送る）
   const [choices, setChoices] = useState(() => (q ? choicesFor(q) : []));
   const [streak, setStreak] = useState(0);
+  const [why, setWhy] = useState(null);           // まちがい／わからないのあと「なぜ？」を出して「次へ」を待つ { tag }
+  const runRef = useRef(0);   // いまの連続正解（まちがい・わからないで0に戻る。あんしんでも）
+  const bestRef = useRef(0);  // この区切りでの最高連続（結果画面に出す）
   const [total, setTotal] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [selected, setSelected] = useState(null);
   const [locked, setLocked] = useState(false);
-  const [hintLevel, setHintLevel] = useState(0); // 0:なし 1:h1 2:h2
   const [msg, setMsg] = useState(() => voice("open"));
   const [showRing, setShowRing] = useState(false);
   const [shakeAns, setShakeAns] = useState(false);
@@ -87,7 +93,9 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
     const lv = navDifficulty ? diffRef.current.level : level; // nav時は自動調整された難易度
     const nq = genPractice(unit, lv, q?.id); // 2問目以降は選んだ難易度（正負は toketa 差し替え）
     if (nq) { setQ(nq); setChoices(choicesFor(nq)); }
-    setSelected(null); setLocked(false); setHintLevel(0); setDontKnow(false);
+    setMsg(voice("next")); // 前の問題の「おしい！」「完璧！」が次の問題に残らないように
+    shownAtRef.current = Date.now();
+    setSelected(null); setLocked(false); setDontKnow(false); setWhy(null);
   }
 
   // ④ 1問の正誤から難易度を更新（nav時のみ）。5連正解で上がったら大きな「レベルアップ！」演出、
@@ -120,10 +128,11 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
     setDontKnow(true);
     setTotal((t) => t + 1);
     if (!anshin) setStreak(0);
+    runRef.current = 0;
     updateNavDifficulty(false); // 分からなかった＝不正解扱いで難易度は下がりうる
     wrongsRef.current.push({ q: q.q, ans: q.ans, unitId: q.unitId, level: q.level, skill: q.skill, ok: false, dontKnow: true });
     setMsg("わからないは、はずかしくないよ。答えを見て、次はできるようにしよう✨");
-    setTimeout(nextQuestion, 1600);
+    setWhy({ tag: null }); // 答えと「なぜ」を見てから「次へ」
   }
 
   function answer(val, idx) {
@@ -134,7 +143,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
     setTotal((t) => t + 1);
     updateNavDifficulty(ok); // ④ 次の問題の難易度を調整（nav時のみ）
     // サーバー権威(Lv2)の影運用：seedがある問題（toketa/DB以外）だけ裏で送信
-    onAttempt?.({ unitId: q.unitId, level: q.level, templateId: q.id, seed: q.seed ?? null, userAnswer: String(val), ok, skill: q.skill });
+    onAttempt?.({ unitId: q.unitId, level: q.plevel || q.level, templateId: q.id, seed: q.seed ?? null, userAnswer: String(val), ok, skill: q.skill, pseed: q.pseed, ms: Math.max(0, Date.now() - shownAtRef.current) });
     // 正答・誤答どちらも中身をサーバへ記録（教師が後から見返せるように。失敗しても進行には影響しない）。
     logAnswer({ unitId: q.unitId, level: q.level, mode: anshin ? "slow-anshin" : "slow", q: q.q, ans: q.ans, userAnswer: String(val), ok, mistakeTag });
 
@@ -142,6 +151,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
       const ns = streak + 1;
       const nc = correct + 1;
       setStreak(ns); setCorrect(nc);
+      runRef.current += 1; bestRef.current = Math.max(bestRef.current, runRef.current);
       // 難易度が高いほど貯まりやすいポイント（発展>標準>簡単）を、この区切りで加算していく
       earnedXpRef.current += slowPointsForLevel(q.level || (navDifficulty ? navLevel : level));
       sfx.correct();
@@ -169,10 +179,11 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
       wrongsRef.current.push({ q: q.q, ans: q.ans, unitId: q.unitId, level: q.level, skill: q.skill, ok: false, mistakeTag });
       // ★1 あんしんモードは失敗で階段が減らない（やさしい言葉かけ）
       if (!anshin) setStreak(0);
+      runRef.current = 0;
       sfx.wrong();
       setShakeAns(true); setTimeout(() => setShakeAns(false), 460);
       setMsg(anshin ? "おしい！ 正しい答えは光っているところだよ。次もいってみよう✨" : voice("wrong"));
-      setTimeout(nextQuestion, anshin ? 1150 : 950);
+      setWhy({ tag: mistakeTag }); // 答えと「なぜ」を見てから「次へ」
     }
   }
 
@@ -189,36 +200,28 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
               <div style={{ fontSize: 18, fontWeight: 900, color: "#1e1b4b" }}>
                 {anshin ? `${correct}問クリア！ ポイントゲット！` : `クリア！${streak}問連続正解！`}
               </div>
-              <div style={{ marginTop: 9 }}>
-                <span className="xp-pill">✨ +{clearInfo ? clearInfo.xp : 0} XP</span>
-                {clearInfo && clearInfo.mult < 1 && (
-                  <div style={{ fontSize: 11, color: "#92400e", fontWeight: 700, marginTop: 5 }}>
-                    {clearInfo.mult === 0.5 ? "今日2回目以降のためXP½" : "クリア済みの再挑戦のためXP⅕"}（通常なら{clearInfo.baseXp}XP）
-                  </div>
-                )}
-              </div>
-              {/* ためすメーター：15問で満タン＝ためすクリア。5問ずつ区切っても貯まる（発展まで上がったのも引き継ぐ）。 */}
+              {/* れんしゅうメダル：サーバーが認めた正解5問で獲得。5問ずつ区切っても貯まる（発展まで上がったのも引き継ぐ）。 */}
               {anshin && (() => {
-                const done = Math.min(CYCLE_PRACTICE_TARGET, cyclePracticeN + correct);
-                const full = done >= CYCLE_PRACTICE_TARGET;
+                const done = Math.min(MEDAL_PRACTICE_TARGET, cyclePracticeN + correct);
+                const full = done >= MEDAL_PRACTICE_TARGET;
                 return (
                   <div style={{ marginTop: 15, textAlign: "left" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 5 }}>
-                      <span>🎯 ためすメーター</span>
-                      <span style={{ color: full ? "#16a34a" : "#d97706" }}>{done}/{CYCLE_PRACTICE_TARGET}{full ? " クリア！🎊" : ""}</span>
+                      <span>🏅 れんしゅうメダル</span>
+                      <span style={{ color: full ? "#16a34a" : "#d97706" }}>{done}/{MEDAL_PRACTICE_TARGET}{full ? " クリア！🎊" : ""}</span>
                     </div>
                     <div style={{ height: 12, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                      <div style={{ width: `${(done / CYCLE_PRACTICE_TARGET) * 100}%`, height: "100%", transition: "width .6s ease",
+                      <div style={{ width: `${(done / MEDAL_PRACTICE_TARGET) * 100}%`, height: "100%", transition: "width .6s ease",
                         background: full ? "linear-gradient(90deg,#22c55e,#4ade80)" : "linear-gradient(90deg,#fbbf24,#f59e0b)" }} />
                     </div>
-                    {!full && <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", marginTop: 6 }}>あと{CYCLE_PRACTICE_TARGET - done}問で「ためす」クリア！ もう5問いこう💪</div>}
+                    {!full && <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", marginTop: 6 }}>あと{MEDAL_PRACTICE_TARGET - done}問でれんしゅうメダルがもらえるよ！ つづけよう💪</div>}
                   </div>
                 );
               })()}
             </div>
             <div className="stats-grid">
               <div className="stat-box"><div className="stat-n" style={{ color: "#16a34a" }}>{correct}</div><div className="stat-l">できた数</div></div>
-              <div className="stat-box"><div className="stat-n" style={{ color: "#d97706" }}>{streak}</div><div className="stat-l">最高連続</div></div>
+              <div className="stat-box"><div className="stat-n" style={{ color: "#d97706" }}>{bestRef.current}</div><div className="stat-l">最高連続</div></div>
               <div className="stat-box"><div className="stat-n" style={{ color: "#94a3b8" }}>{total}</div><div className="stat-l">挑戦</div></div>
             </div>
             {/* つぎのステップ（あんしん→学び直し→バトルの流れを案内） */}
@@ -250,7 +253,7 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
   // ---- プレイ中 ----
   return (
     <div className="app">
-      {phase === "intro" && <BigWord text={anshin ? "スタート！" : "START!"} color="#4ade80" onDone={() => setPhase("playing")} />}
+      {phase === "intro" && <BigWord text={anshin ? "スタート！" : "START!"} color="#4ade80" onDone={() => { shownAtRef.current = Date.now(); setPhase("playing"); }} />}
       {showRing && <div className="correct-flash show" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 55 }} />}
       {/* 5連正解で難化したときの大きな「レベルアップ！」演出 */}
       {levelUpFx && (
@@ -265,15 +268,15 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
         </div>
       )}
       <Header player={player} back="やめる" onBack={onBackToMap} />
-      <div className="content">
+      <div className="content legacy-practice">
         {/* 進み具合メーター（あんしん＝できた！の階段／じっくり＝連続正解） */}
-        <div className="glass" style={{ padding: "11px 13px", marginBottom: 11 }}>
+        <div className="glass legacy-progress" style={{ padding: "11px 13px", marginBottom: 11 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,.5)" }}>
-              {anshin ? "🪜 できた！の かいだん" : "🌱 連続正解チャレンジ"}
+              {anshin ? "できた！の かいだん" : "連続正解チャレンジ"}
             </span>
             <span style={{ fontFamily: "'M PLUS Rounded 1c',sans-serif", fontSize: 18, fontWeight: 900, color: anshin ? "#4ade80" : "#fbbf24" }}>
-              {anshin ? "✨" : "🔥"} {progress}/{target}
+              {progress}/{target}
             </span>
           </div>
           <div style={{ display: "flex", gap: 5 }}>
@@ -302,38 +305,11 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
           </div>
         )}
 
-        <div className="qcard">
-          <span className="q-pill">{unit.name} ・ {navDifficulty ? LEVEL_LABEL[navLevel] : anshin ? "あんしん" : "じっくり"}</span>
+        <div className="qcard" style={{ position: "relative" }}>
+          <ProblemRateBadge q={q} unitId={unit.id} />
+          <span className="q-pill">{unit.name} ・ {navDifficulty ? LEVEL_LABEL[navLevel] : fixedLevel ? LEVEL_LABEL[level] : anshin ? "あんしん" : "じっくり"}</span>
+          {q.fig && <ProofFigure fig={q.fig} />}
           <div className="q-text"><QuestionText text={q.q} furigana={!!player.furigana} readAloud={!!player.readAloud} /></div>
-
-          {/* とけた式ヒント（正負）：つまづき選択メニュー→対比「くらべてみよう」→お手本ステップ */}
-          {q.toketa && !locked && <ToketaHint problem={q} />}
-
-          {/* ヒント（問題に h1 がある＝従来の生成問題） */}
-          {q.h1 && !q.toketa && hintLevel > 0 && (
-            <div style={{ background: "#fef9c3", border: "1px solid #fde047", borderRadius: 11, padding: "9px 12px", marginBottom: 11 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#854d0e", lineHeight: 1.6 }}>
-                💡 {q.h1}
-                {hintLevel >= 2 && q.h2 ? <><br />💡 {q.h2}</> : null}
-              </div>
-            </div>
-          )}
-
-          {/* 手助け：ヒント（h1→h2）と「わからない」（答えを見て次へ・罰なし）。2択(50:50)は廃止。 */}
-          {!locked && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 11 }}>
-              {q.h1 && !q.toketa && hintLevel < 2 && (
-                <button
-                  className="rbtn s" style={{ fontSize: 12, padding: "7px 13px" }}
-                  onClick={() => setHintLevel((h) => h + 1)}
-                >💡 {hintLevel === 0 ? "ヒントを見る" : "もっとくわしく"}</button>
-              )}
-              <button
-                className="rbtn s" style={{ fontSize: 12, padding: "7px 13px", color: "#cbd5e1", borderColor: "rgba(148,163,184,.5)" }}
-                onClick={markDontKnow}
-              >🤔 わからない</button>
-            </div>
-          )}
 
           {/* 選択肢の中央に◯が出るよう relative で包む */}
           <div style={{ position: "relative" }}>
@@ -356,11 +332,29 @@ export default function SlowMode({ player, chapter, unit, level, anshin = false,
               })}
             </div>
           </div>
+
+          {/* まちがい・わからないのあと：正解と「なぜ？」＋次へ（自動では進まない） */}
+          {locked && why && (
+            <div>
+              <WhyBox problem={q} mistakeTag={why.tag} />
+              <button className="hint-yellow-btn" data-sfx="none" style={{ width: "100%", marginTop: 6 }} onClick={nextQuestion}>次の問題へ →</button>
+            </div>
+          )}
+
+          {/* 選択肢の下：黄色い「ヒント」ボタン（こまりごと一覧→ヒント）と「わからない」 */}
+          {!locked && (
+            <div className="hint-area">
+              {q.toketa ? <ToketaHint problem={q} /> : <HintMenu problem={q} />}
+              <div style={{ marginTop: 10 }}>
+                <button className="legacy-help-btn legacy-help-btn--quiet" style={{ fontSize: 12 }} onClick={markDontKnow}>わからない</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ✏️ 手書き計算スペース（れんしゅう中もメモ書きできる） */}
-        <button onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", marginTop: 12, padding: "11px", borderRadius: 12, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer", fontSize: 14, fontWeight: 800, color: "#fff", background: showPad ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)" }}>
-          ✏️ 計算スペース{showPad ? "を閉じる" : "を開く"}
+        <button className="legacy-command" onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", marginTop: 12, fontSize: 14 }}>
+          計算スペース{showPad ? "を閉じる" : "を開く"}
         </button>
         {showPad && <DrawPad key={total} height={360} />}
       </div>

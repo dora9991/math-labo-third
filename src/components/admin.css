@@ -1,0 +1,149 @@
+/* ============================================================
+   admin.css — 管理用モード（先生用）の見た目。
+   2026-09-30：見にくいという声を受けて作り直し。文字を大きく・コントラストを高く、
+   生徒は「表」で並べ、ログインの状態を色で分け、未ログインの生徒は一番下にまとめる。
+   ============================================================ */
+.content.adm-page { max-width: 1180px; }
+
+.adm { --adm-text: #f6f9ff; --adm-sub: #cfdcf3; --adm-dim: #9fb3d6; --adm-line: rgba(166, 220, 255, .22);
+  --adm-card: rgba(8, 22, 60, .62); --adm-today: #4ade80; --adm-week: #38bdf8; --adm-away: #fb923c; --adm-never: #94a3b8;
+  --adm-bad: #f87171; --adm-mid: #fbbf24; --adm-good: #4ade80;
+  color: var(--adm-text); font-variant-numeric: tabular-nums; }
+.adm small { font-size: 12px; color: var(--adm-dim); font-weight: 700; }
+.adm .adm-muted { color: var(--adm-sub); font-size: 13px; line-height: 1.6; }
+.adm .adm-h { font-size: 16px; font-weight: 900; margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; }
+.adm .adm-h small { font-weight: 700; }
+
+/* 上の帯：合言葉・読み込み */
+.adm-connect { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.adm-connect .adm-title { font-size: 18px; font-weight: 900; flex: 1 1 260px; }
+.adm-connect input { font-size: 15px; font-weight: 800; padding: 10px 12px; border-radius: 12px; width: 200px; font-family: inherit; }
+.adm-note { margin-top: 10px; padding: 10px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 700; line-height: 1.6; }
+.adm-note.is-err { background: rgba(248, 113, 113, .16); border: 1px solid rgba(248, 113, 113, .45); color: #fecaca; }
+.adm-note.is-ok { background: rgba(74, 222, 128, .13); border: 1px solid rgba(74, 222, 128, .4); color: #bbf7d0; }
+.adm-note.is-info { background: rgba(251, 191, 36, .12); border: 1px solid rgba(251, 191, 36, .38); color: #fde68a; }
+
+/* ボタン（管理画面の中だけ、ふわっと浮く動きを止める） */
+.adm button { font-family: inherit; cursor: pointer; }
+.content .adm button:hover:not(:disabled) { transform: none; }
+.adm .adm-btn { font-size: 14px; font-weight: 800; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--adm-line); background: rgba(255, 255, 255, .08); color: #fff; }
+.adm .adm-btn.is-primary { background: #6366f1; border-color: #818cf8; }
+.adm .adm-btn.is-danger { background: rgba(239, 68, 68, .28); border-color: rgba(248, 113, 113, .6); }
+.adm .adm-btn.is-small { font-size: 13px; padding: 7px 11px; border-radius: 10px; }
+
+/* タブ */
+.adm-tabs { display: flex; gap: 6px; margin: 14px 0 12px; overflow-x: auto; padding-bottom: 2px; }
+.adm .adm-tab { flex: 0 0 auto; font-size: 15px; font-weight: 900; padding: 11px 16px; border-radius: 14px 14px 10px 10px; border: 1px solid var(--adm-line);
+  background: rgba(255, 255, 255, .05); color: var(--adm-sub); }
+.adm .adm-tab[aria-selected="true"] { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; border-color: #a5b4fc; box-shadow: 0 6px 18px rgba(79, 70, 229, .35); }
+.adm .adm-tab .adm-badge { margin-left: 6px; }
+
+/* 状態のしぼりこみ（件数つき） */
+.adm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.adm .adm-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 800; padding: 8px 13px; border-radius: 999px;
+  border: 1px solid var(--adm-line); background: rgba(255, 255, 255, .05); color: var(--adm-sub); }
+.adm .adm-chip b { font-size: 16px; color: #fff; }
+.adm .adm-chip[aria-pressed="true"] { background: rgba(99, 102, 241, .35); border-color: #a5b4fc; color: #fff; }
+.adm-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 0 2px rgba(0, 0, 0, .25); }
+
+/* 検索・クラス・並び替えの列 */
+.adm-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.adm-tools input, .adm-tools select { font-size: 14.5px; font-weight: 700; padding: 9px 11px; border-radius: 12px; font-family: inherit; }
+.adm-tools input { width: 210px; }
+
+/* 生徒の表 */
+.adm-table { border: 1px solid var(--adm-line); border-radius: 14px; overflow: hidden; background: var(--adm-card); }
+.adm-row, .adm-thead { display: grid; align-items: center; column-gap: 12px;
+  grid-template-columns: 12px minmax(160px, 1.25fr) 88px 84px 140px 120px minmax(200px, 2fr) 16px; padding: 11px 14px; }
+.adm-thead { font-size: 12.5px; font-weight: 800; color: var(--adm-dim); background: rgba(255, 255, 255, .05); border-bottom: 1px solid var(--adm-line); padding-top: 9px; padding-bottom: 9px; }
+.adm .adm-row { width: 100%; text-align: left; border: 0; border-top: 1px solid var(--adm-line); background: transparent; color: var(--adm-text); }
+.adm .adm-row:first-of-type { border-top: 0; }
+.adm .adm-row:hover { background: rgba(255, 255, 255, .06); }
+.adm .adm-row.is-open { background: rgba(99, 102, 241, .2); }
+.adm-row.is-quiet { opacity: .78; }
+.adm-name { min-width: 0; display: flex; flex-direction: column; }
+.adm-name b { font-size: 16px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-name em { font-style: normal; font-size: 11.5px; font-weight: 900; color: #0b1437; background: var(--lab-gold, #ffdb84); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+.adm-last { font-size: 14.5px; font-weight: 900; }
+.adm-num b { font-size: 16px; }
+.adm-num, .adm-rate, .adm-prog { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 700; }
+.adm-rate b, .adm-prog b { font-size: 16px; font-weight: 900; }
+.adm-bar { display: block; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.adm-bar > i { display: block; height: 100%; border-radius: 4px; }
+.adm-weak { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.adm-tag { font-size: 12.5px; font-weight: 800; padding: 3px 8px; border-radius: 8px; background: rgba(248, 113, 113, .18); border: 1px solid rgba(248, 113, 113, .45); color: #fecaca; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.adm-tag.is-mid { background: rgba(251, 191, 36, .14); border-color: rgba(251, 191, 36, .45); color: #fde68a; }
+.adm-caret { font-size: 13px; color: var(--adm-dim); text-align: right; }
+.adm-lbl { display: none; font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--adm-dim); }
+.adm-empty { padding: 18px; text-align: center; color: var(--adm-sub); font-size: 14px; font-weight: 700; }
+.adm-group { padding: 8px 14px; font-size: 13px; font-weight: 900; color: var(--adm-sub); background: rgba(0, 0, 0, .18); border-top: 1px solid var(--adm-line); }
+
+/* 生徒をひらいたときの詳細 */
+.adm-detail { padding: 14px 16px 16px; border-top: 1px solid var(--adm-line); background: rgba(3, 10, 36, .45); }
+.adm-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.adm-card { background: rgba(255, 255, 255, .06); border: 1px solid var(--adm-line); border-radius: 12px; padding: 10px 12px; }
+.adm-card .k { font-size: 12.5px; font-weight: 800; color: var(--adm-sub); }
+.adm-card .v { font-size: 24px; font-weight: 900; line-height: 1.25; }
+.adm-card .s { font-size: 12px; font-weight: 700; color: var(--adm-dim); }
+.adm-sec { margin-bottom: 14px; }
+.adm-sec > .t { font-size: 14px; font-weight: 900; margin-bottom: 8px; }
+.adm-unit { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.6fr) minmax(92px, auto); gap: 10px; align-items: center; padding: 5px 0; font-size: 14px; }
+.adm-recs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.adm-rec { --c: #ffe087; display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); background: color-mix(in srgb, var(--c) 10%, rgba(8, 22, 60, .6)); }
+.adm-rec--grow { --c: #69e8bf; } .adm-rec--review { --c: #7fdcff; } .adm-rec--challenge { --c: #ff8bc7; } .adm-rec--next { --c: #ffe087; }
+.adm-rec b { color: var(--c); font-size: 13.5px; }
+.adm-rec .u { font-size: 14.5px; font-weight: 900; }
+.adm-rec .u em { font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--c); }
+.adm-rec .why { font-size: 12.5px; color: var(--adm-sub); line-height: 1.5; }
+.adm-unit .n { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-unit .adm-bar { height: 10px; }
+.adm-unit .r { font-weight: 900; text-align: right; }
+.adm-cal { display: flex; flex-wrap: wrap; gap: 4px; }
+.adm-cal span { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .07); font-size: 10.5px; font-weight: 800; display: grid; place-items: center; color: var(--adm-dim); }
+.adm-cal span.on { background: #22c55e; color: #052e16; }
+.adm-cal span.today { outline: 2px solid #fff; }
+.adm-party { display: flex; flex-wrap: wrap; gap: 6px; }
+.adm-party span { font-size: 13px; font-weight: 800; padding: 4px 9px; border-radius: 8px; background: rgba(255, 255, 255, .08); }
+.adm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 未ログインの生徒（一番下にまとめる） */
+.adm-never { margin-top: 14px; border: 1px dashed rgba(148, 163, 184, .55); border-radius: 14px; background: rgba(148, 163, 184, .07); }
+.adm .adm-never > button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 13px 14px; background: none; border: 0; color: var(--adm-text); font-size: 15px; font-weight: 900; text-align: left; }
+.adm-never-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; padding: 0 14px 14px; }
+.adm-never-grid > div { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .06); display: flex; flex-direction: column; }
+.adm-never-grid b { font-size: 15px; }
+
+/* クラスのようす */
+.adm-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.adm-chart { display: flex; gap: 8px; align-items: flex-end; height: 130px; padding: 8px 4px 0; }
+.adm-chart > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; font-weight: 800; }
+.adm-chart .bar { width: 100%; max-width: 54px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, #818cf8, #4f46e5); }
+.adm-chart .d { font-size: 12.5px; color: var(--adm-sub); }
+.adm-list > div { display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--adm-line); font-size: 14px; }
+.adm-list > div:first-child { border-top: 0; }
+.adm-list .p { font-size: 17px; font-weight: 900; }
+.adm-list .ex { grid-column: 2 / 4; font-size: 13px; color: var(--adm-sub); }
+.adm-panel { background: var(--adm-card); border: 1px solid var(--adm-line); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+
+/* 管理ツール（生徒の状態を直接変える） */
+.adm-grant { margin-top: 4px; padding: 12px; border-radius: 12px; background: rgba(0, 0, 0, .28); border: 1px solid rgba(248, 113, 113, .3); }
+.adm-grant .row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 9px; }
+.adm-grant .lb { font-size: 13.5px; font-weight: 900; margin-right: 2px; }
+.adm-grant input { font-size: 14px; font-weight: 800; padding: 8px 10px; border-radius: 10px; width: 86px; font-family: inherit; }
+
+/* スマホ・タブレット縦：表を2段に */
+@media (max-width: 860px) {
+  .adm-thead { display: none; }
+  .adm-row { grid-template-columns: 12px 1fr 1fr 1fr 16px; grid-template-areas: "dot name name last caret" ". num rate prog ." ". weak weak weak ."; row-gap: 8px; column-gap: 10px; }
+  .adm-row > :nth-child(1) { grid-area: dot; } .adm-row > :nth-child(2) { grid-area: name; } .adm-row > :nth-child(3) { grid-area: last; text-align: right; }
+  .adm-row > :nth-child(4) { grid-area: num; } .adm-row > :nth-child(5) { grid-area: rate; } .adm-row > :nth-child(6) { grid-area: prog; }
+  .adm-row > :nth-child(7) { grid-area: weak; } .adm-row > :nth-child(8) { grid-area: caret; }
+  .adm-weak:empty { display: none; }
+  .adm-lbl { display: block; }
+  .adm-unit { grid-template-columns: 1fr 80px; } .adm-unit .adm-bar { grid-column: 1 / 3; grid-row: 2; }
+  .adm-tools input { width: 100%; }
+  .adm-chips { gap: 6px; }
+  .adm .adm-chip { font-size: 13px; padding: 6px 10px; gap: 5px; }
+  .adm .adm-chip b { font-size: 14.5px; }
+  .adm .adm-tab { font-size: 14px; padding: 10px 13px; }
+}

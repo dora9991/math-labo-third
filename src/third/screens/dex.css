@@ -1,0 +1,29 @@
+/* 図鑑画面（2026-09-28）。third.css の mw-portrait-* と同じレア度色を使う。 */
+.dx-app{min-height:100vh;padding-bottom:24px;background:radial-gradient(ellipse at 50% 0%,#1a2050 0%,#070912 60%,#04050d 100%);color:#fff;font-family:inherit}
+.dx-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 6px}
+.dx-back{padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(8,10,34,.6);color:#fff;font:700 13px inherit;font-family:inherit;cursor:pointer}
+.dx-back:hover,.dx-back:focus-visible{border-color:#ffe9a8;outline:none}
+.dx-title{font-weight:900;font-size:clamp(16px,4vw,20px);letter-spacing:.08em}
+.dx-count{padding:6px 12px;border-radius:999px;font-weight:900;font-size:13px;border:1px solid rgba(160,220,255,.6);background:linear-gradient(135deg,rgba(20,60,120,.75),rgba(8,20,60,.75))}
+
+.dx-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px 14px 10px}
+.dx-tab{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.3);background:rgba(10,12,36,.7);color:#fff;font:800 12.5px inherit;font-family:inherit;cursor:pointer}
+.dx-tab small{font-size:9.5px;font-weight:700;opacity:.8}
+.dx-tab.on{border-color:#fde047;background:rgba(253,224,71,.18);box-shadow:0 0 10px rgba(253,224,71,.45)}
+.dx-tab-N.on{border-color:#b9bdd8;background:rgba(185,189,216,.2)}
+.dx-tab-R.on{border-color:#7fd0ff;background:rgba(127,208,255,.2)}
+.dx-tab-SR.on{border-color:#ffd166;background:rgba(255,209,102,.2)}
+.dx-tab-UR.on{border-color:#ff9ecb;background:rgba(255,158,203,.2)}
+
+.dx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:10px;padding:0 14px}
+.dx-cell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 2px 6px;border-radius:10px;border:none;background:transparent;color:#fff;font-family:inherit;cursor:pointer}
+.dx-cell:disabled{cursor:default}
+.dx-cell:hover:not(.is-unknown){filter:brightness(1.1)}
+.dx-cell.is-unknown{cursor:default;opacity:.55}
+.dx-cell.is-unknown .mw-portrait-frame{filter:grayscale(1) brightness(.35)}
+.dx-cell-name{font-size:9.5px;font-weight:800;text-align:center;line-height:1.25;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dx-cell-sub{font-size:8.5px;font-weight:700;color:#ffe9b3;opacity:.85}
+
+@media (max-width:420px){
+  .dx-grid{grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:8px}
+}

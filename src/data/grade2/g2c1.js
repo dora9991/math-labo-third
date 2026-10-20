@@ -4,7 +4,7 @@
 //  毎回ちがう係数の問題を生成し、式の答え＋ありがちな誤答の4択を自動でつくる。
 //  skill タグにより、習熟度推定・アダプティブ出題・分析の対象になる。
 // ============================================================
-import { polyStr, monoStr, varStr, sup, mulMono, divMono, rnz, rpick, exprChoices } from "../_algebra.js";
+import { polyStr, monoStr, varStr, sup, mulMono, divMono, rnz, rpick, exprChoices, neg } from "../_algebra.js";
 
 const p = (id, build, skill = null) => ({ id, build, skill });
 
@@ -70,11 +70,13 @@ function genMul(r, level) {
 
 // ── u3 累乗を含む単項式 ───────────────────────────
 function genPow(r, level) {
-  const n = level === "advanced" ? rpick(r, [2, 3]) : 2;
+  // 簡単＝正の数の2乗(小さい数は3乗も)／普通＝負の数の2乗・3乗／難しい＝2文字
+  const smallC = level === "easy" ? rnz(r, 2, 6) : level === "standard" ? rnz(r, -5, -2) : 0;
+  const n = level === "advanced" ? rpick(r, [2, 3]) : Math.abs(smallC) <= 3 && level !== "advanced" ? rpick(r, [2, 3]) : 2;
   const base = level === "easy"
-    ? { c: rnz(r, 2, 5), v: { x: 1 } }
+    ? { c: smallC, v: { [rpick(r, ["x", "a", "y"])]: 1 } }
     : level === "standard"
-      ? { c: rnz(r, -5, -2), v: { [rpick(r, ["a", "x"])]: 1 } }
+      ? { c: smallC, v: { [rpick(r, ["a", "x", "y"])]: 1 } }
       : { c: rnz(r, -4, 4) || 2, v: { x: 1, y: 1 } };
   const av = {}; for (const k in base.v) av[k] = base.v[k] * n;
   const A = { c: Math.pow(base.c, n), v: av };
@@ -94,7 +96,7 @@ function genPow(r, level) {
 function genDiv(r, level) {
   const max = level === "advanced" ? 5 : 4;
   let divisor, quo;
-  if (level === "easy") { divisor = { c: rnz(r, 2, max), v: { a: 1 } }; quo = { c: rnz(r, 2, max), v: { b: 1 } }; }
+  if (level === "easy") { const [v1, v2] = rpick(r, [["a", "b"], ["x", "y"], ["x", "a"]]); divisor = { c: rnz(r, 2, 5), v: { [v1]: 1 } }; quo = { c: rnz(r, 2, 5), v: { [v2]: 1 } }; }
   else if (level === "standard") { divisor = { c: rnz(r, -max, max), v: { x: 1 } }; quo = { c: rnz(r, -max, max), v: { y: 1 } }; }
   else { divisor = { c: rnz(r, -max, max), v: { x: 1, y: 1 } }; quo = { c: rnz(r, -max, max), v: { x: rnz(r, 1, 2) } }; }
   const dividend = mulMono(quo, divisor);           // 割り切れるように構成
@@ -111,7 +113,7 @@ function genDiv(r, level) {
 
 // ── u5 乗除の混じった計算（A ÷ B × C） ────────────────
 function genMix(r, level) {
-  const max = level === "advanced" ? 4 : 3;
+  const max = level === "advanced" ? 4 : level === "easy" ? 5 : 3;
   const B = { c: rnz(r, 2, max), v: { a: 1 } };
   const Q = level === "advanced" ? { c: rnz(r, -max, max), v: { a: 1 } } : { c: rnz(r, 2, max), v: { b: 1 } };
   const C = level === "easy" ? { c: rnz(r, 2, max), v: { b: 1 } } : { c: rnz(r, -max, max), v: { b: 1 } };
@@ -129,9 +131,28 @@ function genMix(r, level) {
   return { q, ans, choices: exprChoices(ans, variants, fill, r), h1: H.mix.h1, h2: H.mix.h2 };
 }
 
-// ── u6 等式の変形（係数±1の文字について解く＝答えは分数なし） ──
+// ── u6 等式の変形（答えは分数なし）。簡単＝+y の1段階／普通＝±y／難しい＝移項してから係数で割る2段階 ──
+function genSolveEasy(r) { // 3x+y=7 → y=−3x+7
+  const A = r(2, 6), c = r(1, 9);
+  const ans = "y=" + polyStr([{ c: -A, v: { x: 1 } }, { c, v: {} }]);
+  const variants = ["y=" + polyStr([{ c: A, v: { x: 1 } }, { c, v: {} }]), "y=" + polyStr([{ c: -A, v: { x: 1 } }, { c: -c, v: {} }]), "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: -c, v: {} }])];
+  return { q: `${monoStr(A, { x: 1 })}+y = ${c} を y について解きなさい。`, ans, choices: exprChoices(ans, variants, ["y=" + polyStr([{ c: -A, v: { x: 1 } }, { c: c + 1, v: {} }])], r), h1: H.solve.h1, h2: H.solve.h2 };
+}
+function genSolveAdv(r) { // 6x−2y=8 → y=3x−4
+  const A = rnz(r, -5, 5), B = rnz(r, -6, 6), k = r(2, 5) * (r(0, 1) ? 1 : -1); // y の係数 k（負もある）
+  const P = -k * A, R = k * B; // Px + ky = R → y = Ax + B
+  const ans = "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: B, v: {} }]);
+  const variants = [
+    "y=" + polyStr([{ c: -A, v: { x: 1 } }, { c: B, v: {} }]),     // 移項で符号を変え忘れ
+    "y=" + polyStr([{ c: -P, v: { x: 1 } }, { c: R, v: {} }]),     // 係数で割り忘れ
+    "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: -B, v: {} }]),     // 割るときの符号ミス
+  ];
+  return { q: `${polyStr([{ c: P, v: { x: 1 } }, { c: k, v: { y: 1 } }])} = ${neg(R)} を y について解きなさい。`, ans, choices: exprChoices(ans, variants, ["y=" + polyStr([{ c: A + 1, v: { x: 1 } }, { c: B, v: {} }])], r), h1: "x の項を右へ移項してから、y の係数で両辺を割る", h2: "割るとき、右辺の全部の項を割る。負の数で割ると符号が変わる" };
+}
 function genSolve(r, level) {
-  const max = level === "advanced" ? 7 : 6;
+  if (level === "easy") return genSolveEasy(r);
+  if (level === "advanced") return genSolveAdv(r);
+  const max = 6;
   const A = rnz(r, 2, max);
   const c = rnz(r, -max, max);
   const plusY = r(0, 1) === 1;                       // y の符号（+y か −y か）
@@ -166,24 +187,77 @@ function genOni(r) {
   return { q, ans, choices: exprChoices(ans, variants, fill, r), h1: "累乗を先に計算→かけ算・わり算を前から順に", h2: "( )²は係数も指数も2倍。約分・符号に注意" };
 }
 
-// 各単元：難易度ごとに生成テンプレを 10 個ずつ置く（1テンプレで毎回ちがう問題を生成）。
-//  ・各レベルの 10 テンプレは同じ生成関数を使う＝呼び出しごとに係数がランダムに変わるので、
-//    出題時には毎回ちがう問題になる（id は重複しないよう連番で振る）。
-//  ・oni（鬼）は「その単元の発展(advanced)の難問」＋「全単元共通の累乗込み乗除混合(genOni)」を
-//    交互に混ぜ、発展のさらに上の難問として 10 個用意する（答えは1つに定まる式/数値）。
+// ── 鬼（2026-09-30）：単元ごとの「2段階の計算」。発展(advanced)とは別の問題にする ──
+function genAddSubOni(r) { // 2(3x−y)−3(x−2y)
+  const m = r(2, 4), n = r(2, 4);
+  const P = { x: rnz(r, -5, 5), y: rnz(r, -5, 5) }, Q = { x: rnz(r, -5, 5), y: rnz(r, -5, 5) };
+  const T = (o) => [{ c: o.x, v: { x: 1 } }, { c: o.y, v: { y: 1 } }];
+  const ansT = [{ c: m * P.x - n * Q.x, v: { x: 1 } }, { c: m * P.y - n * Q.y, v: { y: 1 } }];
+  const ans = polyStr(ansT);
+  const variants = [
+    polyStr([{ c: m * P.x - n * Q.x, v: { x: 1 } }, { c: m * P.y + n * Q.y, v: { y: 1 } }]), // 後ろの2項目の符号を変え忘れ
+    polyStr([{ c: m * P.x - Q.x, v: { x: 1 } }, { c: m * P.y - Q.y, v: { y: 1 } }]),         // 後ろのかっこに数をかけ忘れ
+    polyStr([{ c: m * P.x + n * Q.x, v: { x: 1 } }, { c: m * P.y + n * Q.y, v: { y: 1 } }]), // 引き算をたし算に
+  ];
+  return { q: `${m}(${polyStr(T(P))})−${n}(${polyStr(T(Q))}) を計算しなさい。`, ans, choices: exprChoices(ans, variants, fillersPoly(ansT), r), h1: "まず分配法則でかっこをはずし、それから同類項をまとめる", h2: "−○(…) は、かっこの中の全部の符号が変わる" };
+}
+function genMulOni(r) { // (−2x)×3xy×(−y²)
+  const A = { c: rnz(r, -4, 4), v: { x: 1 } }, B = { c: rnz(r, -3, 3), v: { x: 1, y: 1 } }, C = { c: rnz(r, -3, 3), v: { y: 2 } };
+  const R = mulMono(mulMono(A, B), C);
+  const ans = monoStr(R.c, R.v);
+  const wrongPow = {}; for (const k in R.v) wrongPow[k] = 1;
+  const variants = [monoStr(-R.c, R.v), monoStr(A.c + B.c + C.c, R.v), monoStr(R.c, wrongPow)];
+  return { q: `${fac(A.c, A.v)} × ${fac(B.c, B.v)} × ${fac(C.c, C.v)} を計算しなさい。`, ans, choices: exprChoices(ans, variants, [monoStr(R.c + 1, R.v), monoStr(R.c - 1, R.v), monoStr(R.c * 2, R.v)], r), h1: "負の数が何個あるかで、先に符号を決める", h2: "数は数どうし、同じ文字は指数をたす" };
+}
+function genPowOni(r) { // (−2x²y)³・(−3a)²×(−a)³
+  if (r(0, 1) === 1) {
+    const b = { c: rnz(r, -3, 3), v: { x: 2, y: 1 } };
+    const A = { c: b.c ** 3, v: { x: 6, y: 3 } };
+    const ans = monoStr(A.c, A.v);
+    const variants = [monoStr(-A.c, A.v), monoStr(b.c * 3, A.v), monoStr(A.c, { x: 5, y: 3 })];
+    return { q: `(${monoStr(b.c, b.v)})³ を計算しなさい。`, ans, choices: exprChoices(ans, variants, [monoStr(A.c + 1, A.v), monoStr(A.c - 1, A.v)], r), h1: "係数も、x² も y も、全部3回かける", h2: "(x²)³=x⁶（指数をかける）" };
+  }
+  const k = r(2, 4);
+  const R = { c: -(k * k), v: { a: 5 } };
+  const ans = monoStr(R.c, R.v);
+  const variants = [monoStr(k * k, R.v), monoStr(-(k * k), { a: 6 }), monoStr(-2 * k, R.v)];
+  return { q: `(−${k}a)² × (−a)³ を計算しなさい。`, ans, choices: exprChoices(ans, variants, [monoStr(R.c - 1, R.v), monoStr(R.c + 1, R.v)], r), h1: "累乗を先に計算してから、かけ算をする", h2: "(−a)³=−a³。a²×a³=a⁵" };
+}
+function genDivOni(r) { // 24x³y² ÷ (−3x) ÷ 4xy
+  const R = { c: rnz(r, -4, 4), v: { x: 1, y: 1 } }, B = { c: rnz(r, -4, 4), v: { x: 1 } }, C = { c: r(2, 4), v: { x: 1, y: 1 } };
+  const A = mulMono(mulMono(R, B), C);
+  const ans = monoStr(R.c, R.v);
+  const variants = [monoStr(-R.c, R.v), monoStr(R.c, { x: 2, y: 1 }), monoStr((A.c / B.c) * C.c, R.v)];
+  return { q: `${monoStr(A.c, A.v)} ÷ ${fac(B.c, B.v)} ÷ ${fac(C.c, C.v)} を計算しなさい。`, ans, choices: exprChoices(ans, variants, [monoStr(R.c + 1, R.v), monoStr(R.c - 1, R.v), monoStr(R.c * 2, R.v)], r), h1: "÷ は2回とも、逆数のかけ算にする", h2: "分数の形にまとめて、数も文字も一度に約分する" };
+}
+function genSolveOni(r) { // 3(x−y)=6x+9 を y について
+  const A = rnz(r, -4, 4), B = rnz(r, -6, 6), k = r(2, 4), s = r(0, 1) ? 1 : -1;
+  const m = s * k * A + k, n = s * k * B; // k(x+s·y)=mx+n → y=Ax+B
+  const ans = "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: B, v: {} }]);
+  const variants = [
+    "y=" + polyStr([{ c: -A, v: { x: 1 } }, { c: -B, v: {} }]),  // 最後に符号を変え忘れ
+    "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: -B, v: {} }]),   // 定数だけ符号ミス
+    "y=" + polyStr([{ c: m - k, v: { x: 1 } }, { c: n, v: {} }]), // 係数で割り忘れ
+  ];
+  return { q: `${k}(x${s > 0 ? "+" : "−"}y)=${polyStr([{ c: m, v: { x: 1 } }, { c: n, v: {} }])} を y について解きなさい。`, ans, choices: exprChoices(ans, variants, ["y=" + polyStr([{ c: A + 1, v: { x: 1 } }, { c: B, v: {} }]), "y=" + polyStr([{ c: A, v: { x: 1 } }, { c: B + 1, v: {} }])], r), h1: "まず左のかっこをはずす", h2: "y の項だけを左に残し、最後に y の係数で割る" };
+}
+
+// 各単元：難易度ごとに生成テンプレを 10 個ずつ置く（1テンプレで毎回ちがう問題を生成。id は e1..e10 / s1..s10 / a1..a10 / o1..o10）。
+//  ※ 2026-09-30 まで、生成関数に "e"/"s"/"a"（idの文字）を渡していたため、簡単・普通・難しいが同じ問題になっていた。
+//  鬼は「その単元の鬼問題(2段階)」と「全単元共通の累乗込み乗除混合(genOni)」を交互に出す。
 const N = 10; // 各レベルの問題数
+const LV = { e: "easy", s: "standard", a: "advanced" };
 const mkList = (idp, lvl, fn, skill) =>
-  Array.from({ length: N }, (_, i) => p(`${idp}${lvl}${i + 1}`, (r) => fn(r, lvl), skill));
-// oni 用：その単元の generator を advanced で出す問題と、共通 genOni を交互に
-const mkOni = (idp, fn, skill) =>
+  Array.from({ length: N }, (_, i) => p(`${idp}${lvl}${i + 1}`, (r) => fn(r, LV[lvl]), skill));
+const mkOni = (idp, oniFn, skill) =>
   Array.from({ length: N }, (_, i) =>
-    p(`${idp}o${i + 1}`, (r) => (i % 2 === 0 ? genOni(r) : fn(r, "advanced")), skill)
+    p(`${idp}o${i + 1}`, (r) => (i % 2 === 0 ? genOni(r) : oniFn(r)), skill)
   );
-const lv = (fn, idp, skill) => ({
+const lv = (fn, idp, skill, oniFn = genOni) => ({
   easy: mkList(idp, "e", fn, skill),
   standard: mkList(idp, "s", fn, skill),
   advanced: mkList(idp, "a", fn, skill),
-  oni: mkOni(idp, fn, skill), // 🔥鬼（発展の難問＋累乗を含む乗除混合）
+  oni: mkOni(idp, oniFn, skill), // 🔥鬼（その単元の2段階の問題＋累乗を含む乗除混合）
 });
 
 export const chapter = {
@@ -193,11 +267,11 @@ export const chapter = {
   color: "#34d399",
   grade: 2,
   units: [
-    { id: "g2c1u1", name: "多項式の加法・減法", emoji: "✏️", desc: "同類項をまとめる", problems: lv(genAddSub, "g2c1u1", "S-EXP-ADD") },
-    { id: "g2c1u2", name: "単項式の乗法", emoji: "✖️", desc: "係数の積・指数の和", problems: lv(genMul, "g2c1u2", "S-EXP-MUL") },
-    { id: "g2c1u3", name: "累乗を含む単項式の計算", emoji: "🔼", desc: "( )ⁿ の計算", problems: lv(genPow, "g2c1u3", "S-EXP-POW") },
-    { id: "g2c1u4", name: "単項式の除法", emoji: "➗", desc: "約分・指数の差", problems: lv(genDiv, "g2c1u4", "S-EXP-DIV") },
+    { id: "g2c1u1", name: "多項式の加法・減法", emoji: "✏️", desc: "同類項をまとめる", problems: lv(genAddSub, "g2c1u1", "S-EXP-ADD", genAddSubOni) },
+    { id: "g2c1u2", name: "単項式の乗法", emoji: "✖️", desc: "係数の積・指数の和", problems: lv(genMul, "g2c1u2", "S-EXP-MUL", genMulOni) },
+    { id: "g2c1u3", name: "累乗を含む単項式の計算", emoji: "🔼", desc: "( )ⁿ の計算", problems: lv(genPow, "g2c1u3", "S-EXP-POW", genPowOni) },
+    { id: "g2c1u4", name: "単項式の除法", emoji: "➗", desc: "約分・指数の差", problems: lv(genDiv, "g2c1u4", "S-EXP-DIV", genDivOni) },
     { id: "g2c1u5", name: "乗除の混じった計算", emoji: "🔀", desc: "前から順に計算", problems: lv(genMix, "g2c1u5", "S-EXP-MIX") },
-    { id: "g2c1u6", name: "等式の変形", emoji: "🟰", desc: "○について解く", problems: lv(genSolve, "g2c1u6", "S-EXP-SOLVE") },
+    { id: "g2c1u6", name: "等式の変形", emoji: "🟰", desc: "○について解く", problems: lv(genSolve, "g2c1u6", "S-EXP-SOLVE", genSolveOni) },
   ],
 };

@@ -13,6 +13,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import MonsterSprite from "../components/MonsterSprite.jsx";
 import Avatar from "../components/Avatar.jsx";
 import HeroImg from "../components/HeroImg.jsx";
+import AttackOrbFx from "../components/AttackOrbFx.jsx";
+import UltimateCutIn from "../components/UltimateCutIn.jsx";
+import FxSpeedToggle from "../components/FxSpeedToggle.jsx";
 import { heroImageFor } from "../data/heroes.js";
 import { BigWord, StarField } from "../components/Decorations.jsx";
 import MathText from "../components/MathText.jsx";
@@ -30,6 +33,7 @@ import {
 import { chapterSkillTier } from "../data/chapterSkills.js";
 import { findItem, itemSummary } from "../data/items.js";
 import { findUltimate, ultimateMult } from "../data/ultimates.js";
+import { getFxSpeed, setFxSpeed } from "../engine/fxSpeed.js";
 
 // 敵の通常攻撃・連続攻撃の各発は20%の確率でかわせる（ため攻撃・必殺技は対象外＝必ず当たる）
 const DODGE_CHANCE = 0.2;
@@ -115,6 +119,9 @@ export default function TurnBattle({
   const [hurt, setHurt] = useState(false);
   const [heroAtk, setHeroAtk] = useState(false);
   const [charging, setCharging] = useState(false);
+  const [attackFx, setAttackFx] = useState(null);
+  const [ultimateCutIn, setUltimateCutIn] = useState(null);
+  const [fxSpeed, setCurrentFxSpeed] = useState(() => getFxSpeed());
   const [enemyIntent, setEnemyIntent] = useState(null); // { text, color }
   const [enemyFx, setEnemyFx] = useState(null);         // { icon, label, color }
   const [skillFx, setSkillFx] = useState(null);         // { name, icon, color, big }
@@ -138,6 +145,11 @@ export default function TurnBattle({
   const tallyRef = useRef({ correct: 0, wrong: 0 });
   const bpDeltaRef = useRef(0);          // このバトル中の正解-不正解の差分（companion戦のBP増減用）
   const inputRef = useRef(null);
+  const heroAnchorRef = useRef(null);
+  const monsterAnchorRef = useRef(null);
+  const attackFxIdRef = useRef(0);
+  const attackImpactRef = useRef(null);
+  const launchUltimateAttackRef = useRef(null);
   // プレイヤーの状態異常・バフ
   const sleepRef = useRef(0);            // 睡眠 残ターン
   const poisonRef = useRef(0);           // 毒 残ターン
@@ -172,6 +184,18 @@ export default function TurnBattle({
     onDex?.(monster.id, { moves: { ...dexMovesRef.current }, defeated: !!defeated });
   }
   const setTimerBoth = (v) => { timerRef.current = v; setTimer(v); };
+  function playAttackOrb(options, impact) {
+    const id = ++attackFxIdRef.current;
+    attackImpactRef.current = impact;
+    setAttackFx({ id, ...options });
+  }
+  function handleAttackImpact(id) {
+    if (id !== attackFxIdRef.current || endedRef.current) return;
+    const impact = attackImpactRef.current;
+    attackImpactRef.current = null;
+    impact?.();
+  }
+  function changeFxSpeed(speed) { setCurrentFxSpeed(setFxSpeed(speed)); }
   function changeSp(nv) {
     const v = Math.max(0, Math.min(TURN_SP_MAX, nv));
     spRef.current = v; setSp(v); onSpChange?.(v);
@@ -358,7 +382,9 @@ export default function TurnBattle({
       setTimeout(() => { if (!endedRef.current) enemyPhase(); }, 800);
       return;
     }
-    if (isUlt) { sfx.skill({ ult: true }); setSkillFx({ name: ultimateDef.name, icon: ultimateDef.icon, color: ultimateDef.color || "#f472b6", big: true }); setTimeout(() => setSkillFx(null), 1400); }
+    if (isUlt) sfx.skill({ ult: true });
+    setHeroAtk(true); setTimeout(() => setHeroAtk(false), 340);
+    const launchAttack = () => playAttackOrb({ strong: isUlt || dmg >= baseDmg * 2 }, () => {
     setMonState("damage"); setAnimKey((k) => k + 1);
     setMonDmg(`-${dmg}`); setDmgKey((k) => k + 1);
     setLog(isUlt ? `${ultimateDef.icon} ${ultimateDef.name}さくれつ！ ${dmg}ダメージ！` : `⚔️ こうげき！ ${dmg}ダメージ！`);
@@ -388,6 +414,9 @@ export default function TurnBattle({
     if (nv <= 0) { setTimeout(triggerWin, 700); return; }
     checkBossPhase(nv);
     setTimeout(() => { setMonState("idle"); if (!endedRef.current) enemyPhase(); }, 800);
+    });
+    if (isUlt) { launchUltimateAttackRef.current = launchAttack; setUltimateCutIn({ id: Date.now(), def: ultimateDef }); return; }
+    launchAttack();
   }
 
   function applySkill(skill) {
@@ -721,16 +750,17 @@ export default function TurnBattle({
   if (phase === "win" || phase === "lose") {
     const win = phase === "win";
     return (
-      <div className="battle-app">
+    <div className={`battle-app fx-${fxSpeed}`}>
+      <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
         <StarField /><div className="bt-moon" /><div className="battle-ground" />
-        <div className="battle-content" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-          <div style={{ fontSize: 64 }}>{win ? "🎉" : "💀"}</div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: win ? "#7fff7f" : "#ff6b6b", textShadow: win ? "0 0 18px #00ff88" : "none" }}>{win ? "勝利！" : "敗北…"}</div>
-          <div style={{ fontSize: 13, color: "#cceebb", margin: "6px 0 14px" }}>{win ? `${monster.name} をたおした！ 💰+${monster.reward} を獲得！` : `${monster.name} に やられてしまった…`}</div>
+        <div className="battle-content battle-result" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+          {win && <><div className="victory-confetti" aria-hidden>{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</div><div className="victory-banner">VICTORY<span>MISSION CLEAR</span></div></>}
+          <div className="battle-result__icon">{win ? "✦" : "☠"}</div><div className="battle-result__title">{win ? "勝利！" : "敗北…"}</div>
+          <div className="battle-result__text">{win ? `${monster.name} をたおした！ 💰+${monster.reward} を獲得！` : `${monster.name} に やられてしまった…`}</div>
           {win ? (
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="bt-choice" style={{ padding: "12px 18px" }} onClick={onExit}>👾 相手を選ぶ</button>
-              <button className="bt-choice" style={{ padding: "12px 18px", borderColor: "#7fff7f" }} onClick={() => onResult("retry")}>🔁 もう一度</button>
+            <div className="battle-result__actions">
+              <button className="bt-choice" onClick={onExit}>相手を選ぶ</button>
+              <button className="bt-choice is-result-main" onClick={() => onResult("retry")}>もう一度</button>
             </div>
           ) : (<div style={{ fontSize: 13, color: "#cceebb", fontWeight: 700 }}>メニューにもどります…</div>)}
         </div>
@@ -739,7 +769,9 @@ export default function TurnBattle({
   }
 
   return (
-    <div className={"battle-app" + (hurt ? " bt-screen-shake" : "")}>
+    <div className={`battle-app fx-${fxSpeed}` + (hurt ? " bt-screen-shake" : "")}>
+      <FxSpeedToggle speed={fxSpeed} onChange={changeFxSpeed} />
+      {ultimateCutIn && <UltimateCutIn key={ultimateCutIn.id} ultimate={ultimateCutIn.def} heroSrc={heroImageFor(player.avatar)} speed={fxSpeed} onComplete={() => { const launch = launchUltimateAttackRef.current; launchUltimateAttackRef.current = null; setUltimateCutIn(null); launch?.(); }} />}
       <div className="encounter-flash" />
       {phase === "intro" && <BigWord text="START!" color="#7fff7f" onDone={() => { phaseRef.current = "command"; startTurn(); }} />}
       <StarField /><div className="bt-moon" />
@@ -782,11 +814,11 @@ export default function TurnBattle({
 
         {/* 舞台 */}
         <div className="bt-stage">
-          {heroImageFor(player.avatar) && (
-            <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (hurt ? " hit" : "")}
-              style={{ position: "absolute", left: 0, bottom: -8, height: 150, width: "auto", maxWidth: "44%", objectFit: "contain", zIndex: 3, pointerEvents: "none" }} />
-          )}
-          <div className="bt-mon">
+          <div ref={heroAnchorRef} className="bt-hero-anchor">
+            {heroImageFor(player.avatar) && <HeroImg src={heroImageFor(player.avatar)} alt="あなた" className={"bt-hero" + (heroAtk ? " attack" : "") + (hurt ? " hit" : "")}
+              style={{ position: "absolute", left: 0, bottom: -8, height: 150, width: "auto", maxWidth: "44%", objectFit: "contain", zIndex: 3, pointerEvents: "none" }} />}
+          </div>
+          <div ref={monsterAnchorRef} className="bt-mon">
             {charging && <div className="bt-charge-aura" />}
             {monDmg && <div key={dmgKey} className="mon-dmg-num show">{monDmg}</div>}
             {enemyFx && <div className="bt-enemy-fx" style={{ "--ec": enemyFx.color }}><span className="ic">{enemyFx.icon}</span><span className="nm">{enemyFx.label}</span></div>}
@@ -800,6 +832,7 @@ export default function TurnBattle({
               </div>
             )}
           </div>
+          <AttackOrbFx attack={attackFx} sourceRef={heroAnchorRef} targetRef={monsterAnchorRef} onImpact={handleAttackImpact} fxSpeed={fxSpeed} />
         </div>
 
         {/* プレイヤーHP */}
@@ -916,7 +949,7 @@ export default function TurnBattle({
         {/* ===== 問題フェーズ ===== */}
         {phase === "question" && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="bt-timer-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 11, color: "#88aa88" }}>のこり</span>
               <div className="bt-timer-track" style={{ flex: 1 }}>
                 <div className="bt-timer-fill" style={{ width: timePct + "%", background: timePct > 40 ? "#4ade80" : timePct > 20 ? "#fbbf24" : "#f87171" }} />
@@ -954,7 +987,7 @@ export default function TurnBattle({
                 </>
               ) : <div style={{ color: "#cceebb" }}>問題を準備中…</div>}
             </div>
-            <button onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", margin: "8px 0 0", padding: "9px", borderRadius: 11, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#fff", background: showPad ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)" }}>
+            <button className="bt-pad-toggle" onClick={() => setShowPad((v) => !v)} data-sfx="none" style={{ width: "100%", margin: "8px 0 0", padding: "9px", borderRadius: 11, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer", fontSize: 13, fontWeight: 800, color: "#fff", background: showPad ? "rgba(255,255,255,.14)" : "rgba(255,255,255,.06)" }}>
               ✏️ 計算スペース{showPad ? "を閉じる" : "を開く"}
             </button>
             {showPad && <DrawPad key={q ? q.q : "pad"} height={300} />}

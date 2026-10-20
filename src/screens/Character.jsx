@@ -139,7 +139,7 @@ export default function Character({ player, onSetAvatar, onSetName, onBuyHero, o
   );
 
   return (
-    <div className="app">
+    <div className="app legacy-character">
       <Header player={player} back="ホーム" onBack={onBack} />
       <div className="content">
         <div className="pg-ttl">🎨 キャラクター</div>

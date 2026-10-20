@@ -50,7 +50,7 @@ export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPass
   );
 
   return (
-    <div style={{ margin: "0 0 14px", padding: "10px 10px 8px", borderRadius: 14, background: "rgba(99,102,241,.08)", border: "1px solid rgba(99,102,241,.28)" }}>
+    <div className="menu-unit-cycle" style={{ margin: "0 0 14px", padding: "10px 10px 8px", borderRadius: 14, background: "rgba(99,102,241,.08)", border: "1px solid rgba(99,102,241,.28)" }}>
       <div style={{ fontSize: 11.5, fontWeight: 800, color: "#c7d2fe", marginBottom: 8 }}>単元をえらんで、小単元ごとに 講義→ためす→なおす→応用</div>
 
       {/* 章えらび */}
@@ -141,7 +141,7 @@ export default function UnitCycle({ player, grade = 1, cycleMap = {}, haichiPass
             {tame === u.id ? (
               <div style={{ display: "flex", gap: 6 }}>
                 {stepBtn(() => onPractice?.(ch, u), "✏️ れんしゅう", "linear-gradient(135deg,#22c55e,#10b981)", tameC, "じっくり計算して、確実にレベルアップしよう！")}
-                {stepBtn(() => onBattle?.(u), "⚔️ バトル", "linear-gradient(135deg,#ef4444,#b91c1c)", false, "制限時間内にモンスターを倒せるか！？")}
+                {onBattle && stepBtn(() => onBattle(u), "⚔️ バトル", "linear-gradient(135deg,#ef4444,#b91c1c)", false, "制限時間内にモンスターを倒せるか！？")}
                 {stepBtn(() => setTame(null), "← もどる", "rgba(255,255,255,.12)")}
               </div>
             ) : (

@@ -1,0 +1,18 @@
+/* 経験値メーター（バトル後の報酬画面・キャラ詳細で共通） */
+.xm-bar { position: relative; height: 12px; border: 1px solid rgba(223,189,115,.7); background: rgba(3,8,18,.9); overflow: hidden; clip-path: polygon(3% 0,100% 0,97% 100%,0 100%); }
+.xm-fill { height: 100%; background: linear-gradient(90deg,#3aa6ff,#9be7ef 60%,#fff3b0); box-shadow: 0 0 10px rgba(155,231,239,.7); }
+.xm-bar.is-max .xm-fill { background: linear-gradient(90deg,#ffb347,#ffe066,#fff6c8); }
+
+.xm-row { display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid rgba(155,231,239,.3); background: linear-gradient(110deg,rgba(7,13,25,.9),rgba(20,40,66,.7)); text-align: left; }
+.xm-row.is-up { border-color: #ffe066; box-shadow: 0 0 18px rgba(255,224,102,.35); }
+.xm-face { width: 54px; }
+.xm-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.xm-top { display: flex; align-items: baseline; gap: 8px; font-weight: 800; }
+.xm-name { color: #f4eee0; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xm-lv { font-family: 'Cinzel','Shippori Mincho',serif; color: #ffe9b3; font-size: 1rem; letter-spacing: .04em; }
+.xm-gain { margin-left: auto; color: #9be7ef; font-size: .8rem; white-space: nowrap; }
+.xm-barwrap { display: flex; align-items: center; gap: 8px; }
+.xm-barwrap .xm-bar { flex: 1; }
+.xm-lvup { flex: none; font-weight: 900; font-size: .85rem; color: #ffe066; text-shadow: 0 0 8px rgba(255,180,0,.9); animation: xm-pop .5s cubic-bezier(.2,1.6,.4,1) both; white-space: nowrap; }
+.xm-sub { font-size: .7rem; color: #c9d6d8; opacity: .85; }
+@keyframes xm-pop { 0% { transform: scale(.3) rotate(-8deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }

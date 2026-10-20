@@ -21,7 +21,7 @@ export default function Avatar({ avatar, size = 42, onClick, ring = null }) {
     const src = heroImageFor(avatar);
     if (src) {
       return (
-        <div style={{ ...style, background: "linear-gradient(135deg,#1e3a8a,#0ea5e9)" }} onClick={onClick}>
+        <div className="avatar-frame" style={{ ...style, background: "linear-gradient(135deg,#1e3a8a,#0ea5e9)" }} onClick={onClick}>
           <HeroImg src={src} alt={findHero(avatar.id)?.name || "キャラ"}
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 12%" }} />
         </div>
@@ -31,7 +31,7 @@ export default function Avatar({ avatar, size = 42, onClick, ring = null }) {
 
   if (avatar && avatar.type === "image" && avatar.src) {
     return (
-      <div style={{ ...style, background: "#1a1a2e" }} onClick={onClick}>
+      <div className="avatar-frame" style={{ ...style, background: "#1a1a2e" }} onClick={onClick}>
         <img src={avatar.src} alt="キャラ" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
     );
@@ -39,7 +39,7 @@ export default function Avatar({ avatar, size = 42, onClick, ring = null }) {
 
   const t = (avatar && avatar.type === "template" && findAvatarTemplate(avatar.id)) || findAvatarTemplate("penguin");
   return (
-    <div style={{ ...style, background: t.bg }} onClick={onClick}>
+    <div className="avatar-frame" style={{ ...style, background: t.bg }} onClick={onClick}>
       <span style={{ fontSize: Math.round(size * 0.56), lineHeight: 1 }}>{t.emoji}</span>
     </div>
   );

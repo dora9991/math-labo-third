@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASTRA ACADEMY — Enemy Pilot</title>
+  <style>
+    :root { color-scheme: dark; --ink:#07101f; --line:#28445f; --cyan:#93f5ff; --gold:#f7c968; }
+    * { box-sizing:border-box; } body { margin:0; color:#e6f5ff; background:radial-gradient(circle at 50% 0,#152b4b 0,#07101f 55%); font:15px/1.5 system-ui,sans-serif; }
+    main { max-width:1280px; margin:auto; padding:36px 22px 60px; } h1 { margin:0; color:var(--gold); letter-spacing:.06em; } p { color:#b8d3e7; }
+    .legend { display:flex; gap:16px; flex-wrap:wrap; margin:20px 0; } .legend span { border:1px solid var(--line); border-radius:999px; padding:5px 10px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(225px,1fr)); gap:16px; } figure { margin:0; padding:12px; background:rgba(10,23,42,.83); border:1px solid var(--line); border-radius:14px; }
+    .stage { display:grid; place-items:center; min-height:225px; background:conic-gradient(from 45deg,#101c31 25%,#0a1527 0 50%,#101c31 0 75%,#0a1527 0); background-size:24px 24px; border-radius:9px; }
+    .stage img { width:192px; height:192px; object-fit:contain; image-rendering:auto; } figcaption { padding-top:10px; } code { color:var(--cyan); } small { display:block; color:#91adc2; }
+    .actual { margin-top:36px; border-top:1px solid var(--line); padding-top:20px; } .actual-row { display:flex; flex-wrap:wrap; gap:12px; align-items:end; } .actual-row div { width:122px; } .actual-row img { width:96px; height:96px; object-fit:contain; background:#0b1728; }
+  </style>
+</head>
+<body><main>
+  <h1>Enemy Pilot / 512px</h1>
+  <p>透明領域をチェッカーボードに表示。カード内は 192px プレビュー、下部はゲーム想定の実寸96pxです。</p>
+  <div class="legend"><span>黒曜石・深藍</span><span>金・淡シアン</span><span>全身 / 3/4</span><span>床影なし</span></div>
+  <section class="grid" id="grid"></section>
+  <section class="actual"><h2>Actual size / 96px</h2><div class="actual-row" id="actual"></div></section>
+  <script>
+    const cards = [
+      ['m_c1_u1','unit · calc','算術ホムンクルス'],['m_c3_e1','unit · balance','天秤スフィンクス'],['m_c1_u2','unit · prime','結晶ゴーレム'],['m_c5_z2','unit · geo','三角甲虫'],
+      ['boss_c1','chapterBoss · 中1 c1','日食の審判像'],['boss_c4','chapterBoss · 中1 c4','星烏'],['boss_c6','chapterBoss · 中1 c6','観測ドーム亀竜'],['boss_maou_1','finalBoss · 中1','数学の竜王'],
+      ['su_u1','unitSmallBoss','三日月マンティス'],['su_h3','unitSmallBoss','四翼フクロウコウモリ']
+    ];
+    grid.innerHTML = cards.map(([id,type,name]) => `<figure><div class="stage"><img src="${id}.webp" alt="${name}"></div><figcaption><code>${id}</code><small>${type} — ${name}</small></figcaption></figure>`).join('');
+    actual.innerHTML = cards.map(([id,,name]) => `<div><img src="${id}_small.webp" alt="${name}"><small><code>${id}</code></small></div>`).join('');
+  </script>
+</main></body></html>

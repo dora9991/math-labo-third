@@ -18,7 +18,7 @@ import CharBubble, { voice } from "../components/CharBubble.jsx";
 import DrawPad from "../components/DrawPad.jsx";
 import MathText from "../components/MathText.jsx";
 import * as sfx from "../audio/sfx.js";
-import { buildTemplate, makeChoices } from "../engine/generator.js";
+import { buildTemplate, makeChoices, choiceMode } from "../engine/generator.js";
 import { pickNext } from "../engine/selector.js";
 import { isCorrect } from "../engine/scoring.js";
 import { updateMastery, levelDifficulty, INITIAL_MASTERY, THETA } from "../engine/mastery.js";
@@ -76,7 +76,7 @@ export default function StepUp({ player, chapter, onAttempt, onHome, targetSkill
     if (!problem) { setCur(null); return; }
     lastIdRef.current = entry.templateId;
     setCur({ entry, problem });
-    setChoices(makeChoices(problem.ans));
+    setChoices(makeChoices(problem.ans, { mode: choiceMode(problem.id) }));
     setSelected(null);
     setLocked(false);
     setFb(null);
@@ -218,8 +218,8 @@ export default function StepUp({ player, chapter, onAttempt, onHome, targetSkill
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <div style={{ flex: 1, background: "rgba(255,255,255,.05)", borderRadius: 10, padding: "10px 4px" }}>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24" }}>+{result.points}</div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)" }}>獲得ポイント</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24" }}>{result.correct}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,.45)" }}>せいかい</div>
               </div>
               <div style={{ flex: 1, background: "rgba(255,255,255,.05)", borderRadius: 10, padding: "10px 4px" }}>
                 <div style={{ fontSize: 20, fontWeight: 900, color: "#4ade80" }}>{result.improved.length}</div>

@@ -141,6 +141,26 @@ function genOniC(r) {
   return { q: `生徒 ${base} 人から ${n} 人を選ぶと読書する人が ${kA} 人いて、そのうち毎日読む人は ${pctB}％でした。学校全体で毎日読む生徒はおよそ何人と推定できますか。`, ans: est, choices: numChoices(est, r, [readers, kA, base * pctB / 100]), h1: "全体の読書人数を推定し、さらにその割合をかける", h2: `読書≈${base}×(${kA}/${n})=${readers}、毎日=その${pctB}％=${est}` };
 }
 
+// ── 2026-09-30：用語・判断にも難易度の差をつける ──
+// 用語の応用（難しい）：具体的な場面で「母集団・標本・大きさ」を答える
+const SCENES = [["全校生徒", "人", "睡眠時間"], ["ある工場でつくった電池", "個", "使える時間"], ["ある市の中学生", "人", "通学時間"], ["池にいる魚", "匹", "体長"]];
+function genTermApplied(r) {
+  const [who, unit, what] = rpick(r, SCENES), N = rpick(r, [300, 500, 600, 800, 1200]), n = rpick(r, [30, 40, 50, 60]);
+  const t = r(0, 2);
+  const lead = `${who}${N}${unit}の中から${n}${unit}を無作為に選んで、${what}を調べた。`;
+  if (t === 0) return { q: `${lead}このときの母集団の大きさを答えなさい。`, ans: `${N}${unit}`, choices: exprChoices(`${N}${unit}`, [`${n}${unit}`, `${N - n}${unit}`, `${N + n}${unit}`], [], r), h1: "母集団＝調べたいもの全体", h2: "母集団の大きさ＝全体の数" };
+  if (t === 1) return { q: `${lead}このときの標本の大きさを答えなさい。`, ans: `${n}${unit}`, choices: exprChoices(`${n}${unit}`, [`${N}${unit}`, `${N - n}${unit}`, `${n * 2}${unit}`], [], r), h1: "標本＝実際に選んで調べた一部", h2: "標本の大きさ＝選んだ数" };
+  return { q: `${lead}このとき、標本にあたるものはどれですか。`, ans: `選んだ${n}${unit}`, choices: exprChoices(`選んだ${n}${unit}`, [`${who}${N}${unit}`, `${what}`, `選ばれなかった${N - n}${unit}`], [], r), h1: "標本＝母集団から取り出した一部分", h2: `選んだ${n}${unit}が標本` };
+}
+// 判断の理由（難しい）
+const REASONS = { break: "調べると製品がこわれたり、使えなくなったりするから", cost: "全部を調べると、時間や費用がかかりすぎるから", exact: "全員について、もれなく正確に調べる必要があるから", wrong: "標本調査の方が、全数調査より必ず正確だから" };
+const REASON_ITEMS = [["電球の寿命の検査", "標本調査", "break"], ["缶詰の品質検査", "標本調査", "break"], ["花火の品質検査", "標本調査", "break"], ["テレビ番組の視聴率調査", "標本調査", "cost"], ["新聞の世論調査", "標本調査", "cost"], ["学校の健康診断", "全数調査", "exact"], ["高校の入学試験", "全数調査", "exact"], ["国勢調査", "全数調査", "exact"]];
+function genReason(r) {
+  const [item, kind, key] = rpick(r, REASON_ITEMS), ans = REASONS[key];
+  const ds = Object.entries(REASONS).filter(([k]) => k !== key).map(([, v]) => v);
+  return { q: `「${item}」を${kind}で行う理由として、もっとも適切なものはどれですか。`, ans, choices: exprChoices(ans, ds, [], r), h1: "こわしてしまう？ 手間がかかりすぎる？ 全員を正確に調べる必要がある？", h2: `答えは「${ans}」` };
+}
+
 export const chapter = {
   id: "g3c8",
   name: "標本調査",
@@ -152,9 +172,10 @@ export const chapter = {
       id: "g3c8u1", name: "標本調査の用語", emoji: "📖", desc: "母集団・標本など",
       problems: {
         // 既存 termTemplates(5) ＋ 追加 termTemplates2(5) で各10
-        easy: [...termTemplates("S-SAMP-TERM", "g3c8u1et"), ...termTemplates2("S-SAMP-TERM", "g3c8u1ea")],
-        standard: [...termTemplates("S-SAMP-TERM", "g3c8u1st"), ...termTemplates2("S-SAMP-TERM", "g3c8u1sa")],
-        advanced: [...termTemplates("S-SAMP-TERM", "g3c8u1at"), ...termTemplates2("S-SAMP-TERM", "g3c8u1aa")],
+        // 簡単＝基本の用語5つ／普通＝用語をもう5つ＋基本の復習／難しい＝具体的な場面で母集団・標本を答える
+        easy: [...termTemplates("S-SAMP-TERM", "g3c8u1et"), ...termTemplates("S-SAMP-TERM", "g3c8u1ex")],
+        standard: [...termTemplates2("S-SAMP-TERM", "g3c8u1sa"), ...termTemplates("S-SAMP-TERM", "g3c8u1st")],
+        advanced: rep("g3c8u1ap", 10, genTermApplied, "S-SAMP-TERM"),
         // 鬼：用語の応用（標本比の確認5 ＋ 区別の難判断5）
         oni: [...rep("g3c8u1o", 5, genRatio, "S-SAMP-RATIO"), ...rep("g3c8u1oj", 5, genJudge2, "S-SAMP-JUDGE")],
       },
@@ -163,9 +184,10 @@ export const chapter = {
       id: "g3c8u2", name: "全数調査と標本調査の判断", emoji: "🔍", desc: "どちらが適切か",
       problems: {
         // 既存1 ＋ 追加9（genJudge と genJudge2 を混ぜる）で各10
-        easy: [p("g3c8u2e", genJudge, "S-SAMP-JUDGE"), ...rep("g3c8u2ex", 5, genJudge, "S-SAMP-JUDGE"), ...rep("g3c8u2ej", 4, genJudge2, "S-SAMP-JUDGE")],
-        standard: [p("g3c8u2s", genJudge, "S-SAMP-JUDGE"), ...rep("g3c8u2sx", 5, genJudge2, "S-SAMP-JUDGE"), ...rep("g3c8u2sr", 4, genRatio, "S-SAMP-RATIO")],
-        advanced: [p("g3c8u2a", genJudge, "S-SAMP-JUDGE"), ...rep("g3c8u2ax", 5, genJudge2, "S-SAMP-JUDGE"), ...rep("g3c8u2ar", 4, genRatio, "S-SAMP-RATIO")],
+        // 簡単＝よく出る例で判断／普通＝ほかの例で判断／難しい＝その調査方法を選ぶ理由
+        easy: [p("g3c8u2e", genJudge, "S-SAMP-JUDGE"), ...rep("g3c8u2ex", 9, genJudge, "S-SAMP-JUDGE")],
+        standard: [p("g3c8u2s", genJudge2, "S-SAMP-JUDGE"), ...rep("g3c8u2sx", 9, genJudge2, "S-SAMP-JUDGE")],
+        advanced: rep("g3c8u2ar", 10, genReason, "S-SAMP-JUDGE"),
         // 鬼：判断＋標本比の総合
         oni: [...rep("g3c8u2o", 5, genJudge2, "S-SAMP-JUDGE"), ...rep("g3c8u2or", 5, genRatio, "S-SAMP-RATIO")],
       },

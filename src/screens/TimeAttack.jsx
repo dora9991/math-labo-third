@@ -23,7 +23,7 @@ import { monsterImageUrl } from "../data/monsterImages.js";
 import { pickHitCheer, pickMissCheer, pickKillCheer } from "../data/cheers.js";
 import * as bgm from "../audio/bgm.js";
 import * as sfx from "../audio/sfx.js";
-import { genProblemSeeded, makeChoices, isHardProblem } from "../engine/generator.js";
+import { genProblemSeeded, makeChoices, choiceMode, isHardProblem } from "../engine/generator.js";
 import { calcStars, timeAttackXp, timeAttackCoins, timeAttackCrystal, timeAttackStreakBonus, isCorrect, parseAnswer, STAR_TARGET, XP_PER_CORRECT, XP_PENALTY_PER_WRONG, xpRepeatMultiplier } from "../engine/scoring.js";
 
 // 選択肢・正誤判定のヘルパー
@@ -31,7 +31,7 @@ import { calcStars, timeAttackXp, timeAttackCoins, timeAttackCrystal, timeAttack
 //  choices が無い＝数値問題 → makeChoices で4択を作り、isCorrect で数値照合。
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 const hasChoices = (q) => Array.isArray(q.choices) && q.choices.length > 0;
-const choicesFor = (q) => hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans);
+const choicesFor = (q) => hasChoices(q) ? shuffle([...q.choices]) : makeChoices(q.ans, { mode: choiceMode(q.id) });
 const ansEq = (val, q) => hasChoices(q) ? String(val).replace(/\s/g, "") === String(q.ans).replace(/\s/g, "") : isCorrect(val, q.ans);
 import { getStars } from "../engine/progress.js";
 
@@ -284,21 +284,10 @@ export default function TimeAttack({ player, chapter, unit, level, onComplete, o
               {!weak && <div style={{ marginTop: 7 }}><Stars count={stars} size={24} /></div>}
               {summary && (
                 <div style={{ marginTop: 9 }}>
-                  <span className="xp-pill">✨ +{summary.xp} XP</span>
-                  {summary.coins > 0 && (
-                    <span className="xp-pill" style={{ marginLeft: 6, background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#3a2a00" }}>
-                      💰 +{summary.coins} コイン
-                    </span>
-                  )}
                   {summary.crystal > 0 && (
                     <span className="xp-pill" style={{ marginLeft: 6, background: "linear-gradient(135deg,#22d3ee,#67e8f9)", color: "#063b44" }}>
                       💎 +{summary.crystal} クリスタル
                     </span>
-                  )}
-                  {summary.dailyBonus > 0 && (
-                    <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 800, marginTop: 5 }}>
-                      🎁 今日の初クリアボーナス +{summary.dailyBonus}XP！
-                    </div>
                   )}
                   {!weak && summary.crystal === 0 && (
                     <div style={{ fontSize: 11, color: "#0e7490", fontWeight: 700, marginTop: 5 }}>

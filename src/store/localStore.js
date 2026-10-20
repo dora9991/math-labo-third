@@ -14,18 +14,20 @@
 // 将来サーバー保存にするときは、同じ関数名で supabase 版を作り、import 先を差し替える。
 // ============================================================
 import { getOrCreateLocalStudentId, initialPlayerState, normalizePlayerState } from "./recordSchema.js";
-import { getActiveUid } from "../auth/session.js";
+import { getActiveUid, isGuest, guestMem } from "../auth/session.js";
 
-// 保存キー。ログイン中はユーザーidで分ける（同じ端末で複数人が別々の進捗を持てる）。
+// 保存キー（数学ラボ2とは別。GitHub Pagesは同じドメインを共有するため、キーが同じだと進捗が混ざる）。ログイン中はユーザーidで分ける（同じ端末で複数人が別々の進捗を持てる）。
 //  認証OFF/未ログインは従来の共通キー（後方互換で既存データを引き継ぐ）。
-const BASE = "mathApp2_data_v1";
+const BASE = "mathApp3_data_v1";
 const KEY = () => { const u = getActiveUid(); return u ? `${BASE}__${u}` : BASE; };
 const BAK = () => `${KEY()}_bak`; // 自動バックアップ（前回保存時の中身）
 
 function safeGet(k) {
+  if (isGuest()) return guestMem().get(k) ?? null; // ゲストはメモリのみ（データは残らない）
   try { return localStorage.getItem(k); } catch { return null; }
 }
 function safeSet(k, v) {
+  if (isGuest()) { guestMem().set(k, v); return true; }
   try { localStorage.setItem(k, v); return true; } catch (e) { console.warn("保存に失敗:", e); return false; }
 }
 

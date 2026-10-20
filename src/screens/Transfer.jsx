@@ -26,7 +26,7 @@ export default function Transfer({ player, onImportFile, onSkip }) {
 
   if (phase === "done") {
     return (
-      <div className="app">
+      <div className="app legacy-transfer">
         <div className="content" style={{ display: "flex", minHeight: "70vh", alignItems: "center", justifyContent: "center" }}>
           <div className="glass" style={{ padding: 24, textAlign: "center", maxWidth: 420 }}>
             <div style={{ fontSize: 50 }}>🎉</div>
@@ -46,7 +46,7 @@ export default function Transfer({ player, onImportFile, onSkip }) {
   }
 
   return (
-    <div className="app">
+    <div className="app legacy-transfer">
       <div className="content" style={{ display: "flex", minHeight: "78vh", alignItems: "center", justifyContent: "center" }}>
         <div className="glass" style={{ padding: 24, maxWidth: 460 }}>
           <div style={{ textAlign: "center" }}>
